@@ -1088,6 +1088,7 @@ function App() {
           placeholder="Ejemplo: 2"
           value={cantidadMovimiento}
           onChange={(e) => setCantidadMovimiento(e.target.value)}
+          onWheel={(e) => e.target.blur()}
           style={{
             width: "350px",
             maxWidth: "100%",
@@ -1504,6 +1505,7 @@ function App() {
           value={precio}
           min="0"
           onChange={(e) => setPrecio(e.target.value)}
+          onWheel={(e) => e.target.blur()}
           style={{
             width: "350px",
             maxWidth: "100%",
@@ -1524,6 +1526,7 @@ function App() {
           value={precioVenta}
           min="0"
           onChange={(e) => setPrecioVenta(e.target.value)}
+          onWheel={(e) => e.target.blur()}
           style={{
             width: "350px",
             maxWidth: "100%",
@@ -1545,6 +1548,7 @@ function App() {
               value={stock}
               min="0"
               onChange={(e) => setStock(e.target.value)}
+              onWheel={(e) => e.target.blur()}
               style={{
                 width: "350px",
                 maxWidth: "100%",
