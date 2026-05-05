@@ -19,6 +19,11 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    costoEnvio: {
+      type: Number,
+      default: 0,
+    },
+
     precioVenta: {
       type: Number,
       required: true,
@@ -29,6 +34,11 @@ const productSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+
+    stockMinimo: {
+      type: Number,
+      default: 5,
     },
 
     user: {

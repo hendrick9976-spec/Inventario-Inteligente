@@ -26,8 +26,10 @@ function App() {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [precio, setPrecio] = useState("");
+  const [costoEnvio, setCostoEnvio] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
   const [stock, setStock] = useState("");
+  const [stockMinimo, setStockMinimo] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [productoReposicionId, setProductoReposicionId] = useState("");
   const [cantidadReposicion, setCantidadReposicion] = useState("");
@@ -183,8 +185,15 @@ function App() {
       return;
     }
 
-    if (Number(precioVenta) < Number(precio)) {
-      alert("El precio de venta no puede ser menor que el costo del producto");
+    if (costoEnvio !== "" && Number(costoEnvio) < 0) {
+      alert("El costo de envío/manejo debe ser mayor o igual a 0");
+      return;
+    }
+
+    const costoTotalUnitario = Number(precio) + Number(costoEnvio || 0);
+
+    if (Number(precioVenta) < costoTotalUnitario) {
+      alert("El precio de venta no puede ser menor que el costo total unitario");
       return;
     }
 
@@ -202,7 +211,9 @@ function App() {
           nombre,
           descripcion,
           precio: Number(precio),
+          costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
+          stockMinimo: Number(stockMinimo || 0),
         }),
       });
 
@@ -224,8 +235,10 @@ function App() {
           nombre,
           descripcion,
           precio: Number(precio),
+          costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
           stock: Number(stock),
+          stockMinimo: Number(stockMinimo || 0),
         }),
       });
     }
@@ -233,8 +246,10 @@ function App() {
     setNombre("");
     setDescripcion("");
     setPrecio("");
+    setCostoEnvio("");
     setPrecioVenta("");
     setStock("");
+    setStockMinimo("");
 
     obtenerProductos();
   };
@@ -267,8 +282,10 @@ function App() {
     setNombre("");
     setDescripcion("");
     setPrecio("");
+    setCostoEnvio("");
     setPrecioVenta("");
     setStock("");
+    setStockMinimo("");
     setEditandoId(null);
     setSeccionActiva("inventario");
   };
@@ -509,7 +526,10 @@ function App() {
       const stockProducto = Number(producto.stock);
 
       if (filtroStock === "bajo") {
-        return coincideBusqueda && stockProducto <= 5;
+        return (
+          coincideBusqueda && 
+          stockProducto <= Number(producto.stockMinimo || 5)
+        );
       }
 
       if (filtroStock === "agotado") {
@@ -549,18 +569,28 @@ function App() {
   );
 
   const stockBajo = productos.filter(
-    (producto) => Number(producto.stock) <= 5
+    (producto) => Number(producto.stock) <= Number(producto.stockMinimo || 5)
   ).length;
 
-  const valorInventario = productos.reduce(
+  const valorInvertidoInventario = productos.reduce(
     (total, producto) =>
-      total + Number(producto.precio) * Number(producto.stock),
+      total +
+      (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) *
+        Number(producto.stock || 0),
     0
   );
 
-  const productosAgotados = productos.filter(
-    (producto) => Number(producto.stock) === 0
-  ).length;
+  const valorPotencialVenta = productos.reduce(
+    (total, producto) =>
+      total + Number(producto.precioVenta || 0) * Number(producto.stock || 0),
+    0
+  );
+
+  const utilidadPotencialInventario =
+    valorPotencialVenta - valorInvertidoInventario;
+    const productosAgotados = productos.filter(
+      (producto) => Number(producto.stock) === 0
+    ).length;
 
   const productoPrioritario = productos.length > 0
     ? [...productos].sort(
@@ -578,7 +608,7 @@ function App() {
     alertas.push(`⚠️ ${stockBajo} producto(s) con stock bajo. Conviene revisar reposición.`);
   }
 
-  if (productoPrioritario && Number(productoPrioritario.stock) <= 5) {
+  if (productoPrioritario && Number(productoPrioritario.stock) <= Number(productoPrioritario.stockMinimo || 5)) {
     alertas.push(
       `📌 Prioridad de reposición: ${productoPrioritario.nombre} tiene solo ${productoPrioritario.stock} unidad(es).`
     );
@@ -723,17 +753,23 @@ function App() {
       0
     );
 
-    if (totalVendido >= 10 && Number(producto.stock) <= 5) {
+    if (
+      totalVendido >= 10 &&
+      Number(producto.stock) <= Number(producto.stockMinimo || 5)
+    ) {
       recomendaciones.push({
         tipo: "critico",
         mensaje: `${producto.nombre}: alta demanda y bajo stock. Reposición urgente.`,
       });
     }
 
-    if (totalVendido === 0) {
+    const diasDesdeCreacion =
+      (new Date() - new Date(producto.createdAt)) / (1000 * 60 * 60 * 24);
+
+    if (totalVendido === 0 && diasDesdeCreacion >= 7) {
       recomendaciones.push({
         tipo: "medio",
-        mensaje: `${producto.nombre}: sin ventas registradas. Revisar estrategia.`,
+        mensaje: `${producto.nombre}: lleva 7 días o más sin ventas. Revisar estrategia.`,
       });
     }
 
@@ -990,12 +1026,49 @@ function App() {
           }}
         >
           <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
-            Valor del inventario
+            Valor invertido
           </p>
           <h2 style={{ margin: "8px 0 0", color: "#222" }}>
-            ${valorInventario.toFixed(2)}
+            ${valorInvertidoInventario.toFixed(2)}
           </h2>
-        </div>      
+        </div>
+
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "18px",
+            borderRadius: "12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+            Valor potencial de venta
+          </p>
+          <h2 style={{ margin: "8px 0 0", color: "#222" }}>
+            ${valorPotencialVenta.toFixed(2)}
+          </h2>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "18px",
+            borderRadius: "12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+            Utilidad potencial
+          </p>
+          <h2
+            style={{
+              margin: "8px 0 0",
+              color: utilidadPotencialInventario >= 0 ? "#198754" : "#dc3545",
+            }}
+          >
+            ${utilidadPotencialInventario.toFixed(2)}
+          </h2>
+        </div> 
       </div>
 
       <div
@@ -1032,7 +1105,7 @@ function App() {
           display:
           seccionActiva === "inicio" &&
           productoPrioritario &&
-          Number(productoPrioritario.stock) <= 5
+          Number(productoPrioritario.stock) <= Number(productoPrioritario.stockMinimo || 5)
             ? "block"
             : "none",
           backgroundColor: "white",
@@ -1613,6 +1686,28 @@ function App() {
         <br /><br />
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+          Costo de envío/manejo por unidad
+        </p>
+
+        <input
+          type="number"
+          placeholder="Ejemplo: 15"
+          value={costoEnvio}
+          min="0"
+          onChange={(e) => setCostoEnvio(e.target.value)}
+          onWheel={(e) => e.target.blur()}
+          style={{
+            width: "350px",
+            maxWidth: "100%",
+            padding: "12px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            fontSize: "16px",
+          }}
+        />
+        <br /><br />
+
+        <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Precio de venta
         </p>
         <input
@@ -1631,6 +1726,44 @@ function App() {
             fontSize: "16px",
           }}
         />
+
+        {precio !== "" && precioVenta !== "" && (
+          <div
+            style={{
+              backgroundColor:
+                Number(precioVenta) < Number(precio) + Number(costoEnvio || 0)
+                  ? "#f8d7da"
+                  : "#e7f1ff",
+              color:
+                Number(precioVenta) < Number(precio) + Number(costoEnvio || 0)
+                  ? "#842029"
+                  : "#084298",
+              padding: "12px",
+              borderRadius: "10px",
+              marginBottom: "15px",
+              fontWeight: "600",
+            }}
+          >
+            <p style={{ margin: "0 0 6px" }}>
+              Costo del producto por unidad: ${Number(precio || 0).toFixed(2)}
+            </p>
+
+            <p style={{ margin: "0 0 6px" }}>
+              Costo de envío/manejo por unidad: ${Number(costoEnvio || 0).toFixed(2)}
+            </p>
+
+            <p style={{ margin: "0 0 6px" }}>
+              Costo total unitario: $
+              {(Number(precio || 0) + Number(costoEnvio || 0)).toFixed(2)}
+            </p>
+
+            <p style={{ margin: 0 }}>
+              Utilidad estimada por unidad: $
+              {(Number(precioVenta || 0) -
+                (Number(precio || 0) + Number(costoEnvio || 0))).toFixed(2)}
+            </p>
+          </div>
+        )}
 
         {!editandoId && (
           <>
@@ -1656,6 +1789,28 @@ function App() {
             <br /><br />
           </>
         )}
+
+        <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+          Stock mínimo recomendado
+        </p>
+
+        <input
+          type="number"
+          placeholder="Ejemplo: 5"
+          value={stockMinimo}
+          min="0"
+          onChange={(e) => setStockMinimo(e.target.value)}
+          onWheel={(e) => e.target.blur()}
+          style={{
+            width: "350px",
+            maxWidth: "100%",
+            padding: "12px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            fontSize: "16px",
+          }}
+        />
+        <br /><br />
 
         <button
           type="submit"
@@ -1884,7 +2039,9 @@ function App() {
             <tr>
               <th style={{ padding: "10px" }}>Nombre</th>
               <th style={{ padding: "10px" }}>Descripción</th>
-              <th style={{ padding: "10px" }}>Costo</th>
+              <th style={{ padding: "10px" }}>Costo de compra</th>
+              <th style={{ padding: "10px" }}>Envío/manejo</th>
+              <th style={{ padding: "10px" }}>Costo total</th>
               <th style={{ padding: "10px" }}>Precio de venta</th>
               <th style={{ padding: "10px" }}>Stock</th>
               <th style={{ padding: "10px" }}>Recomendación</th>
@@ -1895,7 +2052,7 @@ function App() {
             {productosFiltrados.length === 0 ? (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan="9"
                   style={{
                     padding: "20px",
                     textAlign: "center",
@@ -1919,6 +2076,14 @@ function App() {
                   </td>
 
                   <td style={{ padding: "10px", textAlign: "center" }}>
+                    ${Number(producto.costoEnvio || 0).toFixed(2)}
+                  </td>
+
+                  <td style={{ padding: "10px", textAlign: "center" }}>
+                    ${(Number(producto.precio || 0) + Number(producto.costoEnvio || 0)).toFixed(2)}
+                  </td>
+
+                  <td style={{ padding: "10px", textAlign: "center" }}>
                     ${Number(producto.precioVenta || 0).toFixed(2)}
                   </td>
 
@@ -1926,8 +2091,8 @@ function App() {
                     style={{
                       padding: "10px",
                       textAlign: "center",
-                      color: Number(producto.stock) <= 5 ? "#dc3545" : "#222",
-                      fontWeight: Number(producto.stock) <= 5 ? "700" : "400",
+                      color: Number(producto.stock) <= Number(producto.stockMinimo || 5) ? "#dc3545" : "#222",
+                      fontWeight: Number(producto.stock) <= Number(producto.stockMinimo || 5) ? "700" : "400",
                     }}
                   >
                     {producto.stock}
@@ -1936,7 +2101,7 @@ function App() {
                   <td style={{ padding: "10px", textAlign: "center", fontWeight: "600" }}>
                     {Number(producto.stock) === 0
                       ? "🚫 Reponer inmediatamente"
-                      : Number(producto.stock) <= 5
+                      : Number(producto.stock) <= Number(producto.stockMinimo || 5)
                       ? "⚠️ Stock bajo"
                       : "✅ Stock suficiente"}
                   </td>
@@ -1947,8 +2112,10 @@ function App() {
                         setNombre(producto.nombre);
                         setDescripcion(producto.descripcion || "");
                         setPrecio(producto.precio);
+                        setCostoEnvio(producto.costoEnvio || "");
                         setPrecioVenta(producto.precioVenta || "");
                         setStock(producto.stock);
+                        setStockMinimo(producto.stockMinimo || "");
                         setEditandoId(producto._id);
                         setSeccionActiva("registrar");
 

@@ -43,7 +43,7 @@ app.get("/productos", authMiddleware, async (req, res) => {
 // Crear producto
 app.post("/productos", authMiddleware, async (req, res) => {
   try {
-    const { nombre, descripcion, precio, precioVenta, stock } = req.body;
+    const { nombre, descripcion, precio, costoEnvio, precioVenta, stock, stockMinimo } = req.body;
 
     if (
       !nombre ||
@@ -62,8 +62,10 @@ app.post("/productos", authMiddleware, async (req, res) => {
       nombre: nombre.trim(),
       descripcion: descripcion ? descripcion.trim() : "",
       precio: Number(precio),
+      costoEnvio: Number(costoEnvio || 0),
       precioVenta: Number(precioVenta),
       stock: Number(stock),
+      stockMinimo: Number(stockMinimo || 5),
       user: req.user.userId,
     });
 
@@ -108,7 +110,7 @@ app.delete("/productos/:id", authMiddleware, async (req, res) => {
 // Editar producto
 app.put("/productos/:id", authMiddleware, async (req, res) => {
   try {
-    const { nombre, descripcion, precio, precioVenta } = req.body;
+    const { nombre, descripcion, precio, costoEnvio, precioVenta, stockMinimo} = req.body;
 
     if (
       !nombre ||
@@ -130,7 +132,9 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
         nombre: nombre.trim(),
         descripcion: descripcion ? descripcion.trim() : "",
         precio: Number(precio),
+        costoEnvio: Number(costoEnvio || 0),
         precioVenta: Number(precioVenta),
+        stockMinimo: Number(stockMinimo || 5),
       },
       { returnDocument:"after" }
     );
@@ -230,7 +234,8 @@ app.post("/ventas", authMiddleware, async (req, res) => {
     }
 
     const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
-    const costoTotal = Number(producto.precio) * Number(cantidad);
+    const costoUnitarioTotal = Number(producto.precio) + Number(producto.costoEnvio || 0);
+    const costoTotal = costoUnitarioTotal * Number(cantidad);
     const utilidad = ingresoTotal - costoTotal;
 
     const nuevaVenta = new Venta({
