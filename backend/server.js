@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// conexión con la Database
+// conexion la Database
 connectDB();
 
 // Ruta principal
@@ -67,6 +67,17 @@ app.post("/productos", authMiddleware, async (req, res) => {
     });
 
     await nuevoProducto.save();
+
+    const reposicionInicial = new Reposicion({
+      productoId: nuevoProducto._id,
+      nombreProducto: nuevoProducto.nombre,
+      cantidad: Number(stock),
+      stockAntes: 0,
+      stockDespues: Number(stock),
+      user: req.user.userId,
+    });
+
+    await reposicionInicial.save();
 
     res.status(201).json(nuevoProducto);
   } catch (error) {

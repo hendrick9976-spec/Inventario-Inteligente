@@ -28,6 +28,9 @@ function App() {
   const [precioVenta, setPrecioVenta] = useState("");
   const [stock, setStock] = useState("");
   const [editandoId, setEditandoId] = useState(null);
+  const [productoReposicionId, setProductoReposicionId] = useState("");
+  const [cantidadReposicion, setCantidadReposicion] = useState("");
+  const [modoRegistro, setModoRegistro] = useState("nuevo");
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState("");
   const [filtroStock, setFiltroStock] = useState("todos");
@@ -330,6 +333,49 @@ function App() {
     }
   };
 
+  const guardarReposicion = async () => {
+    if (!productoReposicionId) {
+      alert("Selecciona un producto para reponer");
+      return;
+    }
+
+    if (cantidadReposicion === "" || Number(cantidadReposicion) <= 0) {
+      alert("La cantidad a reponer debe ser mayor a 0");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/productos/${productoReposicionId}/reponer`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cantidad: Number(cantidadReposicion),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Error al reponer inventario");
+        return;
+      }
+
+      alert("Inventario repuesto correctamente");
+
+      setProductoReposicionId("");
+      setCantidadReposicion("");
+
+      obtenerProductos();
+      obtenerReposiciones();
+    } catch (error) {
+      console.error("Error al reponer inventario:", error);
+      alert("Error al reponer inventario");
+    }
+  };
+
   const cancelarMovimiento = () => {
     setProductoMovimientoId("");
     setCantidadMovimiento("");
@@ -539,9 +585,7 @@ function App() {
 
   const stockDespuesMovimiento =
     productoMovimientoSeleccionado && cantidadMovimiento
-      ? tipoMovimiento === "venta"
-        ? Number(productoMovimientoSeleccionado.stock) - Number(cantidadMovimiento)
-        : Number(productoMovimientoSeleccionado.stock) + Number(cantidadMovimiento)
+      ? Number(productoMovimientoSeleccionado.stock) - Number(cantidadMovimiento)
       : null;
 
   const mensajeAlerta =
@@ -760,11 +804,11 @@ function App() {
       >
         {[
           ["inicio", "🏠 Inicio", "top"],
-          ["ventas", "🔄 Movimiento", "zonaVentas"],
+          ["ventas", "🧾 Ventas", "zonaVentas"],          
           ["historial", "📊 Historial", "zonaHistorial"],        
           [
             "registrar",
-            editandoId ? "✏️ Editar producto" : "➕ Registrar",
+            editandoId ? "✏️ Editar producto" : "➕ Registrar / Reponer",
             "formularioProducto"
           ],
           ["inventario", "📦 Inventario", "listaProductos"],
@@ -1025,33 +1069,10 @@ function App() {
         }}
       >
         <h2 style={{ marginTop: 0, color: "#222" }}>
-          {tipoMovimiento === "venta"
-            ? "🧾 Registrar venta"
-            : "📥 Reponer inventario"}
+            🧾 Registrar venta
         </h2>
         <p style={{ color: "#666" }}>
-          Selecciona si deseas registrar una venta o reponer inventario.        </p>
-
-        <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-          Tipo de movimiento
-        </p>
-
-        <select
-          value={tipoMovimiento}
-          onChange={(e) => setTipoMovimiento(e.target.value)}
-          style={{
-            width: "350px",
-            maxWidth: "100%",
-            padding: "12px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            fontSize: "16px",
-            marginBottom: "15px",
-          }}
-        >
-          <option value="venta">Venta</option>
-          <option value="reposicion">Reposición</option>
-        </select>
+          Registra únicamente salidas de inventario por ventas.        </p>
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Producto
@@ -1080,7 +1101,7 @@ function App() {
         </select>
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-          {tipoMovimiento === "venta" ? "Cantidad vendida" : "Cantidad a reponer"}        </p>
+          Cantidad vendida        </p>
 
         <input
           type="number"
@@ -1124,8 +1145,7 @@ function App() {
             </p>
 
             <p style={{ margin: "0 0 6px" }}>
-              {tipoMovimiento === "venta" ? "Cantidad a vender" : "Cantidad a reponer"}:{" "}
-              {cantidadMovimiento}
+              Cantidad a vender:{cantidadMovimiento}
             </p>
 
             <p style={{ margin: 0 }}>
@@ -1148,7 +1168,7 @@ function App() {
             fontWeight: "600",
           }}
         >
-          {tipoMovimiento === "venta" ? "Registrar venta" : "Guardar reposición"}
+          Registrar venta
         </button>
 
         <button
@@ -1460,6 +1480,43 @@ function App() {
         }}
       >
 
+      {!editandoId && (
+        <div style={{ marginBottom: "20px" }}>
+          <button
+            type="button"
+            onClick={() => setModoRegistro("nuevo")}
+            style={{
+              backgroundColor: modoRegistro === "nuevo" ? "#0d6efd" : "white",
+              color: modoRegistro === "nuevo" ? "white" : "#222",
+              border: "1px solid #ddd",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              marginRight: "10px",
+              fontWeight: "600",
+            }}
+          >
+            ➕ Nuevo producto
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setModoRegistro("reposicion")}
+            style={{
+              backgroundColor: modoRegistro === "reposicion" ? "#198754" : "white",
+              color: modoRegistro === "reposicion" ? "white" : "#222",
+              border: "1px solid #ddd",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600",
+            }}
+          >
+            📥 Reponer producto
+          </button>
+        </div>
+      )}
+
       <h2
         id="formularioProducto"
         style={{
@@ -1469,8 +1526,20 @@ function App() {
           fontSize: "22px",
         }}
       >
-        {editandoId ? "✏️ Editar producto" : "➕ Registrar producto"}
+        {editandoId
+          ? "✏️ Editar producto"
+          : modoRegistro === "nuevo"
+          ? "➕ Registrar nuevo producto"
+          : "📥 Reponer inventario"}
       </h2>
+
+      {!editandoId && modoRegistro === "nuevo" && (
+        <p style={{ color: "#666" }}>
+          Registra un producto nuevo en tu inventario.
+        </p>
+      )}
+
+      {(editandoId || modoRegistro === "nuevo") && (
 
       <form
         onSubmit={guardarProducto}
@@ -1599,6 +1668,84 @@ function App() {
           </button>
         )}
       </form>
+      )}
+
+        {!editandoId && modoRegistro === "reposicion" && (
+          <>
+            <hr style={{ margin: "25px 0" }} />
+
+            <p style={{ color: "#666" }}>
+              Agrega unidades a un producto ya registrado.
+            </p>
+
+            <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+              Producto a reponer
+            </p>
+
+            <select
+              value={productoReposicionId}
+              onChange={(e) => setProductoReposicionId(e.target.value)}
+              style={{
+                width: "350px",
+                maxWidth: "100%",
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                fontSize: "16px",
+                marginBottom: "15px",
+              }}
+            >
+              <option value="">Selecciona un producto...</option>
+
+              {productos.map((producto) => (
+                <option key={producto._id} value={producto._id}>
+                  {producto.nombre} — Stock: {producto.stock}
+                </option>
+              ))}
+            </select>
+
+            <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+              Cantidad a reponer
+            </p>
+
+            <input
+              type="number"
+              min="1"
+              placeholder="Ejemplo: 10"
+              value={cantidadReposicion}
+              onChange={(e) => setCantidadReposicion(e.target.value)}
+              onWheel={(e) => e.target.blur()}
+              style={{
+                width: "350px",
+                maxWidth: "100%",
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                fontSize: "16px",
+                marginBottom: "15px",
+              }}
+            />
+
+            <br />
+
+            <button
+              type="button"
+              onClick={guardarReposicion}
+              style={{
+                backgroundColor: "#198754",
+                color: "white",
+                border: "none",
+                padding: "12px 18px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "600",
+              }}
+            >
+              Guardar reposición
+            </button>
+          </>
+      )}
     </div>
 
     <div
