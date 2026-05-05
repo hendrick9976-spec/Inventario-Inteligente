@@ -43,7 +43,7 @@ app.get("/productos", authMiddleware, async (req, res) => {
 // Crear producto
 app.post("/productos", authMiddleware, async (req, res) => {
   try {
-    const { nombre, precio, precioVenta, stock } = req.body;
+    const { nombre, descripcion, precio, precioVenta, stock } = req.body;
 
     if (
       !nombre ||
@@ -60,6 +60,7 @@ app.post("/productos", authMiddleware, async (req, res) => {
 
     const nuevoProducto = new Product({
       nombre: nombre.trim(),
+      descripcion: descripcion ? descripcion.trim() : "",
       precio: Number(precio),
       precioVenta: Number(precioVenta),
       stock: Number(stock),
@@ -77,7 +78,7 @@ app.post("/productos", authMiddleware, async (req, res) => {
       user: req.user.userId,
     });
 
-    await reposicionInicial.save();
+  await reposicionInicial.save();
 
     res.status(201).json(nuevoProducto);
   } catch (error) {
@@ -107,7 +108,7 @@ app.delete("/productos/:id", authMiddleware, async (req, res) => {
 // Editar producto
 app.put("/productos/:id", authMiddleware, async (req, res) => {
   try {
-    const { nombre, precio, precioVenta } = req.body;
+    const { nombre, descripcion, precio, precioVenta } = req.body;
 
     if (
       !nombre ||
@@ -127,6 +128,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
       },
       {
         nombre: nombre.trim(),
+        descripcion: descripcion ? descripcion.trim() : "",
         precio: Number(precio),
         precioVenta: Number(precioVenta),
       },

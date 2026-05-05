@@ -24,6 +24,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [productos, setProductos] = useState([]);
   const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
   const [precio, setPrecio] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
   const [stock, setStock] = useState("");
@@ -199,6 +200,7 @@ function App() {
         },
         body: JSON.stringify({
           nombre,
+          descripcion,
           precio: Number(precio),
           precioVenta: Number(precioVenta),
         }),
@@ -220,6 +222,7 @@ function App() {
         },
         body: JSON.stringify({
           nombre,
+          descripcion,
           precio: Number(precio),
           precioVenta: Number(precioVenta),
           stock: Number(stock),
@@ -228,6 +231,7 @@ function App() {
     }
 
     setNombre("");
+    setDescripcion("");
     setPrecio("");
     setPrecioVenta("");
     setStock("");
@@ -261,6 +265,7 @@ function App() {
 
   const cancelarEdicion = () => {
     setNombre("");
+    setDescripcion("");
     setPrecio("");
     setPrecioVenta("");
     setStock("");
@@ -1566,6 +1571,27 @@ function App() {
         <br /><br />
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+          Descripción del producto
+        </p>
+
+        <textarea
+          placeholder="Ejemplo: Audífonos Bluetooth, marca X, color negro"
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          style={{
+            width: "350px",
+            maxWidth: "100%",
+            padding: "12px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            fontSize: "16px",
+            minHeight: "80px",
+            resize: "vertical",
+          }}
+        />
+        <br /><br />
+
+        <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Costo del producto
         </p>
         <input
@@ -1857,6 +1883,7 @@ function App() {
           <thead>
             <tr>
               <th style={{ padding: "10px" }}>Nombre</th>
+              <th style={{ padding: "10px" }}>Descripción</th>
               <th style={{ padding: "10px" }}>Costo</th>
               <th style={{ padding: "10px" }}>Precio de venta</th>
               <th style={{ padding: "10px" }}>Stock</th>
@@ -1868,7 +1895,7 @@ function App() {
             {productosFiltrados.length === 0 ? (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="7"
                   style={{
                     padding: "20px",
                     textAlign: "center",
@@ -1882,6 +1909,10 @@ function App() {
               productosFiltrados.map((producto) => (
                 <tr key={producto._id}>
                   <td style={{ padding: "10px" , textAlign:"left"}}>{producto.nombre}</td>
+
+                  <td style={{ padding: "10px", textAlign: "left", color: "#555" }}>
+                    {producto.descripcion || "—"}
+                  </td>
 
                   <td style={{ padding: "10px", textAlign: "center" }}>
                     ${Number(producto.precio).toFixed(2)}
@@ -1914,6 +1945,7 @@ function App() {
                     <button
                       onClick={() => {
                         setNombre(producto.nombre);
+                        setDescripcion(producto.descripcion || "");
                         setPrecio(producto.precio);
                         setPrecioVenta(producto.precioVenta || "");
                         setStock(producto.stock);
