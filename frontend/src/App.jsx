@@ -132,6 +132,12 @@ function App() {
         },
       });
       const data = await res.json();
+
+      if (!res.ok) {
+        setProductos([]);
+        return;
+      }
+
       setProductos(data);
     } catch (error) {
       console.error("Error al obtener productos:", error);
@@ -147,6 +153,12 @@ function App() {
       });
 
       const data = await res.json();
+
+      if (!res.ok) {
+        setVentas([]);
+        return;
+      }
+
       setVentas(data);
     } catch (error) {
       console.error("Error al obtener ventas:", error);
@@ -162,6 +174,12 @@ function App() {
       });
 
       const data = await res.json();
+
+      if (!res.ok) {
+        setReposiciones([]);
+        return;
+      }
+
       setReposiciones(data);
     } catch (error) {
       console.error("Error al obtener reposiciones:", error);
@@ -2298,13 +2316,13 @@ function App() {
 
                           <button
                             onClick={() => {
-                              setProductoMovimientoId(producto._id);
-                              setCantidadMovimiento("");
-                              setTipoMovimiento("reposicion");
-                              setSeccionActiva("ventas");
+                              setModoRegistro("reposicion");
+                              setProductoReposicionId(producto._id);
+                              setCantidadReposicion("");
+                              setSeccionActiva("registrar");
 
                               setTimeout(() => {
-                                document.getElementById("zonaVentas")?.scrollIntoView({
+                                document.getElementById("formularioProducto")?.scrollIntoView({
                                   behavior: "smooth",
                                   block: "start",
                                 });
