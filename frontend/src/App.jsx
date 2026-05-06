@@ -2120,30 +2120,37 @@ function App() {
             >
               <thead>
                 <tr>
-                  {[
-                    "Nombre",
-                    "Descripción",
-                    "Costo total",
-                    "Precio venta",
-                    "Utilidad",
-                    "Stock",
-                    "Recomendación",
-                    "Acciones",
-                  ].map((titulo) => (
-                    <th
-                      key={titulo}
-                      style={{
-                        padding: "12px 10px",
-                        backgroundColor: "#f1f3f5",
-                        fontWeight: "700",
-                        fontSize: "13px",
-                        textAlign: "center",
-                        color: "#444",
-                      }}
-                    >
-                      {titulo}
-                    </th>
-                  ))}
+                  <th style={{ width: "160px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Nombre
+                  </th>
+
+                  <th style={{ width: "180px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Descripción
+                  </th>
+
+                  <th style={{ width: "190px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Costo total
+                  </th>
+
+                  <th style={{ width: "140px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Precio venta
+                  </th>
+
+                  <th style={{ width: "120px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Utilidad
+                  </th>
+
+                  <th style={{ width: "100px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Stock
+                  </th>
+
+                  <th style={{ width: "170px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Recomendación
+                  </th>
+
+                  <th style={{ width: "260px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Acciones
+                  </th>
                 </tr>
               </thead>
             </table>
@@ -2157,6 +2164,7 @@ function App() {
               <table
                 style={{
                   width: "100%",
+                  tableLayout: "fixed",
                   borderCollapse: "separate",
                   borderSpacing: 0,
                   backgroundColor: "white",
