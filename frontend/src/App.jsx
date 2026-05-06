@@ -626,7 +626,7 @@ function App() {
   const mensajeAlerta =
     alertas.length > 0
       ? alertas
-      : ["✅ Inventario estable por el momento. No hay productos críticos."];
+      : [];
 
   const ventasFiltradas = ventas
     .filter((venta) => {
@@ -795,9 +795,9 @@ function App() {
     <div
       id = "top"
       style={{
-        maxWidth: "900px",
-        margin: "40px auto",
-        padding: "30px",
+        maxWidth: "1100px",
+        margin: "25px auto",
+        padding: "22px",
         backgroundColor: "#f8f9fa",
         borderRadius: "12px",
         boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
@@ -826,10 +826,9 @@ function App() {
       <h1
         style={{
           color: "#222",
-          marginBottom: "5px",
-          fontSize: "24px",
+          fontSize: "22px",
           fontWeight: "700",
-          marginBottom: "20px",
+          marginBottom: "16px",
         }}
       >
         Panel de Inventario
@@ -857,20 +856,34 @@ function App() {
           <button
             key={clave}
             onClick={() => {
+
+              if (editandoId && clave !== "registrar") {
+                cancelarEdicion();
+              }
+
               setSeccionActiva(clave);
+
               document.getElementById(destino)?.scrollIntoView({
                 behavior: "smooth",
                 block: "start",
               });
             }}
             style={{
-              backgroundColor: seccionActiva === clave ? "#0d6efd" : "white",
+              backgroundColor:
+                seccionActiva === clave
+                  ? clave === "historial" && tipoHistorial === "reposiciones"
+                    ? "#198754"
+                    : clave === "registrar" && modoRegistro === "reposicion"
+                    ? "#198754"
+                    : "#0d6efd"
+                  : "white",
               color: seccionActiva === clave ? "white" : "#222",
               border: "1px solid #ddd",
-              padding: "10px 14px",
+              padding: "8px 12px",
               borderRadius: "8px",
               cursor: "pointer",
               fontWeight: "600",
+              fontSize: "13px",
             }}
           >
             {texto}
@@ -882,9 +895,10 @@ function App() {
         id = "zonaAlertas"
         style={{
           display:
-            seccionActiva === "inicio" || seccionActiva === "alertas"
+            (seccionActiva === "inicio" || seccionActiva === "alertas") &&
+            mensajeAlerta.length > 0
               ? "block"
-              : "none",
+              : "none",          
           backgroundColor:
             productosAgotados > 0 ? "#f8d7da" : stockBajo > 0 ? "#fff3cd" : "#d1e7dd",
           color:
@@ -895,7 +909,8 @@ function App() {
           fontWeight: "600",
         }}
       >
-        {mensajeAlerta.map((mensaje, index) => (
+        {mensajeAlerta.length > 0 &&
+          mensajeAlerta.map((mensaje, index) => (
           <p
             key={index}
             style={{
@@ -976,7 +991,7 @@ function App() {
           style={{
             display: seccionActiva === "inicio" ? "grid" : "none",
             backgroundColor: "white",
-            padding: "18px",
+            padding: "14px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
@@ -990,7 +1005,7 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "18px",
+            padding: "14px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
@@ -1004,7 +1019,7 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "18px",
+            padding: "14px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
@@ -1020,7 +1035,7 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "18px",
+            padding: "14px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
@@ -1036,7 +1051,7 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "18px",
+            padding: "14px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
@@ -1052,7 +1067,7 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "18px",
+            padding: "14px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
@@ -1109,7 +1124,7 @@ function App() {
             ? "block"
             : "none",
           backgroundColor: "white",
-          padding: "18px",
+          padding: "14px",
           borderRadius: "12px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           marginBottom: "25px",
@@ -1162,10 +1177,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
             marginBottom: "15px",
           }}
         >
@@ -1191,10 +1206,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
             marginBottom: "15px",
           }}
         />
@@ -1239,10 +1254,10 @@ function App() {
             backgroundColor: "#198754",
             color: "white",
             border: "none",
-            padding: "12px 18px",
+            padding: "10px 14px",
             borderRadius: "8px",
             cursor: "pointer",
-            fontSize: "14px",
+            fontSize: "13px",
             fontWeight: "600",
           }}
         >
@@ -1257,10 +1272,10 @@ function App() {
             backgroundColor: "#dc3545",
             color: "white",
             border: "none",
-            padding: "12px 18px",
+            padding: "10px 14px",
             borderRadius: "8px",
             cursor: "pointer",
-            fontSize: "14px",
+            fontSize: "13px",
             fontWeight: "600",
           }}
         >
@@ -1307,8 +1322,10 @@ function App() {
             type="button"
             onClick={() => setTipoHistorial("reposiciones")}
             style={{
-              backgroundColor: tipoHistorial === "reposiciones" ? "#0d6efd" : "white",
-              color: tipoHistorial === "reposiciones" ? "white" : "#222",
+            backgroundColor:
+            tipoHistorial === "reposiciones"
+              ? "#198754"
+              : "white",              color: tipoHistorial === "reposiciones" ? "white" : "#222",
               border: "1px solid #ddd",
               padding: "10px 14px",
               borderRadius: "8px",
@@ -1385,7 +1402,7 @@ function App() {
                 }}
               >
                 <h3 style={{ marginTop: 0, color: "#222" }}>
-                  📈 Ingresos vs utilidad por día
+                  📈 Evolución de ingresos y utilidad por día
                 </h3>
 
                 <ResponsiveContainer width="100%" height="85%">
@@ -1420,36 +1437,58 @@ function App() {
               {topProductos.length === 0 ? (
                 <p>No hay datos suficientes.</p>
               ) : (
-                <table
+                <div
                   style={{
                     width: "100%",
-                    borderCollapse: "collapse",
+                    overflowX: "auto",
                   }}
                 >
-                  <thead>
-                    <tr>
-                      <th style={{ padding: "10px" }}>Producto</th>
-                      <th style={{ padding: "10px" }}>Unidades</th>
-                      <th style={{ padding: "10px" }}>Ingresos</th>
-                      <th style={{ padding: "10px" }}>Utilidad</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {topProductos.map((p, index) => (
-                      <tr key={index}>
-                        <td style={{ padding: "10px", textAlign: "center" }}>{p.nombre}</td>
-                        <td style={{ padding: "10px", textAlign: "center" }}>{p.cantidad}</td>
-                        <td style={{ padding: "10px", textAlign: "center" }}>
-                          ${p.ingresos.toFixed(2)}
-                        </td>
-                        <td style={{ padding: "10px", textAlign: "center", color: "#198754" }}>
-                          ${p.utilidad.toFixed(2)}
-                        </td>
+                  <table
+                    style={{
+                      width: "100%",
+                      minWidth: "600px",
+                      borderCollapse: "collapse",
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th style={{ padding: "10px", textAlign: "center" }}>Producto</th>
+                        <th style={{ padding: "10px", textAlign: "center" }}>Unidades</th>
+                        <th style={{ padding: "10px", textAlign: "center" }}>Ingresos</th>
+                        <th style={{ padding: "10px", textAlign: "center" }}>Utilidad</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+
+                    <tbody>
+                      {topProductos.map((p, index) => (
+                        <tr key={index}>
+                          <td style={{ padding: "10px", textAlign: "center" }}>
+                            {p.nombre}
+                          </td>
+
+                          <td style={{ padding: "10px", textAlign: "center" }}>
+                            {p.cantidad}
+                          </td>
+
+                          <td style={{ padding: "10px", textAlign: "center" }}>
+                            ${p.ingresos.toFixed(2)}
+                          </td>
+
+                          <td
+                            style={{
+                              padding: "10px",
+                              textAlign: "center",
+                              color: "#198754",
+                              fontWeight: "600",
+                            }}
+                          >
+                            ${p.utilidad.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
@@ -1460,41 +1499,75 @@ function App() {
             {ventasFiltradas.length === 0 ? (
               <p>No hay ventas registradas todavía.</p>
             ) : (
-              <table
+              <div
                 style={{
                   width: "100%",
-                  borderCollapse: "collapse",
-                  marginTop: "15px",
+                  overflowX: "auto",
                 }}
               >
-                <thead>
-                  <tr>
-                    <th style={{ padding: "10px" }}>Producto</th>
-                    <th style={{ padding: "10px" }}>Cantidad</th>
-                    <th style={{ padding: "10px" }}>Ingreso</th>
-                    <th style={{ padding: "10px" }}>Costo</th>
-                    <th style={{ padding: "10px" }}>Utilidad</th>
-                    <th style={{ padding: "10px" }}>Fecha</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {ventasFiltradas.map((venta) => (
-                    <tr key={venta._id}>
-                      <td style={{ padding: "10px", textAlign: "center" }}>{venta.nombreProducto}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>{venta.cantidad}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>${Number(venta.ingresoTotal).toFixed(2)}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>${Number(venta.costoTotal).toFixed(2)}</td>
-                      <td style={{ padding: "10px", textAlign: "center", color: "#198754", fontWeight: "700" }}>
-                        ${Number(venta.utilidad).toFixed(2)}
-                      </td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>
-                        {new Date(venta.createdAt).toLocaleString()}
-                      </td>
+                <table
+                  style={{
+                    width: "100%",
+                    minWidth: "850px",
+                    borderCollapse: "collapse",
+                    marginTop: "15px",
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Producto</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Cantidad</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Ingreso</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Costo</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Utilidad</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Fecha</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+
+                  <tbody>
+                    {ventasFiltradas.map((venta) => (
+                      <tr key={venta._id}>
+                        <td style={{ padding: "10px", textAlign: "center" }}>
+                          {venta.nombreProducto}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center" }}>
+                          {venta.cantidad}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center" }}>
+                          ${Number(venta.ingresoTotal).toFixed(2)}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center" }}>
+                          ${Number(venta.costoTotal).toFixed(2)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px",
+                            textAlign: "center",
+                            color: "#198754",
+                            fontWeight: "700",
+                          }}
+                        >
+                          ${Number(venta.utilidad).toFixed(2)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px",
+                            textAlign: "center",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {new Date(venta.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </>
         ) : (
@@ -1635,13 +1708,13 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
           }}
         />
-        <br /><br />
+        <div style={{ height: "14px" }} />
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Descripción del producto
@@ -1654,15 +1727,15 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
             minHeight: "80px",
             resize: "vertical",
           }}
         />
-        <br /><br />
+        <div style={{ height: "14px" }} />
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Costo del producto
@@ -1677,13 +1750,13 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
           }}
         />
-        <br /><br />
+        <div style={{ height: "14px" }} />
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Costo de envío/manejo por unidad
@@ -1699,13 +1772,13 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
           }}
         />
-        <br /><br />
+        <div style={{ height: "14px" }} />
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Precio de venta
@@ -1720,12 +1793,13 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
           }}
         />
+        <div style={{ height: "14px" }} />
 
         {precio !== "" && precioVenta !== "" && (
           <div
@@ -1780,13 +1854,13 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "12px",
+                padding: "10px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "16px",
+                fontSize: "14px",
               }}
             />
-            <br /><br />
+            <div style={{ height: "14px" }} />
           </>
         )}
 
@@ -1804,13 +1878,13 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "12px",
+            padding: "10px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "16px",
+            fontSize: "14px",
           }}
         />
-        <br /><br />
+        <div style={{ height: "14px" }} />
 
         <button
           type="submit"
@@ -1819,10 +1893,10 @@ function App() {
             backgroundColor: "#0d6efd",
             color: "white",
             border: "none",
-            padding: "12px 18px",
+            padding: "10px 14px",
             borderRadius: "8px",
             cursor: "pointer",
-            fontSize: "14px",
+            fontSize: "13px",
             marginTop: "10px",
           }}
         >
@@ -1839,10 +1913,10 @@ function App() {
               backgroundColor: "#dc3545",
               color: "white",
               border: "none",
-              padding: "12px 18px",
+              padding: "10px 14px",
               borderRadius: "8px",
               cursor: "pointer",
-              fontSize: "14px",
+              fontSize: "13px",
             }}
           >
             Cancelar edición
@@ -1869,10 +1943,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "12px",
+                padding: "10px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "16px",
+                fontSize: "14px",
                 marginBottom: "15px",
               }}
             >
@@ -1899,10 +1973,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "12px",
+                padding: "10px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "16px",
+                fontSize: "14px",
                 marginBottom: "15px",
               }}
             />
@@ -1916,10 +1990,10 @@ function App() {
                 backgroundColor: "#198754",
                 color: "white",
                 border: "none",
-                padding: "12px 18px",
+                padding: "10px 14px",
                 borderRadius: "8px",
                 cursor: "pointer",
-                fontSize: "14px",
+                fontSize: "13px",
                 fontWeight: "600",
               }}
             >
@@ -1961,10 +2035,10 @@ function App() {
         style={{
           width: "350px",
           maxWidth: "100%",
-          padding: "12px",
+          padding: "10px",
           borderRadius: "8px",
           border: "1px solid #ccc",
-          fontSize: "16px",
+          fontSize: "14px",
           marginBottom: "20px",
         }}
       />
@@ -1975,10 +2049,10 @@ function App() {
         style={{
           width: "220px",
           maxWidth: "100%",
-          padding: "12px",
+          padding: "10px",
           borderRadius: "8px",
           border: "1px solid #ccc",
-          fontSize: "16px",
+          fontSize: "14px",
           marginBottom: "20px",
           marginLeft: "10px",
         }}
@@ -1997,10 +2071,10 @@ function App() {
         style={{
           width: "220px",
           maxWidth: "100%",
-          padding: "12px",
+          padding: "10px",
           borderRadius: "8px",
           border: "1px solid #ccc",
-          fontSize: "16px",
+          fontSize: "14px",
           marginBottom: "20px",
           marginLeft: "10px",
         }}
@@ -2015,7 +2089,7 @@ function App() {
           marginTop: "-5px",
           marginBottom: "15px",
           color: "#666",
-          fontSize: "14px",
+          fontSize: "13px",
         }}
       >
         Mostrando {productosFiltrados.length} de {productos.length} productos
@@ -2025,169 +2099,230 @@ function App() {
         productos.length === 0 ? (
         <p>No hay productos registrados.</p>
       ) : (
-        <table
+        <div
           style={{
             width: "100%",
-            borderCollapse: "collapse",
-            backgroundColor: "white",
+            overflowX: "auto",
             borderRadius: "12px",
-            overflow: "hidden",
+            border: "1px solid #eee",
+            backgroundColor: "white",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <thead>
-            <tr>
-              <th style={{ padding: "10px" }}>Nombre</th>
-              <th style={{ padding: "10px" }}>Descripción</th>
-              <th style={{ padding: "10px" }}>Costo de compra</th>
-              <th style={{ padding: "10px" }}>Envío/manejo</th>
-              <th style={{ padding: "10px" }}>Costo total</th>
-              <th style={{ padding: "10px" }}>Precio de venta</th>
-              <th style={{ padding: "10px" }}>Stock</th>
-              <th style={{ padding: "10px" }}>Recomendación</th>
-              <th style={{ padding: "10px" }}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {productosFiltrados.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="9"
-                  style={{
-                    padding: "20px",
-                    textAlign: "center",
-                    color: "#666",
-                  }}
-                >
-                  No se encontraron productos.
-                </td>
-              </tr>
-            ) : (
-              productosFiltrados.map((producto) => (
-                <tr key={producto._id}>
-                  <td style={{ padding: "10px" , textAlign:"left"}}>{producto.nombre}</td>
-
-                  <td style={{ padding: "10px", textAlign: "left", color: "#555" }}>
-                    {producto.descripcion || "—"}
-                  </td>
-
-                  <td style={{ padding: "10px", textAlign: "center" }}>
-                    ${Number(producto.precio).toFixed(2)}
-                  </td>
-
-                  <td style={{ padding: "10px", textAlign: "center" }}>
-                    ${Number(producto.costoEnvio || 0).toFixed(2)}
-                  </td>
-
-                  <td style={{ padding: "10px", textAlign: "center" }}>
-                    ${(Number(producto.precio || 0) + Number(producto.costoEnvio || 0)).toFixed(2)}
-                  </td>
-
-                  <td style={{ padding: "10px", textAlign: "center" }}>
-                    ${Number(producto.precioVenta || 0).toFixed(2)}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "10px",
-                      textAlign: "center",
-                      color: Number(producto.stock) <= Number(producto.stockMinimo || 5) ? "#dc3545" : "#222",
-                      fontWeight: Number(producto.stock) <= Number(producto.stockMinimo || 5) ? "700" : "400",
-                    }}
-                  >
-                    {producto.stock}
-                  </td>
-
-                  <td style={{ padding: "10px", textAlign: "center", fontWeight: "600" }}>
-                    {Number(producto.stock) === 0
-                      ? "🚫 Reponer inmediatamente"
-                      : Number(producto.stock) <= Number(producto.stockMinimo || 5)
-                      ? "⚠️ Stock bajo"
-                      : "✅ Stock suficiente"}
-                  </td>
-
-                  <td style={{ padding: "10px", textAlign: "center"  }}>
-                    <button
-                      onClick={() => {
-                        setNombre(producto.nombre);
-                        setDescripcion(producto.descripcion || "");
-                        setPrecio(producto.precio);
-                        setCostoEnvio(producto.costoEnvio || "");
-                        setPrecioVenta(producto.precioVenta || "");
-                        setStock(producto.stock);
-                        setStockMinimo(producto.stockMinimo || "");
-                        setEditandoId(producto._id);
-                        setSeccionActiva("registrar");
-
-                        setTimeout(() => {
-                          document
-                            .getElementById("formularioProducto")
-                            ?.scrollIntoView({
-                              behavior: "smooth",
-                              block: "start",
-                            });
-                        }, 100);
-                      }}
+          <div style={{ minWidth: "950px" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "separate",
+                borderSpacing: 0,
+                backgroundColor: "white",
+              }}
+            >
+              <thead>
+                <tr>
+                  {[
+                    "Nombre",
+                    "Descripción",
+                    "Costo total",
+                    "Precio venta",
+                    "Utilidad",
+                    "Stock",
+                    "Recomendación",
+                    "Acciones",
+                  ].map((titulo) => (
+                    <th
+                      key={titulo}
                       style={{
-                        backgroundColor: "#0d6efd",
-                        color: "white",
-                        border: "none",
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
+                        padding: "12px 10px",
+                        backgroundColor: "#f1f3f5",
+                        fontWeight: "700",
+                        fontSize: "13px",
+                        textAlign: "center",
+                        color: "#444",
                       }}
                     >
-                      Editar
-                    </button>
-
-                    <button
-                      onClick={() => eliminarProducto(producto._id)}
-                      style={{
-                        marginLeft: "10px",
-                        backgroundColor: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Eliminar
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setProductoMovimientoId(producto._id);
-                        setCantidadMovimiento("");
-                        setTipoMovimiento("reposicion");
-                        setSeccionActiva("ventas");
-
-                        setTimeout(() => {
-                          document.getElementById("zonaVentas")?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          });
-                        }, 100);
-                      }}
-                      style={{
-                        marginLeft: "10px",
-                        backgroundColor: "#198754",
-                        color: "white",
-                        border: "none",
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Reponer
-                    </button>
-
-                  </td>
+                      {titulo}
+                    </th>
+                  ))}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+            </table>
+
+            <div
+              style={{
+                maxHeight: "300px",
+                overflowY: "auto",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "separate",
+                  borderSpacing: 0,
+                  backgroundColor: "white",
+                }}
+              >
+                <tbody>
+                  {productosFiltrados.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan="8"
+                        style={{
+                          padding: "20px",
+                          textAlign: "center",
+                          color: "#666",
+                        }}
+                      >
+                        No se encontraron productos.
+                      </td>
+                    </tr>
+                  ) : (
+                    productosFiltrados.map((producto) => (
+                      <tr key={producto._id}>
+                        <td style={{ padding: "10px", textAlign: "left", fontSize: "13px" }}>
+                          {producto.nombre}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "left", color: "#555", fontSize: "13px" }}>
+                          {producto.descripcion || "—"}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center", fontSize: "13px" }}>
+                          <strong>
+                            ${(Number(producto.precio || 0) + Number(producto.costoEnvio || 0)).toFixed(2)}
+                          </strong>
+                          <div style={{ color: "#777", fontSize: "11px", marginTop: "4px" }}>
+                            Compra: ${Number(producto.precio || 0).toFixed(2)} · Envío: ${Number(producto.costoEnvio || 0).toFixed(2)}
+                          </div>
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center", fontSize: "13px" }}>
+                          ${Number(producto.precioVenta || 0).toFixed(2)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px",
+                            textAlign: "center",
+                            color: "#198754",
+                            fontWeight: "700",
+                            fontSize: "13px",
+                          }}
+                        >
+                          $
+                          {(
+                            Number(producto.precioVenta || 0) -
+                            (Number(producto.precio || 0) + Number(producto.costoEnvio || 0))
+                          ).toFixed(2)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px",
+                            textAlign: "center",
+                            color:
+                              Number(producto.stock) <= Number(producto.stockMinimo || 5)
+                                ? "#dc3545"
+                                : "#198754",
+                            fontWeight: "700",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {producto.stock}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center", fontWeight: "600", fontSize: "13px" }}>
+                          {Number(producto.stock) === 0
+                            ? "🚫 Reponer"
+                            : Number(producto.stock) <= Number(producto.stockMinimo || 5)
+                            ? "⚠️ Bajo"
+                            : "✅ Suficiente"}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center" }}>
+                          <button
+                            onClick={() => {
+                              setNombre(producto.nombre);
+                              setDescripcion(producto.descripcion || "");
+                              setPrecio(producto.precio);
+                              setCostoEnvio(producto.costoEnvio || "");
+                              setPrecioVenta(producto.precioVenta || "");
+                              setStock(producto.stock);
+                              setStockMinimo(producto.stockMinimo || "");
+                              setEditandoId(producto._id);
+                              setSeccionActiva("registrar");
+
+                              setTimeout(() => {
+                                document
+                                  .getElementById("formularioProducto")
+                                  ?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                  });
+                              }, 100);
+                            }}
+                            style={{
+                              backgroundColor: "#0d6efd",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            onClick={() => eliminarProducto(producto._id)}
+                            style={{
+                              marginLeft: "10px",
+                              backgroundColor: "#dc3545",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Eliminar
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setProductoMovimientoId(producto._id);
+                              setCantidadMovimiento("");
+                              setTipoMovimiento("reposicion");
+                              setSeccionActiva("ventas");
+
+                              setTimeout(() => {
+                                document.getElementById("zonaVentas")?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                });
+                              }, 100);
+                            }}
+                            style={{
+                              marginLeft: "10px",
+                              backgroundColor: "#198754",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Reponer
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
             )
       ) : null}
       </div>
