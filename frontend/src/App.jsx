@@ -41,6 +41,9 @@ function App() {
   const [productoMovimientoId, setProductoMovimientoId] = useState("");
   const [cantidadMovimiento, setCantidadMovimiento] = useState("");
   const [tipoMovimiento, setTipoMovimiento] = useState("venta");
+  const [tipoVentaSeleccionado, setTipoVentaSeleccionado] = useState("detalle");
+  const [precioUnitarioNegociado, setPrecioUnitarioNegociado] = useState("");
+  const [precioGlobalMayoreo, setPrecioGlobalMayoreo] = useState("");
   const [ventas, setVentas] = useState([]);
   const [filtroFechaVenta, setFiltroFechaVenta] = useState("");
   const [ordenVentas, setOrdenVentas] = useState("");
@@ -319,6 +322,33 @@ function App() {
       return;
     }
 
+    if (
+      tipoVentaSeleccionado === "mayoreo" &&
+      (precioGlobalMayoreo === "" || Number(precioGlobalMayoreo) < 0)
+    ) {
+      alert("Ingresa un precio global válido para la venta al mayoreo");
+      return;
+    }
+
+    if (
+      tipoVentaSeleccionado === "detalle" &&
+      precioUnitarioNegociado !== "" &&
+      Number(precioUnitarioNegociado) < 0
+    ) {
+      alert("El precio unitario negociado no puede ser negativo");
+      return;
+    }
+
+    if (tipoMovimiento === "venta" && ventaConPerdida) {
+      const confirmado = window.confirm(
+        "⚠ Esta venta generará pérdida. ¿Seguro que quieres registrarla?"
+      );
+
+      if (!confirmado) {
+        return;
+      }
+    }
+
     try {
       const url =
         tipoMovimiento === "venta"
@@ -332,11 +362,22 @@ function App() {
           ? {
               productoId: productoMovimientoId,
               cantidad: Number(cantidadMovimiento),
+              tipoVenta: tipoVentaSeleccionado,
+              precioUnitarioNegociado:
+                tipoVentaSeleccionado === "detalle" &&
+                precioUnitarioNegociado !== ""
+                  ? Number(precioUnitarioNegociado)
+                  : null,
+              precioGlobalMayoreo:
+                tipoVentaSeleccionado === "mayoreo"
+                  ? Number(precioGlobalMayoreo)
+                  : null,
             }
           : {
               cantidad: Number(cantidadMovimiento),
             };
 
+      console.log("Body enviado:", body);
       const res = await fetch(url, {
         method,
         headers: {
@@ -347,6 +388,7 @@ function App() {
       });
 
       const data = await res.json();
+      console.log("Respuesta al registrar venta:", data);
 
       if (!res.ok) {
         alert(data.error || "Error al guardar movimiento");
@@ -361,7 +403,10 @@ function App() {
 
       setProductoMovimientoId("");
       setCantidadMovimiento("");
+      setPrecioUnitarioNegociado("");
+      setPrecioGlobalMayoreo("");
       setTipoMovimiento("venta");
+      setTipoVentaSeleccionado("detalle");
       setSeccionActiva("inventario");
 
       obtenerProductos();
@@ -419,7 +464,10 @@ function App() {
   const cancelarMovimiento = () => {
     setProductoMovimientoId("");
     setCantidadMovimiento("");
+    setPrecioUnitarioNegociado("");
+    setPrecioGlobalMayoreo("");
     setTipoMovimiento("venta");
+    setTipoVentaSeleccionado("detalle");
     setSeccionActiva("inventario");
   };
 
@@ -577,6 +625,46 @@ function App() {
         return Number(a.precio) - Number(b.precio);
       }
 
+      if (orden === "margenMayor") {
+        const margenA =
+          Number(a.precioVenta || 0) > 0
+            ? ((Number(a.precioVenta || 0) -
+                (Number(a.precio || 0) + Number(a.costoEnvio || 0))) /
+                Number(a.precioVenta || 0)) *
+              100
+            : 0;
+
+        const margenB =
+          Number(b.precioVenta || 0) > 0
+            ? ((Number(b.precioVenta || 0) -
+                (Number(b.precio || 0) + Number(b.costoEnvio || 0))) /
+                Number(b.precioVenta || 0)) *
+              100
+            : 0;
+
+        return margenB - margenA;
+      }
+
+      if (orden === "margenMenor") {
+        const margenA =
+          Number(a.precioVenta || 0) > 0
+            ? ((Number(a.precioVenta || 0) -
+                (Number(a.precio || 0) + Number(a.costoEnvio || 0))) /
+                Number(a.precioVenta || 0)) *
+              100
+            : 0;
+
+        const margenB =
+          Number(b.precioVenta || 0) > 0
+            ? ((Number(b.precioVenta || 0) -
+                (Number(b.precio || 0) + Number(b.costoEnvio || 0))) /
+                Number(b.precioVenta || 0)) *
+              100
+            : 0;
+
+        return margenA - margenB;
+      }
+
       return Number(a.stock) - Number(b.stock);
     });
   const totalProductos = productos.length;
@@ -640,6 +728,47 @@ function App() {
     productoMovimientoSeleccionado && cantidadMovimiento
       ? Number(productoMovimientoSeleccionado.stock) - Number(cantidadMovimiento)
       : null;
+
+  const precioUnitarioUsado =
+    precioUnitarioNegociado !== ""
+      ? Number(precioUnitarioNegociado)
+      : Number(productoMovimientoSeleccionado?.precioVenta || 0);
+
+  const ventaListaParaCalcular =
+    productoMovimientoSeleccionado &&
+    cantidadMovimiento &&
+    (
+      tipoVentaSeleccionado === "detalle" ||
+      precioGlobalMayoreo !== ""
+    );
+
+  const ingresoVentaNormalMovimiento =
+    productoMovimientoSeleccionado && cantidadMovimiento
+      ? Number(productoMovimientoSeleccionado.precioVenta || 0) *
+        Number(cantidadMovimiento || 0)
+      : 0;
+
+  const ingresoEstimadoMovimiento =
+    ventaListaParaCalcular
+      ? tipoVentaSeleccionado === "mayoreo"
+        ? Number(precioGlobalMayoreo)
+        : precioUnitarioUsado * Number(cantidadMovimiento || 0)
+      : 0;
+
+  const costoEstimadoMovimiento =
+    productoMovimientoSeleccionado && cantidadMovimiento
+      ? (Number(productoMovimientoSeleccionado.precio || 0) +
+          Number(productoMovimientoSeleccionado.costoEnvio || 0)) *
+        Number(cantidadMovimiento || 0)
+      : 0;
+
+  const utilidadEstimadaMovimiento =
+    ingresoEstimadoMovimiento - costoEstimadoMovimiento;
+
+  const ventaConPerdida =
+    productoMovimientoSeleccionado &&
+    cantidadMovimiento &&
+    utilidadEstimadaMovimiento < 0;
 
   const mensajeAlerta =
     alertas.length > 0
@@ -893,6 +1022,9 @@ function App() {
                     ? "#198754"
                     : clave === "registrar" && modoRegistro === "reposicion"
                     ? "#198754"
+                    : clave === "ventas" &&
+                      tipoVentaSeleccionado === "mayoreo"
+                    ? "#fd7e14"
                     : "#0d6efd"
                   : "white",
               color: seccionActiva === clave ? "white" : "#222",
@@ -1180,10 +1312,61 @@ function App() {
         }}
       >
         <h2 style={{ marginTop: 0, color: "#222" }}>
-            🧾 Registrar venta
+          🧾 Registrar venta
         </h2>
-        <p style={{ color: "#666" }}>
-          Registra únicamente salidas de inventario por ventas.        </p>
+
+        <div style={{ marginBottom: "20px" }}>
+          <button
+            type="button"
+            onClick={() => setTipoVentaSeleccionado("detalle")}
+            style={{
+              backgroundColor:
+                tipoVentaSeleccionado === "detalle"
+                  ? "#0d6efd"
+                  : "white",
+              color:
+                tipoVentaSeleccionado === "detalle"
+                  ? "white"
+                  : "#222",
+              border: "1px solid #ddd",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              marginRight: "10px",
+              fontWeight: "600",
+            }}
+          >
+            🛒 Venta normal
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTipoVentaSeleccionado("mayoreo")}
+            style={{
+              backgroundColor:
+                tipoVentaSeleccionado === "mayoreo"
+                  ? "#fd7e14"
+                  : "white",
+              color:
+                tipoVentaSeleccionado === "mayoreo"
+                  ? "white"
+                  : "#222",
+              border: "1px solid #ddd",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600",
+            }}
+          >
+            📦 Venta al mayoreo
+          </button>
+        </div>
+
+        <p style={{ color: "#666", marginTop: "0", marginBottom: "18px" }}>
+          {tipoVentaSeleccionado === "detalle"
+            ? "Registra ventas unitarias o por cantidad usando el precio de venta establecido. También puedes indicar un precio negociado si aplica."
+            : "Registra ventas al por mayor usando un precio global negociado para toda la operación."}
+        </p>
 
         <p style={{ marginBottom: "6px", fontWeight: "600" }}>
           Producto
@@ -1232,9 +1415,92 @@ function App() {
           }}
         />
 
-        <br />
+        {tipoVentaSeleccionado === "detalle" && productoMovimientoSeleccionado && (
+          <>
+            <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+              Precio unitario negociado opcional
+            </p>
+
+            <input
+              type="number"
+              min="0"
+              placeholder={`Precio normal: $${Number(
+                productoMovimientoSeleccionado.precioVenta || 0
+              ).toFixed(2)}`}
+              value={precioUnitarioNegociado}
+              onChange={(e) => setPrecioUnitarioNegociado(e.target.value)}
+              onWheel={(e) => e.target.blur()}
+              style={{
+                width: "350px",
+                maxWidth: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                fontSize: "14px",
+                marginBottom: "15px",
+              }}
+            />
+          </>
+        )}
+
+        {tipoVentaSeleccionado === "mayoreo" && (
+          <>
+            <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+              Precio global negociado
+            </p>
+
+            <input
+              type="number"
+              min="0"
+              placeholder="Ejemplo: 850"
+              value={precioGlobalMayoreo}
+              onChange={(e) => setPrecioGlobalMayoreo(e.target.value)}
+              onWheel={(e) => e.target.blur()}
+              style={{
+                width: "350px",
+                maxWidth: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                fontSize: "14px",
+                marginBottom: "15px",
+              }}
+            />
+          </>
+        )}
 
         {productoMovimientoSeleccionado && cantidadMovimiento && (
+          <div
+            style={{
+              backgroundColor: "#f8f9fa",
+              color: "#333",
+              padding: "12px",
+              borderRadius: "10px",
+              marginBottom: "15px",
+              fontWeight: "600",
+              border: "1px solid #ddd",
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px", color: "#222" }}>
+              Referencia con precio normal
+            </h3>
+
+            <p style={{ margin: "0 0 6px" }}>
+              Ingreso normal: ${ingresoVentaNormalMovimiento.toFixed(2)}
+            </p>
+
+            <p style={{ margin: "0 0 6px" }}>
+              Costo total: ${costoEstimadoMovimiento.toFixed(2)}
+            </p>
+
+            <p style={{ margin: 0, color: "#198754" }}>
+              Utilidad normal estimada: $
+              {(ingresoVentaNormalMovimiento - costoEstimadoMovimiento).toFixed(2)}
+            </p>
+          </div>
+        )}
+
+        {productoMovimientoSeleccionado && cantidadMovimiento && ventaListaParaCalcular && (
           <div
             style={{
               backgroundColor:
@@ -1247,23 +1513,59 @@ function App() {
               fontWeight: "600",
             }}
           >
-            <p style={{ margin: "0 0 6px" }}>
-              Producto: {productoMovimientoSeleccionado.nombre}
-            </p>
+
+            <h3 style={{ margin: "0 0 10px", color: "#084298" }}>
+              Resumen de la operación
+            </h3>
 
             <p style={{ margin: "0 0 6px" }}>
-              Stock actual: {productoMovimientoSeleccionado.stock}
-            </p>
-
-            <p style={{ margin: "0 0 6px" }}>
-              Cantidad a vender:{cantidadMovimiento}
-            </p>
-
-            <p style={{ margin: 0 }}>
               Stock después del movimiento: {stockDespuesMovimiento}
             </p>
+
+            <p style={{ margin: "0 0 6px" }}>
+              Ingreso de esta venta: ${ingresoEstimadoMovimiento.toFixed(2)}
+            </p>
+
+            {tipoVentaSeleccionado === "mayoreo" && (
+              <p style={{ margin: "0 0 6px" }}>
+                Ingreso si fuera venta normal: ${ingresoVentaNormalMovimiento.toFixed(2)}
+              </p>
+            )}
+
+            <p style={{ margin: "0 0 6px" }}>
+              Costo total de esta venta: ${costoEstimadoMovimiento.toFixed(2)}
+            </p>
+
+            <p
+              style={{
+                margin: 0,
+                color: utilidadEstimadaMovimiento < 0 ? "#dc3545" : "#198754",
+                fontWeight: "700",
+              }}
+            >
+              Utilidad real estimada: ${utilidadEstimadaMovimiento.toFixed(2)}
+            </p>
+
+            {ventaConPerdida && (
+              <div
+                style={{
+                  backgroundColor: "#f8d7da",
+                  color: "#842029",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  marginTop: "10px",
+                  fontWeight: "700",
+                }}
+              >
+                ⚠ Advertencia: esta venta generará pérdida.
+              </div>
+            )}
+
+            
           </div>
         )}
+
+        <div style={{ height: "10px" }} />
 
         <button
           type="button"
@@ -1534,10 +1836,12 @@ function App() {
                   <thead>
                     <tr>
                       <th style={{ padding: "10px", textAlign: "center" }}>Producto</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Tipo</th>
                       <th style={{ padding: "10px", textAlign: "center" }}>Cantidad</th>
                       <th style={{ padding: "10px", textAlign: "center" }}>Ingreso</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Costo</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Costo total</th>
                       <th style={{ padding: "10px", textAlign: "center" }}>Utilidad</th>
+                      <th style={{ padding: "10px", textAlign: "center" }}>Margen %</th>
                       <th style={{ padding: "10px", textAlign: "center" }}>Fecha</th>
                     </tr>
                   </thead>
@@ -1547,6 +1851,10 @@ function App() {
                       <tr key={venta._id}>
                         <td style={{ padding: "10px", textAlign: "center" }}>
                           {venta.nombreProducto}
+                        </td>
+
+                        <td style={{ padding: "10px", textAlign: "center" }}>
+                          {venta.tipoVenta === "mayoreo" ? "Mayoreo" : "Normal"}
                         </td>
 
                         <td style={{ padding: "10px", textAlign: "center" }}>
@@ -1570,6 +1878,19 @@ function App() {
                           }}
                         >
                           ${Number(venta.utilidad).toFixed(2)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px",
+                            textAlign: "center",
+                            color: Number(venta.utilidad) < 0 ? "#dc3545" : "#198754",
+                            fontWeight: "700",
+                          }}
+                        >
+                          {Number(venta.ingresoTotal) > 0
+                            ? `${((Number(venta.utilidad) / Number(venta.ingresoTotal)) * 100).toFixed(2)}%`
+                            : "0.00%"}
                         </td>
 
                         <td
@@ -2081,6 +2402,8 @@ function App() {
         <option value="stockMenor">Menor stock</option>
         <option value="precioMayor">Mayor precio</option>
         <option value="precioMenor">Menor precio</option>
+        <option value="margenMayor">Mayor porcentaje utilidad</option>
+        <option value="margenMenor">Menor porcentaje utilidad</option>
       </select>
 
       <select
@@ -2127,7 +2450,7 @@ function App() {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <div style={{ minWidth: "950px" }}>
+          <div style={{ minWidth: "1070px" }}>
             <table
               style={{
                 width: "100%",
@@ -2156,6 +2479,10 @@ function App() {
 
                   <th style={{ width: "120px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
                     Utilidad
+                  </th>
+
+                  <th style={{ width: "120px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                    Margen %
                   </th>
 
                   <th style={{ width: "100px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
@@ -2192,7 +2519,7 @@ function App() {
                   {productosFiltrados.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="8"
+                        colSpan="9"
                         style={{
                           padding: "20px",
                           textAlign: "center",
@@ -2240,6 +2567,37 @@ function App() {
                             Number(producto.precioVenta || 0) -
                             (Number(producto.precio || 0) + Number(producto.costoEnvio || 0))
                           ).toFixed(2)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px",
+                            textAlign: "center",
+                            color:
+                              Number(producto.precioVenta || 0) > 0 &&
+                              ((Number(producto.precioVenta || 0) -
+                                (Number(producto.precio || 0) + Number(producto.costoEnvio || 0))) /
+                                Number(producto.precioVenta || 0)) *
+                                100 < 0
+                                ? "#dc3545"
+                                : ((Number(producto.precioVenta || 0) -
+                                    (Number(producto.precio || 0) + Number(producto.costoEnvio || 0))) /
+                                    Number(producto.precioVenta || 0)) *
+                                    100 < 10
+                                ? "#fd7e14"
+                                : "#198754",
+                            fontWeight: "700",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {Number(producto.precioVenta || 0) > 0
+                            ? `${(
+                                ((Number(producto.precioVenta || 0) -
+                                  (Number(producto.precio || 0) + Number(producto.costoEnvio || 0))) /
+                                  Number(producto.precioVenta || 0)) *
+                                100
+                              ).toFixed(2)}%`
+                            : "0.00%"}
                         </td>
 
                         <td

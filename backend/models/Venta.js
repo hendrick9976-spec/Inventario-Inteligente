@@ -48,6 +48,27 @@ const ventaSchema = new mongoose.Schema(
       required: true,
     },
 
+    tipoVenta: {
+      type: String,
+      enum: ["detalle", "mayoreo"],
+      default: "detalle",
+    },
+
+    precioUnitarioNegociado: {
+      type: Number,
+      default: null,
+    },
+
+    precioGlobalMayoreo: {
+      type: Number,
+      default: null,
+    },
+
+    ventaConPerdida: {
+      type: Boolean,
+      default: false,
+    },
+
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

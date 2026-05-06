@@ -214,7 +214,13 @@ app.get("/reposiciones", authMiddleware, async (req, res) => {
 // Registrar venta
 app.post("/ventas", authMiddleware, async (req, res) => {
   try {
-    const { productoId, cantidad } = req.body;
+    const {
+      productoId,
+      cantidad,
+      tipoVenta,
+      precioUnitarioNegociado,
+      precioGlobalMayoreo,
+    } = req.body;
 
     if (!productoId || cantidad === undefined || Number(cantidad) <= 0) {
       return res.status(400).json({ error: "Datos inválidos" });
@@ -233,9 +239,24 @@ app.post("/ventas", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Stock insuficiente" });
     }
 
-    const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
+    let ingresoTotal = 0;
+
+    if (tipoVenta === "mayoreo") {
+      ingresoTotal = Number(precioGlobalMayoreo);
+    } else {
+      const precioUnitarioFinal =
+        precioUnitarioNegociado !== null &&
+        precioUnitarioNegociado !== undefined
+          ? Number(precioUnitarioNegociado)
+          : Number(producto.precioVenta);
+
+      ingresoTotal = precioUnitarioFinal * Number(cantidad);
+    }    
     const costoUnitarioTotal = Number(producto.precio) + Number(producto.costoEnvio || 0);
-    const costoTotal = costoUnitarioTotal * Number(cantidad);
+    const costoTotal =
+      (Number(producto.precio || 0) +
+        Number(producto.costoEnvio || 0)) *
+      Number(cantidad);    
     const utilidad = ingresoTotal - costoTotal;
 
     const nuevaVenta = new Venta({
@@ -247,6 +268,22 @@ app.post("/ventas", authMiddleware, async (req, res) => {
       ingresoTotal,
       costoTotal,
       utilidad,
+
+      tipoVenta: tipoVenta || "detalle",
+
+      precioUnitarioNegociado:
+        precioUnitarioNegociado !== null &&
+        precioUnitarioNegociado !== undefined
+          ? Number(precioUnitarioNegociado)
+          : null,
+
+      precioGlobalMayoreo:
+        tipoVenta === "mayoreo"
+          ? Number(precioGlobalMayoreo)
+          : null,
+
+      ventaConPerdida: utilidad < 0,
+      
       user: req.user.userId,
     });
 
