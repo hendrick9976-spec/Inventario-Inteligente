@@ -47,7 +47,9 @@ function App() {
   const [ventas, setVentas] = useState([]);
   const [filtroFechaVenta, setFiltroFechaVenta] = useState("");
   const [ordenVentas, setOrdenVentas] = useState("");
+  const [busquedaVenta, setBusquedaVenta] = useState("");
   const [reposiciones, setReposiciones] = useState([]);
+  const [busquedaReposicion, setBusquedaReposicion] = useState("");
   const [tipoHistorial, setTipoHistorial] = useState("ventas");
   const [topHistorialActivo, setTopHistorialActivo] = useState("ventas");
   const [filtroFechaReposicion, setFiltroFechaReposicion] = useState("");
@@ -135,6 +137,7 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
       });
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -774,6 +777,14 @@ function App() {
     cantidadMovimiento &&
     utilidadEstimadaMovimiento < 0;
 
+  const obtenerFechaLocal = (fecha) => {
+    const fechaObj = new Date(fecha);
+
+    return `${fechaObj.getFullYear()}-${String(
+      fechaObj.getMonth() + 1
+    ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
+  };
+
   const mensajeAlerta =
     alertas.length > 0
       ? alertas
@@ -781,12 +792,17 @@ function App() {
 
   const ventasFiltradas = ventas
     .filter((venta) => {
-      if (!filtroFechaVenta) return true;
+      const coincideNombre = (venta.nombreProducto || "")
+        .toLowerCase()
+        .includes(busquedaVenta.toLowerCase());
 
-      const fechaVenta = new Date(venta.createdAt).toISOString().split("T")[0];
+      if (!filtroFechaVenta) return coincideNombre;
 
-      return fechaVenta === filtroFechaVenta;
+      const fechaVenta = obtenerFechaLocal(venta.createdAt);
+
+      return coincideNombre && fechaVenta === filtroFechaVenta;
     })
+
     .sort((a, b) => {
       if (ordenVentas === "ingresoMayor") {
         return Number(b.ingresoTotal) - Number(a.ingresoTotal);
@@ -802,6 +818,34 @@ function App() {
 
       if (ordenVentas === "utilidadMenor") {
         return Number(a.utilidad) - Number(b.utilidad);
+      }
+
+      if (ordenVentas === "margenMayor") {
+        const margenA =
+          Number(a.ingresoTotal) > 0
+            ? (Number(a.utilidad) / Number(a.ingresoTotal)) * 100
+            : 0;
+
+        const margenB =
+          Number(b.ingresoTotal) > 0
+            ? (Number(b.utilidad) / Number(b.ingresoTotal)) * 100
+            : 0;
+
+        return margenB - margenA;
+      }
+
+      if (ordenVentas === "margenMenor") {
+        const margenA =
+          Number(a.ingresoTotal) > 0
+            ? (Number(a.utilidad) / Number(a.ingresoTotal)) * 100
+            : 0;
+
+        const margenB =
+          Number(b.ingresoTotal) > 0
+            ? (Number(b.utilidad) / Number(b.ingresoTotal)) * 100
+            : 0;
+
+        return margenA - margenB;
       }
 
       return new Date(b.createdAt) - new Date(a.createdAt);
@@ -823,13 +867,15 @@ function App() {
       : 0;
 
   const reposicionesFiltradas = reposiciones.filter((reposicion) => {
-    if (!filtroFechaReposicion) return true;
+    const coincideNombre = (reposicion.nombreProducto || "")
+      .toLowerCase()
+      .includes(busquedaReposicion.toLowerCase());
 
-    const fechaReposicion = new Date(reposicion.createdAt)
-      .toISOString()
-      .split("T")[0];
+    if (!filtroFechaReposicion) return coincideNombre;
 
-    return fechaReposicion === filtroFechaReposicion;
+    const fechaReposicion = obtenerFechaLocal(reposicion.createdAt);
+
+    return coincideNombre && fechaReposicion === filtroFechaReposicion;
   });
 
   const costosFiltrados = ventasFiltradas.reduce(
@@ -837,27 +883,54 @@ function App() {
     0
   );
 
-  const datosGraficaVentas = Object.values(
-    ventasFiltradas.reduce((acc, venta) => {
-      const fechaObj = new Date(venta.createdAt);
+  const ventasPorDia = ventas.reduce((acc, venta) => {
+    const fechaObj = new Date(venta.createdAt);
 
-      const fecha = `${fechaObj.getFullYear()}-${String(
-        fechaObj.getMonth() + 1
-      ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
-      if (!acc[fecha]) {
-        acc[fecha] = {
-          fecha,
-          ingresos: 0,
-          utilidad: 0,
-        };
-      }
+    const fecha = `${fechaObj.getFullYear()}-${String(
+      fechaObj.getMonth() + 1
+    ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
 
-      acc[fecha].ingresos += Number(venta.ingresoTotal);
-      acc[fecha].utilidad += Number(venta.utilidad);
+    if (!acc[fecha]) {
+      acc[fecha] = {
+        fecha,
+        ingresos: 0,
+        utilidad: 0,
+      };
+    }
 
-      return acc;
-    }, {})
-  ).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    acc[fecha].ingresos += Number(venta.ingresoTotal);
+    acc[fecha].utilidad += Number(venta.utilidad);
+
+    return acc;
+  }, {});
+
+  const fechasVentas = Object.keys(ventasPorDia).sort();
+
+  let datosGraficaVentas = [];
+
+  const crearFechaLocalDesdeTexto = (fechaTexto) => {
+    const [year, month, day] = fechaTexto.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  if (fechasVentas.length > 0) {
+    const fechaInicio = crearFechaLocalDesdeTexto(fechasVentas[0]);
+    const fechaFin = crearFechaLocalDesdeTexto(fechasVentas[fechasVentas.length - 1]);
+
+    const fechaActual = new Date(fechaInicio);
+
+    while (fechaActual <= fechaFin) {
+      const fecha = obtenerFechaLocal(fechaActual);
+
+      datosGraficaVentas.push({
+        fecha,
+        ingresos: ventasPorDia[fecha]?.ingresos || 0,
+        utilidad: ventasPorDia[fecha]?.utilidad || 0,
+      });
+
+      fechaActual.setDate(fechaActual.getDate() + 1);
+    }
+  }
 
   const resumenProductos = Object.values(
     ventas.reduce((acc, venta) => {
@@ -1008,7 +1081,7 @@ function App() {
       <div
         style={{
           display: "flex",
-          gap: "10px",
+          gap: "6px",
           flexWrap: "wrap",
           marginBottom: "25px",
         }}
@@ -1710,25 +1783,6 @@ function App() {
 
         {tipoHistorial === "ventas" ? (
           <>
-            <div style={{ marginBottom: "15px" }}>
-              <input
-                type="date"
-                value={filtroFechaVenta}
-                onChange={(e) => setFiltroFechaVenta(e.target.value)}
-              />
-
-              <select
-                value={ordenVentas}
-                onChange={(e) => setOrdenVentas(e.target.value)}
-                style={{ marginLeft: "10px" }}
-              >
-                <option value="">Más recientes</option>
-                <option value="ingresoMayor">Mayor ingreso</option>
-                <option value="ingresoMenor">Menor ingreso</option>
-                <option value="utilidadMayor">Mayor utilidad</option>
-                <option value="utilidadMenor">Menor utilidad</option>
-              </select>
-            </div>
 
             <div
               style={{
@@ -1961,11 +2015,45 @@ function App() {
               )}
             </div>
 
-            
-
             <h3 style={{ marginBottom: "10px", color: "#222" }}>
               📄 Historial de ventas
             </h3>
+
+            <div style={{ marginBottom: "15px" }}>
+
+              <input
+                type="text"
+                placeholder="Buscar producto..."
+                value={busquedaVenta}
+                onChange={(e) => setBusquedaVenta(e.target.value)}
+                style={{
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                  marginRight: "10px",
+                }}
+              />
+
+              <input
+                type="date"
+                value={filtroFechaVenta}
+                onChange={(e) => setFiltroFechaVenta(e.target.value)}
+              />
+
+              <select
+                value={ordenVentas}
+                onChange={(e) => setOrdenVentas(e.target.value)}
+                style={{ marginLeft: "10px" }}
+              >
+                <option value="">Más recientes</option>
+                <option value="ingresoMayor">Mayor ingreso</option>
+                <option value="ingresoMenor">Menor ingreso</option>
+                <option value="utilidadMayor">Mayor utilidad</option>
+                <option value="utilidadMenor">Menor utilidad</option>
+                <option value="margenMayor">Mayor porcentaje de utilidad</option>
+                <option value="margenMenor">Menor porcentaje de utilidad</option>
+              </select>
+            </div>
 
             {ventasFiltradas.length === 0 ? (
               <p>No hay ventas registradas todavía.</p>
@@ -2063,6 +2151,19 @@ function App() {
         ) : (
           <>
             <div style={{ marginBottom: "15px" }}>
+              <input
+                type="text"
+                placeholder="Buscar producto repuesto..."
+                value={busquedaReposicion}
+                onChange={(e) => setBusquedaReposicion(e.target.value)}
+                style={{
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                  marginRight: "10px",
+                }}
+              />
+
               <input
                 type="date"
                 value={filtroFechaReposicion}
@@ -2417,7 +2518,6 @@ function App() {
 
         {!editandoId && modoRegistro === "reposicion" && (
           <>
-            <hr style={{ margin: "25px 0" }} />
 
             <p style={{ color: "#666" }}>
               Agrega unidades a un producto ya registrado.
@@ -2591,6 +2691,7 @@ function App() {
         productos.length === 0 ? (
         <p>No hay productos registrados.</p>
       ) : (
+
         <div
           style={{
             width: "100%",
@@ -2601,7 +2702,7 @@ function App() {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <div style={{ minWidth: "1070px" }}>
+          <div style={{ minWidth: "1000px" }}>
             <table
               style={{
                 width: "100%",
@@ -2612,39 +2713,102 @@ function App() {
             >
               <thead>
                 <tr>
-                  <th style={{ width: "160px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Nombre
                   </th>
 
-                  <th style={{ width: "180px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Descripción
                   </th>
 
-                  <th style={{ width: "190px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Costo total
                   </th>
 
-                  <th style={{ width: "140px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Precio venta
                   </th>
 
-                  <th style={{ width: "120px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Utilidad
                   </th>
 
-                  <th style={{ width: "120px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Margen %
                   </th>
 
-                  <th style={{ width: "100px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Stock
                   </th>
 
-                  <th style={{ width: "170px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Recomendación
                   </th>
 
-                  <th style={{ width: "260px", padding: "12px 10px", backgroundColor: "#f1f3f5" }}>
+                  <th
+                    style={{
+                      padding: "10px 8px",
+                      backgroundColor: "#f1f3f5",
+                      fontSize: "16px",
+                      textAlign: "center",
+                    }}
+                  >                    
                     Acciones
                   </th>
                 </tr>
@@ -2683,24 +2847,24 @@ function App() {
                   ) : (
                     productosFiltrados.map((producto) => (
                       <tr key={producto._id}>
-                        <td style={{ padding: "10px", textAlign: "left", fontSize: "13px" }}>
+                        <td style={{ padding: "10px", textAlign: "left", fontSize: "16px" }}>
                           {producto.nombre}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "left", color: "#555", fontSize: "13px" }}>
+                        <td style={{ padding: "10px", textAlign: "left", color: "#555", fontSize: "16px" }}>
                           {producto.descripcion || "—"}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center", fontSize: "13px" }}>
-                          <strong>
-                            ${(Number(producto.precio || 0) + Number(producto.costoEnvio || 0)).toFixed(2)}
-                          </strong>
+                        <td style={{ padding: "10px", textAlign: "center", fontSize: "16px" }}>
+                          
+                          ${(Number(producto.precio || 0) + Number(producto.costoEnvio || 0)).toFixed(2)}
+                          
                           <div style={{ color: "#777", fontSize: "11px", marginTop: "4px" }}>
                             Compra: ${Number(producto.precio || 0).toFixed(2)} · Envío: ${Number(producto.costoEnvio || 0).toFixed(2)}
                           </div>
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center", fontSize: "13px" }}>
+                        <td style={{ padding: "10px", textAlign: "center", fontSize: "16px" }}>
                           ${Number(producto.precioVenta || 0).toFixed(2)}
                         </td>
 
@@ -2710,7 +2874,7 @@ function App() {
                             textAlign: "center",
                             color: "#198754",
                             fontWeight: "700",
-                            fontSize: "13px",
+                            fontSize: "16px",
                           }}
                         >
                           $
@@ -2738,7 +2902,7 @@ function App() {
                                 ? "#fd7e14"
                                 : "#198754",
                             fontWeight: "700",
-                            fontSize: "13px",
+                            fontSize: "16px",
                           }}
                         >
                           {Number(producto.precioVenta || 0) > 0
@@ -2760,7 +2924,7 @@ function App() {
                                 ? "#dc3545"
                                 : "#198754",
                             fontWeight: "700",
-                            fontSize: "13px",
+                            fontSize: "16px",
                           }}
                         >
                           {producto.stock}
@@ -2774,7 +2938,18 @@ function App() {
                             : "✅ Suficiente"}
                         </td>
 
+                        
+
                         <td style={{ padding: "10px", textAlign: "center" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "6px",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
                           <button
                             onClick={() => {
                               setNombre(producto.nombre);
@@ -2803,6 +2978,7 @@ function App() {
                               padding: "6px 10px",
                               borderRadius: "6px",
                               cursor: "pointer",
+                              fontSize: "13px",
                             }}
                           >
                             Editar
@@ -2811,13 +2987,13 @@ function App() {
                           <button
                             onClick={() => eliminarProducto(producto._id)}
                             style={{
-                              marginLeft: "10px",
                               backgroundColor: "#dc3545",
                               color: "white",
                               border: "none",
                               padding: "6px 10px",
                               borderRadius: "6px",
                               cursor: "pointer",
+                              fontSize: "13px",
                             }}
                           >
                             Eliminar
@@ -2838,18 +3014,19 @@ function App() {
                               }, 100);
                             }}
                             style={{
-                              marginLeft: "10px",
                               backgroundColor: "#198754",
                               color: "white",
                               border: "none",
                               padding: "6px 10px",
                               borderRadius: "6px",
                               cursor: "pointer",
+                              fontSize: "13px",
                             }}
                           >
                             Reponer
                           </button>
-                        </td>
+                        </div>
+                      </td>
                       </tr>
                     ))
                   )}
