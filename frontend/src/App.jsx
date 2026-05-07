@@ -49,6 +49,7 @@ function App() {
   const [ordenVentas, setOrdenVentas] = useState("");
   const [reposiciones, setReposiciones] = useState([]);
   const [tipoHistorial, setTipoHistorial] = useState("ventas");
+  const [topHistorialActivo, setTopHistorialActivo] = useState("ventas");
   const [filtroFechaReposicion, setFiltroFechaReposicion] = useState("");
 
   //Función de registro de usuario
@@ -377,7 +378,6 @@ function App() {
               cantidad: Number(cantidadMovimiento),
             };
 
-      console.log("Body enviado:", body);
       const res = await fetch(url, {
         method,
         headers: {
@@ -388,7 +388,6 @@ function App() {
       });
 
       const data = await res.json();
-      console.log("Respuesta al registrar venta:", data);
 
       if (!res.ok) {
         alert(data.error || "Error al guardar movimiento");
@@ -698,6 +697,11 @@ function App() {
       (producto) => Number(producto.stock) === 0
     ).length;
 
+  const porcentajeUtilidadPromedioInventario =
+    valorPotencialVenta > 0
+      ? (utilidadPotencialInventario / valorPotencialVenta) * 100
+      : 0;
+
   const productoPrioritario = productos.length > 0
     ? [...productos].sort(
         (a, b) => Number(a.stock) - Number(b.stock)
@@ -813,6 +817,11 @@ function App() {
     0
   );
 
+  const margenGlobalVentas =
+    ingresosFiltrados > 0
+      ? (utilidadFiltrada / ingresosFiltrados) * 100
+      : 0;
+
   const reposicionesFiltradas = reposiciones.filter((reposicion) => {
     if (!filtroFechaReposicion) return true;
 
@@ -881,6 +890,21 @@ function App() {
 
   const topProductos = [...resumenProductos]
     .sort((a, b) => b.cantidad - a.cantidad)
+    .slice(0, 3);
+
+  const topProductosUtilidad = [...resumenProductos]
+    .sort((a, b) => b.utilidad - a.utilidad)
+    .slice(0, 3);
+
+  const topProductosMargen = [...resumenProductos]
+    .map((p) => ({
+      ...p,
+      margen:
+        p.ingresos > 0
+          ? (p.utilidad / p.ingresos) * 100
+          : 0,
+    }))
+    .sort((a, b) => b.margen - a.margen)
     .slice(0, 3);
 
   const recomendaciones = [];
@@ -1234,6 +1258,33 @@ function App() {
             ${utilidadPotencialInventario.toFixed(2)}
           </h2>
         </div> 
+
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "14px",
+            borderRadius: "12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+            Margen promedio inventario
+          </p>
+
+          <h2
+            style={{
+              margin: "8px 0 0",
+              color:
+                porcentajeUtilidadPromedioInventario < 0
+                  ? "#dc3545"
+                  : porcentajeUtilidadPromedioInventario < 10
+                  ? "#fd7e14"
+                  : "#198754",
+            }}
+          >
+            {porcentajeUtilidadPromedioInventario.toFixed(2)}%
+          </h2>
+        </div>
       </div>
 
       <div
@@ -1708,6 +1759,24 @@ function App() {
                   ${utilidadFiltrada.toFixed(2)}
                 </h3>
               </div>
+
+              <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
+                <p style={{ margin: 0, color: "#666" }}>Margen global</p>
+
+                <h3
+                  style={{
+                    margin: "8px 0 0",
+                    color:
+                      margenGlobalVentas < 0
+                        ? "#dc3545"
+                        : margenGlobalVentas < 10
+                        ? "#fd7e14"
+                        : "#198754",
+                  }}
+                >
+                  {margenGlobalVentas.toFixed(2)}%
+                </h3>
+              </div>
             </div>
 
             {datosGraficaVentas.length > 0 && (
@@ -1752,7 +1821,59 @@ function App() {
             )}
 
             <div style={{ marginBottom: "25px" }}>
-              <h3 style={{ marginBottom: "10px" }}>📊 Top 3 productos</h3>
+              <h3 style={{ marginBottom: "10px" }}>📦 Top 3 productos más vendidos</h3>
+
+              <div style={{ marginBottom: "15px" }}>
+                <button
+                  type="button"
+                  onClick={() => setTopHistorialActivo("ventas")}
+                  style={{
+                    backgroundColor: topHistorialActivo === "ventas" ? "#0d6efd" : "white",
+                    color: topHistorialActivo === "ventas" ? "white" : "#222",
+                    border: "1px solid #ddd",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    marginRight: "8px",
+                    fontWeight: "600",
+                  }}
+                >
+                  🛒 Más vendidos por unidad
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTopHistorialActivo("utilidad")}
+                  style={{
+                    backgroundColor: topHistorialActivo === "utilidad" ? "#198754" : "white",
+                    color: topHistorialActivo === "utilidad" ? "white" : "#222",
+                    border: "1px solid #ddd",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    marginRight: "8px",
+                    fontWeight: "600",
+                  }}
+                >
+                  💰 Mayor utilidad
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTopHistorialActivo("margen")}
+                  style={{
+                    backgroundColor: topHistorialActivo === "margen" ? "#fd7e14" : "white",
+                    color: topHistorialActivo === "margen" ? "white" : "#222",
+                    border: "1px solid #ddd",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                  }}
+                >
+                  📈 Mayor margen
+                </button>
+              </div>
 
               {topProductos.length === 0 ? (
                 <p>No hay datos suficientes.</p>
@@ -1766,7 +1887,7 @@ function App() {
                   <table
                     style={{
                       width: "100%",
-                      minWidth: "600px",
+                      minWidth: "700px",
                       borderCollapse: "collapse",
                     }}
                   >
@@ -1776,41 +1897,71 @@ function App() {
                         <th style={{ padding: "10px", textAlign: "center" }}>Unidades</th>
                         <th style={{ padding: "10px", textAlign: "center" }}>Ingresos</th>
                         <th style={{ padding: "10px", textAlign: "center" }}>Utilidad</th>
+                        <th style={{ padding: "10px", textAlign: "center" }}>Margen %</th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      {topProductos.map((p, index) => (
-                        <tr key={index}>
-                          <td style={{ padding: "10px", textAlign: "center" }}>
-                            {p.nombre}
-                          </td>
+                      {(
+                        topHistorialActivo === "utilidad"
+                          ? topProductosUtilidad
+                          : topHistorialActivo === "margen"
+                          ? topProductosMargen
+                          : topProductos
+                      ).map((p, index) => {
+                        const margen =
+                          p.ingresos > 0 ? (p.utilidad / p.ingresos) * 100 : 0;
 
-                          <td style={{ padding: "10px", textAlign: "center" }}>
-                            {p.cantidad}
-                          </td>
+                        return (
+                          <tr key={index}>
+                            <td style={{ padding: "10px", textAlign: "center" }}>
+                              {p.nombre}
+                            </td>
 
-                          <td style={{ padding: "10px", textAlign: "center" }}>
-                            ${p.ingresos.toFixed(2)}
-                          </td>
+                            <td style={{ padding: "10px", textAlign: "center" }}>
+                              {p.cantidad}
+                            </td>
 
-                          <td
-                            style={{
-                              padding: "10px",
-                              textAlign: "center",
-                              color: "#198754",
-                              fontWeight: "600",
-                            }}
-                          >
-                            ${p.utilidad.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                            <td style={{ padding: "10px", textAlign: "center" }}>
+                              ${p.ingresos.toFixed(2)}
+                            </td>
+
+                            <td
+                              style={{
+                                padding: "10px",
+                                textAlign: "center",
+                                color: p.utilidad < 0 ? "#dc3545" : "#198754",
+                                fontWeight: "700",
+                              }}
+                            >
+                              ${p.utilidad.toFixed(2)}
+                            </td>
+
+                            <td
+                              style={{
+                                padding: "10px",
+                                textAlign: "center",
+                                color:
+                                  margen < 0
+                                    ? "#dc3545"
+                                    : margen < 10
+                                    ? "#fd7e14"
+                                    : "#198754",
+                                fontWeight: "700",
+                              }}
+                            >
+                              {margen.toFixed(2)}%
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
+
+            
 
             <h3 style={{ marginBottom: "10px", color: "#222" }}>
               📄 Historial de ventas
