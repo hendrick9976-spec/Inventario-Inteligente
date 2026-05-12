@@ -99,7 +99,74 @@ const login = async (req, res) => {
   }
 };
 
+const actualizarPerfil = async (req, res) => {
+  try {
+    const { name, email, password, confirmarPassword } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        message: "Nombre y correo son obligatorios",
+      });
+    }
+
+    const emailNormalizado = email.trim().toLowerCase();
+
+    const usuarioExistente = await User.findOne({
+      email: emailNormalizado,
+      _id: { $ne: req.user.userId },
+    });
+
+    if (usuarioExistente) {
+      return res.status(400).json({
+        message: "Ese correo ya está en uso por otro usuario",
+      });
+    }
+
+    const datosActualizados = {
+      name: name.trim(),
+      email: emailNormalizado,
+    };
+
+    if (password || confirmarPassword) {
+      if (password !== confirmarPassword) {
+        return res.status(400).json({
+          message: "Las contraseñas no coinciden",
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({
+          message: "La contraseña debe tener al menos 6 caracteres",
+        });
+      }
+
+      datosActualizados.password = await bcrypt.hash(password, 10);
+    }
+
+    const usuarioActualizado = await User.findByIdAndUpdate(
+      req.user.userId,
+      datosActualizados,
+      { new: true }
+    ).select("-password");
+
+    return res.json({
+      message: "Perfil actualizado correctamente",
+      user: {
+        id: usuarioActualizado._id,
+        name: usuarioActualizado.name,
+        email: usuarioActualizado.email,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error al actualizar perfil",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
+  actualizarPerfil,
 };

@@ -12,16 +12,52 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// ======================================================
+// COMPONENTE PRINCIPAL DE LA APLICACIÓN
+// SISTEMA INVENTARIO INTELIGENTE
+// ======================================================
+
 function App() {
+
+  // ======================================================
+  // ESTADOS GENERALES Y SESIÓN DE USUARIO
+  // ======================================================
+
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [usuario, setUsuario] = useState(
     JSON.parse(localStorage.getItem("usuario")) || null
   );
+
+  // ----------------------
+  // PERFIL DE USUARIO
+  // Edición de nombre, correo y contraseña
+  // ----------------------
+
+  const [perfilNombre, setPerfilNombre] = useState(
+    JSON.parse(localStorage.getItem("usuario"))?.name || ""
+  );
+  const [perfilEmail, setPerfilEmail] = useState(
+    JSON.parse(localStorage.getItem("usuario"))?.email || ""
+  );
+  const [perfilPassword, setPerfilPassword] = useState("");
+  const [perfilConfirmarPassword, setPerfilConfirmarPassword] = useState("");
+
+  // ----------------------
+  // AUTENTICACIÓN
+  // Registro e inicio de sesión
+  // ----------------------
+
   const [regNombre, setRegNombre] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+
+  // ----------------------
+  // INVENTARIO Y PRODUCTOS
+  // Lista de productos y formulario principal
+  // ----------------------
+
   const [productos, setProductos] = useState([]);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -30,31 +66,64 @@ function App() {
   const [precioVenta, setPrecioVenta] = useState("");
   const [stock, setStock] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
+
+  // ----------------------
+  // EDICIÓN DE PRODUCTOS
+  // Control del modo edición
+  // ----------------------
+
   const [editandoId, setEditandoId] = useState(null);
   const [productoReposicionId, setProductoReposicionId] = useState("");
   const [cantidadReposicion, setCantidadReposicion] = useState("");
   const [modoRegistro, setModoRegistro] = useState("nuevo");
-  const [busqueda, setBusqueda] = useState("");
-  const [orden, setOrden] = useState("");
-  const [filtroStock, setFiltroStock] = useState("todos");
+
+  // ----------------------
+  // NAVEGACIÓN DEL DASHBOARD
+  // Sidebar y módulos activos
+  // ----------------------
+
   const [seccionActiva, setSeccionActiva] = useState("inicio");
+
+  // ----------------------
+  // REGISTRO DE VENTAS Y MOVIMIENTOS
+  // Ventas normales y mayoreo
+  // ----------------------
   const [productoMovimientoId, setProductoMovimientoId] = useState("");
   const [cantidadMovimiento, setCantidadMovimiento] = useState("");
   const [tipoMovimiento, setTipoMovimiento] = useState("venta");
   const [tipoVentaSeleccionado, setTipoVentaSeleccionado] = useState("detalle");
   const [precioUnitarioNegociado, setPrecioUnitarioNegociado] = useState("");
   const [precioGlobalMayoreo, setPrecioGlobalMayoreo] = useState("");
+
+  // ----------------------
+  // HISTORIAL Y REPORTES
+  // Ventas, reposiciones y métricas
+  // ----------------------
+
   const [ventas, setVentas] = useState([]);
   const [filtroFechaVenta, setFiltroFechaVenta] = useState("");
   const [ordenVentas, setOrdenVentas] = useState("");
-  const [busquedaVenta, setBusquedaVenta] = useState("");
   const [reposiciones, setReposiciones] = useState([]);
+
+  // ----------------------
+  // FILTROS Y BÚSQUEDAS
+  // Inventario e historial
+  // ----------------------
+
+  const [busqueda, setBusqueda] = useState("");
+  const [orden, setOrden] = useState("");
+  const [filtroStock, setFiltroStock] = useState("todos");
+  const [busquedaVenta, setBusquedaVenta] = useState("");
   const [busquedaReposicion, setBusquedaReposicion] = useState("");
   const [tipoHistorial, setTipoHistorial] = useState("ventas");
   const [topHistorialActivo, setTopHistorialActivo] = useState("ventas");
   const [filtroFechaReposicion, setFiltroFechaReposicion] = useState("");
 
-  //Función de registro de usuario
+  // ======================================================
+  // FUNCIONES DE AUTENTICACIÓN
+  // Registro, login y cierre de sesión
+  // ======================================================
+
   const registrarUsuario = async (e) => {
     e.preventDefault();
 
@@ -87,7 +156,6 @@ function App() {
     }
   };
 
-  //Función de Login
   const iniciarSesion = async (e) => {
     e.preventDefault();
 
@@ -122,13 +190,78 @@ function App() {
     }
   };
 
-  //Función cerrar sesión
   const cerrarSesion = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
     setToken("");
     setUsuario(null);
   };
+
+  // ======================================================
+  // FUNCIÓN DE PERFIL DE USUARIO
+  // Actualiza nombre, correo y contraseña
+  // ======================================================
+
+  const actualizarPerfil = async (e) => {
+    e.preventDefault();
+
+    if (!perfilNombre.trim() || !perfilEmail.trim()) {
+      alert("Nombre y correo son obligatorios");
+      return;
+    }
+
+    if (perfilPassword || perfilConfirmarPassword) {
+      if (perfilPassword !== perfilConfirmarPassword) {
+        alert("Las contraseñas no coinciden");
+        return;
+      }
+
+      if (perfilPassword.length < 6) {
+        alert("La contraseña debe tener al menos 6 caracteres");
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/perfil`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: perfilNombre,
+          email: perfilEmail,
+          password: perfilPassword,
+          confirmarPassword: perfilConfirmarPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Error al actualizar perfil");
+        return;
+      }
+
+      localStorage.setItem("usuario", JSON.stringify(data.user));
+      setUsuario(data.user);
+
+      setPerfilPassword("");
+      setPerfilConfirmarPassword("");
+
+      alert("Perfil actualizado correctamente");
+      setSeccionActiva("inicio");
+    } catch (error) {
+      console.error("Error al actualizar perfil:", error);
+      alert("Error al actualizar perfil");
+    }
+  };
+
+  // ======================================================
+  // FUNCIONES PARA OBTENER DATOS DEL BACKEND
+  // Productos, ventas y reposiciones
+  // ======================================================
 
   const obtenerProductos = async () => {
     try {
@@ -192,6 +325,11 @@ function App() {
       console.error("Error al obtener reposiciones:", error);
     }
   };
+
+  // ======================================================
+  // FUNCIONES DE INVENTARIO Y PRODUCTOS
+  // Crear, editar, eliminar y cancelar edición
+  // ======================================================
 
   const guardarProducto = async (e) => {
     e.preventDefault();
@@ -314,6 +452,11 @@ function App() {
     setEditandoId(null);
     setSeccionActiva("inventario");
   };
+
+  // ======================================================
+  // FUNCIONES DE VENTAS Y MOVIMIENTOS
+  // Registra ventas normales, mayoreo y reposiciones
+  // ======================================================
 
   const guardarMovimiento = async () => {
     if (!productoMovimientoId) {
@@ -473,6 +616,11 @@ function App() {
     setSeccionActiva("inventario");
   };
 
+  // ======================================================
+  // CARGA INICIAL DE DATOS
+  // Se ejecuta cuando hay sesión activa
+  // ======================================================
+
   useEffect(() => {
   if (token) {
     obtenerProductos();
@@ -481,13 +629,17 @@ function App() {
   }
 }, [token]);
 
-  //si no hay token
+  // ======================================================
+  // PANTALLA DE AUTENTICACIÓN
+  // Se muestra cuando no hay sesión activa
+  // Incluye login y registro de usuario
+  // ======================================================
   
   if (!token) {
     return (
       <div
         style={{
-          padding: "20px",
+          padding: "12px",
           maxWidth: "420px",
           margin: "60px auto",
           backgroundColor: "#f8f9fa",
@@ -531,7 +683,7 @@ function App() {
               backgroundColor: "#0d6efd",
               color: "white",
               border: "none",
-              padding: "10px 16px",
+              padding: "8px 12px",
               borderRadius: "8px",
               cursor: "pointer",
             }}
@@ -570,7 +722,7 @@ function App() {
               backgroundColor: "#0d6efd",
               color: "white",
               border: "none",
-              padding: "10px 16px",
+              padding: "8px 12px",
               borderRadius: "8px",
               cursor: "pointer",
             }}
@@ -583,7 +735,15 @@ function App() {
     );
   }
 
-  //Si hay token
+  // ======================================================
+  // DATOS CALCULADOS CUANDO HAY SESIÓN ACTIVA
+  // Filtros, métricas, alertas, ventas e historial
+  // ======================================================
+
+  // ----------------------
+  // INVENTARIO FILTRADO
+  // Búsqueda, ordenamiento y filtros de stock
+  // ----------------------
 
   const productosFiltrados = productos
     .filter((producto) => {
@@ -669,6 +829,12 @@ function App() {
 
       return Number(a.stock) - Number(b.stock);
     });
+
+  // ----------------------
+  // MÉTRICAS PRINCIPALES DEL DASHBOARD
+  // Totales generales y estado del inventario
+  // ----------------------
+
   const totalProductos = productos.length;
 
   const stockTotal = productos.reduce(
@@ -726,6 +892,11 @@ function App() {
       `📌 Prioridad de reposición: ${productoPrioritario.nombre} tiene solo ${productoPrioritario.stock} unidad(es).`
     );
   }
+
+  // ----------------------
+  // CÁLCULOS DE VENTAS Y MOVIMIENTOS
+  // Simulación de ingresos, costos y utilidad
+  // ----------------------
 
   const productoMovimientoSeleccionado = productos.find(
     (producto) => producto._id === productoMovimientoId
@@ -789,6 +960,11 @@ function App() {
     alertas.length > 0
       ? alertas
       : [];
+
+  // ----------------------
+  // HISTORIAL FILTRADO DE VENTAS
+  // Búsquedas, filtros y ordenamiento
+  // ----------------------
 
   const ventasFiltradas = ventas
     .filter((venta) => {
@@ -866,6 +1042,11 @@ function App() {
       ? (utilidadFiltrada / ingresosFiltrados) * 100
       : 0;
 
+  // ----------------------
+  // HISTORIAL FILTRADO DE REPOSICIONES
+  // Filtros y búsqueda de reposiciones
+  // ----------------------
+
   const reposicionesFiltradas = reposiciones.filter((reposicion) => {
     const coincideNombre = (reposicion.nombreProducto || "")
       .toLowerCase()
@@ -882,6 +1063,11 @@ function App() {
     (total, venta) => total + Number(venta.costoTotal),
     0
   );
+
+  // ----------------------
+  // DATOS PARA GRÁFICAS
+  // Ventas e ingresos por día
+  // ----------------------
 
   const ventasPorDia = ventas.reduce((acc, venta) => {
     const fechaObj = new Date(venta.createdAt);
@@ -932,6 +1118,11 @@ function App() {
     }
   }
 
+  // ----------------------
+  // ANÁLISIS DE PRODUCTOS
+  // Productos más vendidos y mayor utilidad
+  // ----------------------
+
   const resumenProductos = Object.values(
     ventas.reduce((acc, venta) => {
       const nombre = venta.nombreProducto;
@@ -979,6 +1170,11 @@ function App() {
     }))
     .sort((a, b) => b.margen - a.margen)
     .slice(0, 3);
+
+  // ----------------------
+  // RECOMENDACIONES INTELIGENTES
+  // Alertas y sugerencias automáticas
+  // ----------------------
 
   const recomendaciones = [];
 
@@ -1035,108 +1231,374 @@ function App() {
     (a, b) => prioridadOrden[a.tipo] - prioridadOrden[b.tipo]
   );
 
-  return (
-    <div
-      id = "top"
+  // ======================================================
+  // ESTILOS GENERALES DEL DASHBOARD
+  // Sidebar, encabezado, contenido y diseño base
+  // ======================================================
+
+  const layoutStyles = {
+    appShell: {
+      minHeight: "100vh",
+      display: "flex",
+      backgroundColor: "#f5f7fb",
+      fontFamily: "'Segoe UI', sans-serif",
+      fontSize: "13px",
+      color: "#111827",
+    },
+
+    sidebar: {
+      width: "240px",
+      height: "100vh",
+      backgroundColor: "white",
+      borderRight: "1px solid #e5e7eb",
+      padding: "18px 12px",
+      display: "flex",
+      flexDirection: "column",
+      position: "fixed",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      zIndex: 10,
+    },
+
+    logoBox: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      padding: "0 8px 16px",
+      borderBottom: "1px solid #eef0f4",
+      marginBottom: "14px",
+    },
+
+    logoIcon: {
+      width: "34px",
+      height: "34px",
+      borderRadius: "10px",
+      background: "linear-gradient(135deg, #7c3aed, #2563eb)",
+      color: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "18px",
+      fontWeight: "800",
+    },
+
+    userBox: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      padding: "8px 8px",
+      marginBottom: "12px",
+    },
+
+    avatar: {
+      width: "34px",
+      height: "34px",
+      borderRadius: "50%",
+      backgroundColor: "#dbeafe",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#2563eb",
+      fontWeight: "800",
+    },
+
+    sidebarNav: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "8px",
+    },
+
+    sidebarButton: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      backgroundColor: "transparent",
+      border: "none",
+      padding: "9px 12px",
+      borderRadius: "9px",
+      cursor: "pointer",
+      color: "#374151",
+      fontSize: "12.5px",
+      fontWeight: "600",
+      textAlign: "left",
+      boxSizing: "border-box",
+    },
+
+    sidebarButtonActive: {
+      backgroundColor: "#f1ecff",
+      color: "#6d28d9",
+      boxShadow: "inset 4px 0 0 #7c3aed",
+    },
+    
+    logoutButton: {
+      marginTop: "auto",
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      backgroundColor: "transparent",
+      border: "none",
+      color: "#dc2626",
+      padding: "9px 12px",
+      borderRadius: "9px",
+      cursor: "pointer",
+      fontWeight: "700",
+      fontSize: "12.5px",
+    },
+
+    mainContent: {
+      flex: 1,
+      minWidth: 0,
+      marginLeft: "240px",
+    },
+
+    topbar: {
+      minHeight: "74px",
+      backgroundColor: "white",
+      borderBottom: "1px solid #e5e7eb",
+      padding: "24px 42px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      boxSizing: "border-box",
+    },
+
+    pageTitle: {
+      margin: 0,
+      fontSize: "22px",
+      fontWeight: "700",
+      color: "#111827",
+    },
+
+    pageSubtitle: {
+      margin: "4px 0 0",
+      color: "#6b7280",
+      fontSize: "13px",
+      fontWeight: "400",
+    },
+
+    contentArea: {
+      padding: "12px 42px 26px",
+      boxSizing: "border-box",
+    },
+  };
+
+  // ======================================================
+  // FUNCIONES DE NAVEGACIÓN
+  // Cambia entre módulos del sistema
+  // ======================================================
+
+  const cambiarSeccion = (seccion) => {
+    if (editandoId && seccion !== "registrar") {
+      cancelarEdicion();
+    }
+
+    setSeccionActiva(seccion);
+  };
+
+  const opcionMenu = (clave, texto, icono) => (
+    <button
+      type="button"
+      onClick={() => cambiarSeccion(clave)}
       style={{
-        maxWidth: "1100px",
-        margin: "25px auto",
-        padding: "22px",
-        backgroundColor: "#f8f9fa",
-        borderRadius: "12px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-        fontFamily: "Arial, sans-serif",
+        ...layoutStyles.sidebarButton,
+        ...(seccionActiva === clave ? layoutStyles.sidebarButtonActive : {}),
       }}
     >
-      <h2 style={{ color: "#333", marginBottom: "10px" }}>
-        Bienvenido, {usuario?.name}
-      </h2>
+      <span>{icono}</span>
+      <span>{texto}</span>
+    </button>
+  );
 
-      <button
-        onClick={cerrarSesion}
-        style={{
-          backgroundColor: "#dc3545",
-          color: "white",
-          border: "none",
-          padding: "10px 16px",
-          borderRadius: "8px",
-          cursor: "pointer",
-          float: "right",
-        }}
-      >
-        Cerrar sesión
-      </button>
+  // ======================================================
+  // TÍTULOS DINÁMICOS DEL ENCABEZADO
+  // Cambian según el módulo activo
+  // ======================================================
 
-      <h1
-        style={{
-          color: "#222",
-          fontSize: "22px",
-          fontWeight: "700",
-          marginBottom: "16px",
-        }}
-      >
-        Panel de Inventario
-      </h1>
+  const tituloSeccion =
+    seccionActiva === "perfil"
+      ? "Mi Perfil"
+      : seccionActiva === "inicio"
+      ? "🏠 Inicio"
+      : seccionActiva === "inventario"
+      ? "📦 Inventario"
+      : seccionActiva === "ventas"
+      ? "🛒 Ventas"
+      : seccionActiva === "historial"
+      ? "📊 Historial"
+      : editandoId
+      ? "Editar Producto"
+      : "Agregar Producto";
 
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          flexWrap: "wrap",
-          marginBottom: "25px",
-        }}
-      >
-        {[
-          ["inicio", "🏠 Inicio", "top"],
-          ["ventas", "🧾 Ventas", "zonaVentas"],          
-          ["historial", "📊 Historial", "zonaHistorial"],        
-          [
-            "registrar",
-            editandoId ? "✏️ Editar producto" : "➕ Registrar / Reponer",
-            "formularioProducto"
-          ],
-          ["inventario", "📦 Inventario", "listaProductos"],
-        ].map(([clave, texto, destino]) => (
-          <button
-            key={clave}
-            onClick={() => {
+  const subtituloSeccion =
+    seccionActiva === "perfil"
+      ? "Configuración de usuario y seguridad"
+      : seccionActiva === "inicio"
+      ? "Resumen general del negocio"
+      : seccionActiva === "inventario"
+      ? "Gestiona tus productos y controla tu stock"
+      : seccionActiva === "ventas"
+      ? "Registra ventas normales o al mayoreo"
+      : seccionActiva === "historial"
+      ? "Consulta ventas, reposiciones y rendimiento"
+      : editandoId
+      ? "Actualiza la información del producto seleccionado"
+      : "Formulario de productos dentro del módulo de inventario";
 
-              if (editandoId && clave !== "registrar") {
-                cancelarEdicion();
-              }
+  // ======================================================
+  // RENDER PRINCIPAL DE LA APLICACIÓN
+  // Estructura visual completa del sistema
+  // ======================================================
 
-              setSeccionActiva(clave);
+  return (
+    <div id="top" style={layoutStyles.appShell}>
 
-              document.getElementById(destino)?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            }}
-            style={{
-              backgroundColor:
-                seccionActiva === clave
-                  ? clave === "historial" && tipoHistorial === "reposiciones"
-                    ? "#198754"
-                    : clave === "registrar" && modoRegistro === "reposicion"
-                    ? "#198754"
-                    : clave === "ventas" &&
-                      tipoVentaSeleccionado === "mayoreo"
-                    ? "#fd7e14"
-                    : "#0d6efd"
-                  : "white",
-              color: seccionActiva === clave ? "white" : "#222",
-              border: "1px solid #ddd",
-              padding: "8px 12px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontWeight: "600",
-              fontSize: "13px",
-            }}
-          >
-            {texto}
-          </button>
-        ))}
-      </div>
+      {/* ======================================================
+      SIDEBAR LATERAL
+      Logo, usuario, navegación y cierre de sesión
+      ====================================================== */}
+
+      <aside style={layoutStyles.sidebar}>
+        <div style={layoutStyles.logoBox}>
+          <div style={layoutStyles.logoIcon}>⚡</div>
+
+          <div>
+            <h2 style={{ margin: 0, fontSize: "22px", color: "#6d28d9" }}>
+              Inventario
+            </h2>
+            <p style={{ margin: 0, fontSize: "13px", color: "#374151" }}>
+              Inteligente
+            </p>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...layoutStyles.userBox,
+            cursor: "pointer",
+
+            backgroundColor:
+              seccionActiva === "perfil"
+                ? "#f3f0ff"
+                : "transparent",
+
+            borderLeft:
+              seccionActiva === "perfil"
+                ? "4px solid #7c3aed"
+                : "4px solid transparent",
+
+            borderRadius: "10px",
+            paddingLeft: "10px",
+          }}
+          onClick={() => setSeccionActiva("perfil")}
+        >
+          <div style={layoutStyles.avatar}>
+            {usuario?.name?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+
+          <div>
+            <p
+              style={{
+                margin: 0,
+                fontWeight: "800",
+                fontSize: "12.5px",
+                color:
+                  seccionActiva === "perfil"
+                    ? "#7c3aed"
+                    : "#111827",
+              }}
+            >
+              {usuario?.name}
+            </p>
+
+            <p
+              style={{
+                margin: "3px 0 0",
+                color:
+                  seccionActiva === "perfil"
+                    ? "#7c3aed"
+                    : "#64748b",
+                fontSize: "13px",
+              }}
+            >
+              Administrador
+            </p>
+          </div>
+        </div>
+
+        <nav style={layoutStyles.sidebarNav}>
+          {opcionMenu("inicio", "Inicio", "🏠")}
+          {opcionMenu("inventario", "Inventario", "📦")}
+          {opcionMenu("ventas", "Ventas", "🛒")}
+          {opcionMenu("historial", "Historial", "📊")}
+        </nav>
+
+        <button type="button" onClick={cerrarSesion} style={layoutStyles.logoutButton}>
+          <span>↪</span>
+          <span>Cerrar Sesión</span>
+        </button>
+      </aside>
+
+      <main style={layoutStyles.mainContent}>
+
+        {/* ======================================================
+        ENCABEZADO SUPERIOR
+        Título dinámico y alertas rápidas
+        ====================================================== */}
+
+        <header style={layoutStyles.topbar}>
+          <div>
+            <h1 style={layoutStyles.pageTitle}>{tituloSeccion}</h1>
+            <p style={layoutStyles.pageSubtitle}>{subtituloSeccion}</p>
+          </div>
+
+          {mensajeAlerta.length > 0 && (
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "50%",
+                backgroundColor: "white",
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+                fontSize: "20px",
+              }}
+            >
+              🔔
+              <span
+                style={{
+                  position: "absolute",
+                  top: "5px",
+                  right: "7px",
+                  backgroundColor: "#ef4444",
+                  color: "white",
+                  width: "16px",
+                  height: "16px",
+                  borderRadius: "50%",
+                  fontSize: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "800",
+                }}
+              >
+                {mensajeAlerta.length}
+              </span>
+            </div>
+          )}
+        </header>
+
+        <section style={layoutStyles.contentArea}>
+
+      {/* ======================================================
+      PANEL DE ALERTAS INTELIGENTES
+      Stock bajo, agotados y prioridades
+      ====================================================== */}
 
       <div
         id = "zonaAlertas"
@@ -1169,17 +1631,203 @@ function App() {
         ))}
       </div>
 
+      {/* ======================================================
+      MÓDULO DE PERFIL DE USUARIO
+      Edición de nombre, correo y contraseña
+      ====================================================== */}
+
+      {seccionActiva === "perfil" && (
+        <form
+          onSubmit={actualizarPerfil}
+          style={{
+            backgroundColor: "white",
+            padding: "18px",
+            borderRadius: "14px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            border: "1px solid #edf0f5",
+            maxWidth: "720px",
+          }}
+        >
+          <h2
+            style={{
+              marginTop: 0,
+              marginBottom: "6px",
+              fontSize: "18px",
+              color: "#111827",
+            }}
+          >
+            Información del usuario
+          </h2>
+
+          <p
+            style={{
+              marginTop: 0,
+              marginBottom: "18px",
+              color: "#64748b",
+              fontSize: "13px",
+            }}
+          >
+            Actualiza tus datos de usuario. La contraseña solo se cambia si escribes una nueva.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: "14px",
+              marginBottom: "18px",
+            }}
+          >
+            <div>
+              <p style={{ marginBottom: "6px", fontWeight: "600", fontSize: "13px" }}>
+                Nombre
+              </p>
+
+              <input
+                type="text"
+                value={perfilNombre}
+                onChange={(e) => setPerfilNombre(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <p style={{ marginBottom: "6px", fontWeight: "600", fontSize: "13px" }}>
+                Correo
+              </p>
+
+              <input
+                type="email"
+                value={perfilEmail}
+                onChange={(e) => setPerfilEmail(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <p style={{ marginBottom: "6px", fontWeight: "600", fontSize: "13px" }}>
+                Nueva contraseña
+              </p>
+
+              <input
+                  type="password"
+                  placeholder="Opcional"
+                  value={perfilPassword}
+                  onChange={(e) => setPerfilPassword(e.target.value)}
+                  style={{
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <p style={{ marginBottom: "6px", fontWeight: "600", fontSize: "13px" }}>
+                Confirmar contraseña
+              </p>
+
+              <input
+                  type="password"
+                  placeholder="Repite la nueva contraseña"
+                  value={perfilConfirmarPassword}
+                  onChange={(e) => setPerfilConfirmarPassword(e.target.value)}
+                  style={{
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="submit"
+              style={{
+                backgroundColor: "#198754",
+                color: "white",
+                border: "none",
+                padding: "9px 12px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: "500",
+                lineHeight: "1",
+                cursor: "pointer",
+              }}
+            >
+              Actualizar perfil
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSeccionActiva("inicio")}
+              style={{
+                backgroundColor: "#dc3545",
+                color: "white",
+                border: "none",
+                padding: "9px 12px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: "500",
+                lineHeight: "1",
+                cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ======================================================
+      DASHBOARD PRINCIPAL
+      Resumen general del negocio
+      ====================================================== */}
+
       <div
         style={{
           display: seccionActiva === "inicio" ? "block" : "none",
           backgroundColor: "#eef6ff",
           color: "#084298",
-          padding: "15px",
+          padding: "12px",
           borderRadius: "10px",
           marginBottom: "20px",
           fontWeight: "600",
         }}
       >
+
+        {/* ----------------------
+        RECOMENDACIONES INTELIGENTES
+        Análisis automático del inventario
+        ---------------------- */}
+
         <h3 style={{ marginTop: 0 }}>🧠 Recomendaciones inteligentes</h3>
 
         {recomendaciones.length === 0 ? (
@@ -1214,7 +1862,7 @@ function App() {
                 style={{
                   backgroundColor: colorFondo,
                   color: colorTexto,
-                  padding: "10px",
+                  padding: "8px",
                   borderRadius: "8px",
                   marginBottom: "8px",
                 }}
@@ -1231,19 +1879,25 @@ function App() {
           display: seccionActiva === "inicio" ? "grid" : "none",
           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "15px",
-          marginBottom: "25px",
+          marginBottom: "10px",
         }}
       >
+
+        {/* ----------------------
+        MÉTRICAS PRINCIPALES
+        Resumen financiero y estado del inventario
+        ---------------------- */}
+
         <div
           style={{
             display: seccionActiva === "inicio" ? "grid" : "none",
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Total de productos
           </p>
           <h2 style={{ margin: "8px 0 0", color: "#222" }}>{totalProductos}</h2>
@@ -1252,12 +1906,12 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Stock total
           </p>
           <h2 style={{ margin: "8px 0 0", color: "#222" }}>{stockTotal}</h2>
@@ -1266,12 +1920,12 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Productos con stock bajo
           </p>
           <h2 style={{ margin: "8px 0 0", color: stockBajo > 0 ? "#dc3545" : "#198754" }}>
@@ -1282,12 +1936,12 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Valor invertido
           </p>
           <h2 style={{ margin: "8px 0 0", color: "#222" }}>
@@ -1298,12 +1952,12 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Valor potencial de venta
           </p>
           <h2 style={{ margin: "8px 0 0", color: "#222" }}>
@@ -1314,12 +1968,12 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Utilidad potencial
           </p>
           <h2
@@ -1335,12 +1989,12 @@ function App() {
         <div
           style={{
             backgroundColor: "white",
-            padding: "14px",
+            padding: "12px",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: "12.5px" }}>
             Margen promedio inventario
           </p>
 
@@ -1360,6 +2014,11 @@ function App() {
         </div>
       </div>
 
+      {/* ----------------------
+      PRODUCTOS DESTACADOS
+      Más vendido y mayor utilidad
+      ---------------------- */}
+
       <div
           style={{
             display: seccionActiva === "inicio" ? "grid" : "none",
@@ -1368,7 +2027,7 @@ function App() {
             marginBottom: "25px",
           }}
         >
-          <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
+          <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
              <p style={{ margin: 0, color: "#666" }}>🥇 Más vendido</p>
              <h3 style={{ margin: "8px 0 0" }}>
               {productoMasVendido?.nombre || "—"}
@@ -1378,7 +2037,7 @@ function App() {
             </p>
           </div>
 
-          <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
+          <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
             <p style={{ margin: 0, color: "#666" }}>💰 Mayor utilidad</p>
              <h3 style={{ margin: "8px 0 0" }}>
               {productoMayorUtilidad?.nombre || "—"}
@@ -1389,6 +2048,11 @@ function App() {
            </div>
         </div>  
       
+      {/* ----------------------
+      PRODUCTO PRIORITARIO
+      Producto con reposición urgente
+      ---------------------- */}
+
       <div
         style={{
           display:
@@ -1398,7 +2062,7 @@ function App() {
             ? "block"
             : "none",
           backgroundColor: "white",
-          padding: "14px",
+          padding: "12px",
           borderRadius: "12px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           marginBottom: "25px",
@@ -1406,7 +2070,7 @@ function App() {
       >
         {productoPrioritario ? (
           <>
-            <p style={{ display: seccionActiva === "inicio" ? "block" : "none", margin: 0, color: "#666", fontSize: "14px" }}>
+            <p style={{ display: seccionActiva === "inicio" ? "block" : "none", margin: 0, color: "#666", fontSize: "12.5px" }}>
               Producto prioritario
             </p>
 
@@ -1423,21 +2087,23 @@ function App() {
         )}
       </div>
 
+      {/* ======================================================
+      MÓDULO DE VENTAS
+      Ventas normales, mayoreo y simulación financiera
+      ====================================================== */}
+
       <div
         id="zonaVentas"
         style={{
           display: seccionActiva === "ventas" ? "block" : "none",
           backgroundColor: "white",
-          padding: "20px",
+          padding: "12px",
           borderRadius: "12px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          marginTop: "25px",
+          marginTop: "0",
           marginBottom: "25px",
         }}
       >
-        <h2 style={{ marginTop: 0, color: "#222" }}>
-          🧾 Registrar venta
-        </h2>
 
         <div style={{ marginBottom: "20px" }}>
           <button
@@ -1453,7 +2119,7 @@ function App() {
                   ? "white"
                   : "#222",
               border: "1px solid #ddd",
-              padding: "10px 14px",
+              padding: "8px 12px",
               borderRadius: "8px",
               cursor: "pointer",
               marginRight: "10px",
@@ -1476,7 +2142,7 @@ function App() {
                   ? "white"
                   : "#222",
               border: "1px solid #ddd",
-              padding: "10px 14px",
+              padding: "8px 12px",
               borderRadius: "8px",
               cursor: "pointer",
               fontWeight: "600",
@@ -1502,10 +2168,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
             marginBottom: "15px",
           }}
         >
@@ -1531,10 +2197,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
             marginBottom: "15px",
           }}
         />
@@ -1557,10 +2223,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "10px",
+                padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "14px",
+                fontSize: "12.5px",
                 marginBottom: "15px",
               }}
             />
@@ -1583,10 +2249,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "10px",
+                padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "14px",
+                fontSize: "12.5px",
                 marginBottom: "15px",
               }}
             />
@@ -1638,6 +2304,11 @@ function App() {
             }}
           >
 
+            {/* ----------------------
+            RESUMEN FINANCIERO DE VENTA
+            Cálculo automático de ingresos y utilidad
+            ---------------------- */}
+
             <h3 style={{ margin: "0 0 10px", color: "#084298" }}>
               Resumen de la operación
             </h3>
@@ -1670,12 +2341,17 @@ function App() {
               Utilidad real estimada: ${utilidadEstimadaMovimiento.toFixed(2)}
             </p>
 
+            {/* ----------------------
+            ALERTA DE VENTA CON PÉRDIDA
+            Validación financiera preventiva
+            ---------------------- */}
+
             {ventaConPerdida && (
               <div
                 style={{
                   backgroundColor: "#f8d7da",
                   color: "#842029",
-                  padding: "10px",
+                  padding: "8px",
                   borderRadius: "8px",
                   marginTop: "10px",
                   fontWeight: "700",
@@ -1685,7 +2361,6 @@ function App() {
               </div>
             )}
 
-            
           </div>
         )}
 
@@ -1698,7 +2373,7 @@ function App() {
             backgroundColor: "#198754",
             color: "white",
             border: "none",
-            padding: "10px 14px",
+            padding: "8px 12px",
             borderRadius: "8px",
             cursor: "pointer",
             fontSize: "13px",
@@ -1716,10 +2391,10 @@ function App() {
             backgroundColor: "#dc3545",
             color: "white",
             border: "none",
-            padding: "10px 14px",
+            padding: "8px 12px",
             borderRadius: "8px",
             cursor: "pointer",
-            fontSize: "13px",
+            fontSize: "12px",
             fontWeight: "600",
           }}
         >
@@ -1728,21 +2403,23 @@ function App() {
 
       </div>
 
+      {/* ======================================================
+      MÓDULO DE HISTORIAL
+      Ventas, reposiciones y análisis financiero
+      ====================================================== */}
+
       <div
         id="zonaHistorial"
         style={{
           display: seccionActiva === "historial" ? "block" : "none",
           backgroundColor: "white",
-          padding: "20px",
+          padding: "16px",
           borderRadius: "12px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          marginTop: "25px",
-          marginBottom: "25px",
+          marginTop: "0",
+          marginBottom: "20px",
         }}
       >
-        <h2 style={{ marginTop: 0, color: "#222" }}>
-          📊 Historial
-        </h2>
 
         <div style={{ marginBottom: "15px" }}>
           <button
@@ -1752,8 +2429,11 @@ function App() {
               backgroundColor: tipoHistorial === "ventas" ? "#0d6efd" : "white",
               color: tipoHistorial === "ventas" ? "white" : "#222",
               border: "1px solid #ddd",
-              padding: "10px 14px",
+              padding: "9px 12px",
               borderRadius: "8px",
+              fontSize: "12px",
+              fontWeight: "500",
+              lineHeight: "1",
               cursor: "pointer",
               marginRight: "10px",
               fontWeight: "600",
@@ -1771,8 +2451,11 @@ function App() {
               ? "#198754"
               : "white",              color: tipoHistorial === "reposiciones" ? "white" : "#222",
               border: "1px solid #ddd",
-              padding: "10px 14px",
+              padding: "9px 12px",
               borderRadius: "8px",
+              fontSize: "12px",
+              fontWeight: "500",
+              lineHeight: "1",
               cursor: "pointer",
               fontWeight: "600",
             }}
@@ -1780,6 +2463,11 @@ function App() {
             Reposiciones
           </button>
         </div>
+
+        {/* ----------------------
+        RESUMEN DE VENTAS
+        Tarjetas financieras del historial
+        ---------------------- */}
 
         {tipoHistorial === "ventas" ? (
           <>
@@ -1792,30 +2480,30 @@ function App() {
                 marginBottom: "20px",
               }}
             >
-              <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
-                <p style={{ margin: 0, color: "#666" }}>Ventas filtradas</p>
+              <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
+                <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>Ventas filtradas</p>
                 <h3 style={{ margin: "8px 0 0" }}>{ventasFiltradas.length}</h3>
               </div>
 
-              <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
-                <p style={{ margin: 0, color: "#666" }}>Ingresos</p>
+              <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
+                <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>Ingresos</p>
                 <h3 style={{ margin: "8px 0 0" }}>${ingresosFiltrados.toFixed(2)}</h3>
               </div>
 
-              <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
-                <p style={{ margin: 0, color: "#666" }}>Costos</p>
+              <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
+                <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>Costos</p>
                 <h3 style={{ margin: "8px 0 0" }}>${costosFiltrados.toFixed(2)}</h3>
               </div>
 
-              <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
-                <p style={{ margin: 0, color: "#666" }}>Utilidad</p>
+              <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
+                <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>Utilidad</p>
                 <h3 style={{ margin: "8px 0 0", color: "#198754" }}>
                   ${utilidadFiltrada.toFixed(2)}
                 </h3>
               </div>
 
-              <div style={{ backgroundColor: "#f8f9fa", padding: "15px", borderRadius: "10px" }}>
-                <p style={{ margin: 0, color: "#666" }}>Margen global</p>
+              <div style={{ backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "10px" }}>
+                <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>Margen global</p>
 
                 <h3
                   style={{
@@ -1833,48 +2521,18 @@ function App() {
               </div>
             </div>
 
-            {datosGraficaVentas.length > 0 && (
-              <div
-                style={{
-                  width: "100%",
-                  height: 320,
-                  backgroundColor: "#f8f9fa",
-                  padding: "15px",
-                  borderRadius: "12px",
-                  marginBottom: "25px",
-                }}
-              >
-                <h3 style={{ marginTop: 0, color: "#222" }}>
-                  📈 Evolución de ingresos y utilidad por día
-                </h3>
-
-                <ResponsiveContainer width="100%" height="85%">
-                  <LineChart data={datosGraficaVentas}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="fecha" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="ingresos"
-                      name="Ingresos"
-                      stroke="#0d6efd"
-                      strokeWidth={3}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="utilidad"
-                      name="Utilidad"
-                      stroke="#198754"
-                      strokeWidth={3}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            {/* ----------------------
+            TOP DE PRODUCTOS
+            Más vendidos, utilidad y margen
+            ---------------------- */}
 
             <div style={{ marginBottom: "25px" }}>
+
+              {/* ----------------------
+              ANÁLISIS DE PRODUCTOS
+              Productos más vendidos, utilidad y margen
+              ---------------------- */}
+
               <h3 style={{ marginBottom: "10px" }}>📦 Top 3 productos más vendidos</h3>
 
               <div style={{ marginBottom: "15px" }}>
@@ -1938,6 +2596,12 @@ function App() {
                     overflowX: "auto",
                   }}
                 >
+
+                  {/* ----------------------
+                  TABLA DE HISTORIAL DE VENTAS
+                  Listado completo de operaciones
+                  ---------------------- */}
+
                   <table
                     style={{
                       width: "100%",
@@ -1947,11 +2611,11 @@ function App() {
                   >
                     <thead>
                       <tr>
-                        <th style={{ padding: "10px", textAlign: "center" }}>Producto</th>
-                        <th style={{ padding: "10px", textAlign: "center" }}>Unidades</th>
-                        <th style={{ padding: "10px", textAlign: "center" }}>Ingresos</th>
-                        <th style={{ padding: "10px", textAlign: "center" }}>Utilidad</th>
-                        <th style={{ padding: "10px", textAlign: "center" }}>Margen %</th>
+                        <th style={{ padding: "8px", textAlign: "center" }}>Producto</th>
+                        <th style={{ padding: "8px", textAlign: "center" }}>Unidades</th>
+                        <th style={{ padding: "8px", textAlign: "center" }}>Ingresos</th>
+                        <th style={{ padding: "8px", textAlign: "center" }}>Utilidad</th>
+                        <th style={{ padding: "8px", textAlign: "center" }}>Margen %</th>
                       </tr>
                     </thead>
 
@@ -1968,21 +2632,21 @@ function App() {
 
                         return (
                           <tr key={index}>
-                            <td style={{ padding: "10px", textAlign: "center" }}>
+                            <td style={{ padding: "8px", textAlign: "center" }}>
                               {p.nombre}
                             </td>
 
-                            <td style={{ padding: "10px", textAlign: "center" }}>
+                            <td style={{ padding: "8px", textAlign: "center" }}>
                               {p.cantidad}
                             </td>
 
-                            <td style={{ padding: "10px", textAlign: "center" }}>
+                            <td style={{ padding: "8px", textAlign: "center" }}>
                               ${p.ingresos.toFixed(2)}
                             </td>
 
                             <td
                               style={{
-                                padding: "10px",
+                                padding: "8px",
                                 textAlign: "center",
                                 color: p.utilidad < 0 ? "#dc3545" : "#198754",
                                 fontWeight: "700",
@@ -1993,7 +2657,7 @@ function App() {
 
                             <td
                               style={{
-                                padding: "10px",
+                                padding: "8px",
                                 textAlign: "center",
                                 color:
                                   margen < 0
@@ -2014,6 +2678,52 @@ function App() {
                 </div>
               )}
             </div>
+
+            {datosGraficaVentas.length > 0 && (
+              <div
+                style={{
+                  width: "100%",
+                  height: 320,
+                  backgroundColor: "#f8f9fa",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  marginBottom: "25px",
+                }}
+              >
+                <h3 style={{ marginTop: 0, color: "#222" }}>
+                  📈 Evolución de ingresos y utilidad por día
+                </h3>
+
+                {/* ----------------------
+                GRÁFICA FINANCIERA
+                Ingresos y utilidad por día
+                ---------------------- */}
+
+                <ResponsiveContainer width="100%" height="85%">
+                  <LineChart data={datosGraficaVentas}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="fecha" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="ingresos"
+                      name="Ingresos"
+                      stroke="#0d6efd"
+                      strokeWidth={3}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="utilidad"
+                      name="Utilidad"
+                      stroke="#198754"
+                      strokeWidth={3}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             <h3 style={{ marginBottom: "10px", color: "#222" }}>
               📄 Historial de ventas
@@ -2058,6 +2768,7 @@ function App() {
             {ventasFiltradas.length === 0 ? (
               <p>No hay ventas registradas todavía.</p>
             ) : (
+
               <div
                 style={{
                   width: "100%",
@@ -2074,43 +2785,43 @@ function App() {
                 >
                   <thead>
                     <tr>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Producto</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Tipo</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Cantidad</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Ingreso</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Costo total</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Utilidad</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Margen %</th>
-                      <th style={{ padding: "10px", textAlign: "center" }}>Fecha</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Producto</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Tipo</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Cantidad</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Ingreso</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Costo total</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Utilidad</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Margen %</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Fecha</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {ventasFiltradas.map((venta) => (
                       <tr key={venta._id}>
-                        <td style={{ padding: "10px", textAlign: "center" }}>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
                           {venta.nombreProducto}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center" }}>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
                           {venta.tipoVenta === "mayoreo" ? "Mayoreo" : "Normal"}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center" }}>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
                           {venta.cantidad}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center" }}>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
                           ${Number(venta.ingresoTotal).toFixed(2)}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center" }}>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
                           ${Number(venta.costoTotal).toFixed(2)}
                         </td>
 
                         <td
                           style={{
-                            padding: "10px",
+                            padding: "8px",
                             textAlign: "center",
                             color: "#198754",
                             fontWeight: "700",
@@ -2121,7 +2832,7 @@ function App() {
 
                         <td
                           style={{
-                            padding: "10px",
+                            padding: "8px",
                             textAlign: "center",
                             color: Number(venta.utilidad) < 0 ? "#dc3545" : "#198754",
                             fontWeight: "700",
@@ -2134,7 +2845,7 @@ function App() {
 
                         <td
                           style={{
-                            padding: "10px",
+                            padding: "8px",
                             textAlign: "center",
                             whiteSpace: "nowrap",
                           }}
@@ -2150,6 +2861,12 @@ function App() {
           </>
         ) : (
           <>
+
+            {/* ----------------------
+            TABLA DE HISTORIAL DE REPOSICIONES
+            Listado de entradas y reposiciones
+            ---------------------- */}
+
             <div style={{ marginBottom: "15px" }}>
               <input
                 type="text"
@@ -2183,22 +2900,22 @@ function App() {
               >
                 <thead>
                   <tr>
-                    <th style={{ padding: "10px" }}>Producto</th>
-                    <th style={{ padding: "10px" }}>Cantidad</th>
-                    <th style={{ padding: "10px" }}>Stock antes</th>
-                    <th style={{ padding: "10px" }}>Stock después</th>
-                    <th style={{ padding: "10px" }}>Fecha</th>
+                    <th style={{ padding: "8px" }}>Producto</th>
+                    <th style={{ padding: "8px" }}>Cantidad</th>
+                    <th style={{ padding: "8px" }}>Stock antes</th>
+                    <th style={{ padding: "8px" }}>Stock después</th>
+                    <th style={{ padding: "8px" }}>Fecha</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {reposicionesFiltradas.map((reposicion) => (
                     <tr key={reposicion._id}>
-                      <td style={{ padding: "10px", textAlign: "center" }}>{reposicion.nombreProducto}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>{reposicion.cantidad}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>{reposicion.stockAntes}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>{reposicion.stockDespues}</td>
-                      <td style={{ padding: "10px", textAlign: "center" }}>
+                      <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.nombreProducto}</td>
+                      <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.cantidad}</td>
+                      <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.stockAntes}</td>
+                      <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.stockDespues}</td>
+                      <td style={{ padding: "8px", textAlign: "center" }}>
                         {new Date(reposicion.createdAt).toLocaleString()}
                       </td>
                     </tr>
@@ -2214,7 +2931,7 @@ function App() {
         style={{
           display: seccionActiva === "registrar" ? "block" : "none",
           backgroundColor: "white",
-          padding: "20px",
+          padding: "12px",
           borderRadius: "12px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           marginTop: "25px",
@@ -2222,42 +2939,6 @@ function App() {
         }}
       >
 
-      {!editandoId && (
-        <div style={{ marginBottom: "20px" }}>
-          <button
-            type="button"
-            onClick={() => setModoRegistro("nuevo")}
-            style={{
-              backgroundColor: modoRegistro === "nuevo" ? "#0d6efd" : "white",
-              color: modoRegistro === "nuevo" ? "white" : "#222",
-              border: "1px solid #ddd",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              marginRight: "10px",
-              fontWeight: "600",
-            }}
-          >
-            ➕ Nuevo producto
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setModoRegistro("reposicion")}
-            style={{
-              backgroundColor: modoRegistro === "reposicion" ? "#198754" : "white",
-              color: modoRegistro === "reposicion" ? "white" : "#222",
-              border: "1px solid #ddd",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontWeight: "600",
-            }}
-          >
-            📥 Reponer producto
-          </button>
-        </div>
-      )}
 
       <h2
         id="formularioProducto"
@@ -2281,6 +2962,11 @@ function App() {
         </p>
       )}
 
+      {/* ----------------------
+      FORMULARIO DE PRODUCTOS
+      Crear y editar productos
+      ---------------------- */}
+
       {(editandoId || modoRegistro === "nuevo") && (
 
       <form
@@ -2299,10 +2985,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
           }}
         />
         <div style={{ height: "14px" }} />
@@ -2318,10 +3004,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
             minHeight: "80px",
             resize: "vertical",
           }}
@@ -2341,10 +3027,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
           }}
         />
         <div style={{ height: "14px" }} />
@@ -2363,10 +3049,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
           }}
         />
         <div style={{ height: "14px" }} />
@@ -2384,10 +3070,10 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
           }}
         />
         <div style={{ height: "14px" }} />
@@ -2445,10 +3131,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "10px",
+                padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "14px",
+                fontSize: "12.5px",
               }}
             />
             <div style={{ height: "14px" }} />
@@ -2469,52 +3155,80 @@ function App() {
           style={{
             width: "350px",
             maxWidth: "100%",
-            padding: "10px",
+            padding: "8px",
             borderRadius: "8px",
             border: "1px solid #ccc",
-            fontSize: "14px",
+            fontSize: "12.5px",
           }}
         />
         <div style={{ height: "14px" }} />
 
-        <button
-          type="submit"
+        <div
           style={{
-            display: "block",
-            backgroundColor: "#0d6efd",
-            color: "white",
-            border: "none",
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontSize: "13px",
-            marginTop: "10px",
+            display: "flex",
+            gap: "10px",
+            marginTop: "15px",
+            flexWrap: "wrap",
           }}
         >
-          {editandoId ? "Actualizar producto" : "Guardar producto"}
-        </button>
 
-        {editandoId && (
+          <button
+            type="submit"
+            style={{
+              display: "block",
+              backgroundColor: editandoId ? "#0d6efd" : "#7c3aed",
+              color: "white",
+              border: "none",
+              padding: "9px 12px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "600",
+            }}
+          >
+            {editandoId ? "Actualizar producto" : "Guardar producto"}
+          </button>
+
+        
           <button
             type="button"
-            onClick={cancelarEdicion}
+            onClick={() => {
+              setNombre("");
+              setDescripcion("");
+              setPrecio("");
+              setCostoEnvio("");
+              setPrecioVenta("");
+              setStock("");
+              setStockMinimo("");
+              setProductoReposicionId("");
+              setCantidadReposicion("");
+              setEditandoId(null);
+              setModoRegistro("nuevo");
+              setSeccionActiva("inventario");
+            }}
             style={{
-              display:"block",
-              marginTop: "10px",
               backgroundColor: "#dc3545",
               color: "white",
               border: "none",
-              padding: "10px 14px",
+              padding: "9px 12px",
               borderRadius: "8px",
               cursor: "pointer",
-              fontSize: "13px",
+              fontSize: "12px",
+              fontWeight: "600",
             }}
           >
-            Cancelar edición
+            Cancelar
           </button>
-        )}
+
+        </div>
+
       </form>
       )}
+
+        {/* ----------------------
+        FORMULARIO DE REPOSICIÓN
+        Entrada rápida de inventario
+        ---------------------- */}
 
         {!editandoId && modoRegistro === "reposicion" && (
           <>
@@ -2533,10 +3247,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "10px",
+                padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "14px",
+                fontSize: "12.5px",
                 marginBottom: "15px",
               }}
             >
@@ -2563,10 +3277,10 @@ function App() {
               style={{
                 width: "350px",
                 maxWidth: "100%",
-                padding: "10px",
+                padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #ccc",
-                fontSize: "14px",
+                fontSize: "12.5px",
                 marginBottom: "15px",
               }}
             />
@@ -2580,7 +3294,7 @@ function App() {
                 backgroundColor: "#198754",
                 color: "white",
                 border: "none",
-                padding: "10px 14px",
+                padding: "8px 12px",
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontSize: "13px",
@@ -2589,33 +3303,86 @@ function App() {
             >
               Guardar reposición
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setProductoReposicionId("");
+                setCantidadReposicion("");
+                setModoRegistro("nuevo");
+                setSeccionActiva("inventario");
+              }}
+              style={{
+                marginLeft: "10px",
+                backgroundColor: "#dc3545",
+                color: "white",
+                border: "none",
+                padding: "8x 12px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: "600",
+              }}
+            >
+              Cancelar
+            </button>
           </>
       )}
     </div>
 
+    {/* ======================================================
+    MÓDULO DE INVENTARIO
+    Listado, filtros y gestión de productos
+    ====================================================== */}
+
     <div
+      id="zonaInventario"
       style={{
         display: seccionActiva === "inventario" ? "block" : "none",
         backgroundColor: "white",
-        padding: "20px",
+        padding: "12px",
         borderRadius: "12px",
         boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-        marginTop: "25px",
+        marginTop: "0",
         marginBottom: "25px",
       }}
     >
 
-      <h2
+      <div
         id="listaProductos"
         style={{
-          marginTop: "20px",
-          marginBottom: "20px",
-          fontSize: "22px",
-          color: "#222",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "12px",
+          flexWrap: "wrap",
+          marginTop: "4px",
+          marginBottom: "16px",
         }}
       >
-        📦 Lista de Productos
-      </h2>
+
+        <button
+          type="button"
+          onClick={() => {
+            cancelarEdicion();
+            setModoRegistro("nuevo");
+            setSeccionActiva("registrar");
+          }}
+          style={{
+            backgroundColor: "#7c3aed",
+            color: "white",
+            border: "none",
+            padding: "9px 13px",
+            borderRadius: "9px",
+            cursor: "pointer",
+            fontSize: "12.5px",
+            fontWeight: "700",
+            boxShadow: "0 6px 14px rgba(124, 58, 237, 0.22)",
+          }}
+        >
+          + Agregar producto
+        </button>
+      </div>
 
       <input
         type="text"
@@ -2625,10 +3392,10 @@ function App() {
         style={{
           width: "350px",
           maxWidth: "100%",
-          padding: "10px",
+          padding: "8px",
           borderRadius: "8px",
           border: "1px solid #ccc",
-          fontSize: "14px",
+          fontSize: "12.5px",
           marginBottom: "20px",
         }}
       />
@@ -2639,10 +3406,10 @@ function App() {
         style={{
           width: "220px",
           maxWidth: "100%",
-          padding: "10px",
+          padding: "8px",
           borderRadius: "8px",
           border: "1px solid #ccc",
-          fontSize: "14px",
+          fontSize: "12.5px",
           marginBottom: "20px",
           marginLeft: "10px",
         }}
@@ -2663,10 +3430,10 @@ function App() {
         style={{
           width: "220px",
           maxWidth: "100%",
-          padding: "10px",
+          padding: "8px",
           borderRadius: "8px",
           border: "1px solid #ccc",
-          fontSize: "14px",
+          fontSize: "12.5px",
           marginBottom: "20px",
           marginLeft: "10px",
         }}
@@ -2702,7 +3469,13 @@ function App() {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <div style={{ minWidth: "1000px" }}>
+          <div style={{ minWidth: "800px" }}>
+
+            {/* ----------------------
+            TABLA DE INVENTARIO
+            Listado general de productos
+            ---------------------- */}
+
             <table
               style={{
                 width: "100%",
@@ -2715,9 +3488,10 @@ function App() {
                 <tr>
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2726,9 +3500,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2737,9 +3512,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2748,9 +3524,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2759,9 +3536,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2770,9 +3548,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2781,9 +3560,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2792,9 +3572,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11x",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2803,9 +3584,10 @@ function App() {
 
                   <th
                     style={{
-                      padding: "10px 8px",
+                      padding: "7px 5px",
                       backgroundColor: "#f1f3f5",
-                      fontSize: "16px",
+                      fontSize: "11px",
+                      fontWeight: "600",
                       textAlign: "center",
                     }}
                   >                    
@@ -2817,7 +3599,7 @@ function App() {
 
             <div
               style={{
-                maxHeight: "300px",
+                maxHeight: "360px",
                 overflowY: "auto",
               }}
             >
@@ -2836,7 +3618,7 @@ function App() {
                       <td
                         colSpan="9"
                         style={{
-                          padding: "20px",
+                          padding: "12px",
                           textAlign: "center",
                           color: "#666",
                         }}
@@ -2847,15 +3629,15 @@ function App() {
                   ) : (
                     productosFiltrados.map((producto) => (
                       <tr key={producto._id}>
-                        <td style={{ padding: "10px", textAlign: "left", fontSize: "16px" }}>
+                        <td style={{ padding: "8px", textAlign: "left", fontSize: "13px" }}>
                           {producto.nombre}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "left", color: "#555", fontSize: "16px" }}>
+                        <td style={{ padding: "8px", textAlign: "left", maxWidth: "120px", wordBreak: "break-word", color: "#555", fontSize: "13px" }}>
                           {producto.descripcion || "—"}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center", fontSize: "16px" }}>
+                        <td style={{ padding: "8px", textAlign: "center", fontSize: "13px" }}>
                           
                           ${(Number(producto.precio || 0) + Number(producto.costoEnvio || 0)).toFixed(2)}
                           
@@ -2864,17 +3646,17 @@ function App() {
                           </div>
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center", fontSize: "16px" }}>
+                        <td style={{ padding: "8px", textAlign: "center", fontSize: "13px" }}>
                           ${Number(producto.precioVenta || 0).toFixed(2)}
                         </td>
 
                         <td
                           style={{
-                            padding: "10px",
+                            padding: "8px",
                             textAlign: "center",
                             color: "#198754",
                             fontWeight: "700",
-                            fontSize: "16px",
+                            fontSize: "13px",
                           }}
                         >
                           $
@@ -2886,7 +3668,7 @@ function App() {
 
                         <td
                           style={{
-                            padding: "10px",
+                            padding: "8px",
                             textAlign: "center",
                             color:
                               Number(producto.precioVenta || 0) > 0 &&
@@ -2902,7 +3684,7 @@ function App() {
                                 ? "#fd7e14"
                                 : "#198754",
                             fontWeight: "700",
-                            fontSize: "16px",
+                            fontSize: "13px",
                           }}
                         >
                           {Number(producto.precioVenta || 0) > 0
@@ -2917,20 +3699,20 @@ function App() {
 
                         <td
                           style={{
-                            padding: "10px",
+                            padding: "8px",
                             textAlign: "center",
                             color:
                               Number(producto.stock) <= Number(producto.stockMinimo || 5)
                                 ? "#dc3545"
                                 : "#198754",
                             fontWeight: "700",
-                            fontSize: "16px",
+                            fontSize: "13px",
                           }}
                         >
                           {producto.stock}
                         </td>
 
-                        <td style={{ padding: "10px", textAlign: "center", fontWeight: "600", fontSize: "13px" }}>
+                        <td style={{ padding: "8px", textAlign: "center", fontWeight: "600", fontSize: "13px" }}>
                           {Number(producto.stock) === 0
                             ? "🚫 Reponer"
                             : Number(producto.stock) <= Number(producto.stockMinimo || 5)
@@ -2938,9 +3720,12 @@ function App() {
                             : "✅ Suficiente"}
                         </td>
 
-                        
+                        {/* ----------------------
+                        ACCIONES DE PRODUCTO
+                        Editar, eliminar y reponer inventario
+                        ---------------------- */}
 
-                        <td style={{ padding: "10px", textAlign: "center" }}>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
                         <div
                           style={{
                             display: "flex",
@@ -2975,10 +3760,10 @@ function App() {
                               backgroundColor: "#0d6efd",
                               color: "white",
                               border: "none",
-                              padding: "6px 10px",
+                              padding: "5px 7px",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontSize: "13px",
+                              fontSize: "10px",
                             }}
                           >
                             Editar
@@ -2990,10 +3775,10 @@ function App() {
                               backgroundColor: "#dc3545",
                               color: "white",
                               border: "none",
-                              padding: "6px 10px",
+                              padding: "5px 7px",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontSize: "13px",
+                              fontSize: "10px",
                             }}
                           >
                             Eliminar
@@ -3017,10 +3802,10 @@ function App() {
                               backgroundColor: "#198754",
                               color: "white",
                               border: "none",
-                              padding: "6px 10px",
+                              padding: "5px 7px",
                               borderRadius: "6px",
                               cursor: "pointer",
-                              fontSize: "13px",
+                              fontSize: "10px",
                             }}
                           >
                             Reponer
@@ -3038,6 +3823,8 @@ function App() {
             )
       ) : null}
       </div>
+        </section>
+      </main>
     </div>
   );
 }
