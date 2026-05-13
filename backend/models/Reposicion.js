@@ -28,6 +28,11 @@ const reposicionSchema = new mongoose.Schema(
       required: true,
     },
 
+    proveedor: {
+      type: String,
+      default: "",
+    },
+
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

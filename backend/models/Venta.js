@@ -64,6 +64,16 @@ const ventaSchema = new mongoose.Schema(
       default: null,
     },
 
+    porcentajeDescuento: {
+      type: Number,
+      default: 0,
+    },
+
+    cliente: {
+      type: String,
+      default: "",
+    },
+
     ventaConPerdida: {
       type: Boolean,
       default: false,

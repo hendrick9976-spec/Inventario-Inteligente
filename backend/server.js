@@ -43,7 +43,7 @@ app.get("/productos", authMiddleware, async (req, res) => {
 // Crear producto
 app.post("/productos", authMiddleware, async (req, res) => {
   try {
-    const { nombre, descripcion, precio, costoEnvio, precioVenta, stock, stockMinimo } = req.body;
+    const { nombre, descripcion, precio, costoEnvio, precioVenta, stock, stockMinimo, proveedorInicial } = req.body;
 
     if (
       !nombre ||
@@ -71,16 +71,19 @@ app.post("/productos", authMiddleware, async (req, res) => {
 
     await nuevoProducto.save();
 
-    const reposicionInicial = new Reposicion({
-      productoId: nuevoProducto._id,
-      nombreProducto: nuevoProducto.nombre,
-      cantidad: Number(stock),
-      stockAntes: 0,
-      stockDespues: Number(stock),
-      user: req.user.userId,
-    });
+    if (Number(stock) > 0) {
+      const nuevaReposicion = new Reposicion({
+        productoId: nuevoProducto._id,
+        nombreProducto: nuevoProducto.nombre,
+        cantidad: Number(stock),
+        stockAntes: 0,
+        stockDespues: Number(stock),
+        proveedor: proveedorInicial || "",
+        user: req.user.userId,
+      });
 
-  await reposicionInicial.save();
+      await nuevaReposicion.save();
+    }
 
     res.status(201).json(nuevoProducto);
   } catch (error) {
@@ -153,7 +156,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
 // Reponer inventario
 app.put("/productos/:id/reponer", authMiddleware, async (req, res) => {
   try {
-    const { cantidad } = req.body;
+    const { cantidad, proveedor } = req.body;
 
     if (cantidad === undefined || Number(cantidad) <= 0) {
       return res.status(400).json({ error: "La cantidad debe ser mayor a 0" });
@@ -181,6 +184,7 @@ app.put("/productos/:id/reponer", authMiddleware, async (req, res) => {
       cantidad: Number(cantidad),
       stockAntes,
       stockDespues,
+      proveedor: proveedor || "",
       user: req.user.userId,
     });
 
@@ -220,6 +224,8 @@ app.post("/ventas", authMiddleware, async (req, res) => {
       tipoVenta,
       precioUnitarioNegociado,
       precioGlobalMayoreo,
+      porcentajeDescuento,
+      cliente,
     } = req.body;
 
     if (!productoId || cantidad === undefined || Number(cantidad) <= 0) {
@@ -242,16 +248,28 @@ app.post("/ventas", authMiddleware, async (req, res) => {
     let ingresoTotal = 0;
 
     if (tipoVenta === "mayoreo") {
-      ingresoTotal = Number(precioGlobalMayoreo);
-    } else {
-      const precioUnitarioFinal =
-        precioUnitarioNegociado !== null &&
-        precioUnitarioNegociado !== undefined
-          ? Number(precioUnitarioNegociado)
-          : Number(producto.precioVenta);
 
-      ingresoTotal = precioUnitarioFinal * Number(cantidad);
-    }    
+      // Precio negociado manual
+      if (
+        precioGlobalMayoreo !== null &&
+        precioGlobalMayoreo !== undefined &&
+        precioGlobalMayoreo !== ""
+      ) {
+        ingresoTotal = Number(precioGlobalMayoreo);
+      }
+
+      // Descuento porcentual
+      else {
+        const precioBase =
+          Number(producto.precioVenta) * Number(cantidad);
+
+        const descuento = Number(porcentajeDescuento || 0);
+
+        ingresoTotal =
+          precioBase - (precioBase * descuento) / 100;
+      }
+    }
+
     const costoUnitarioTotal = Number(producto.precio) + Number(producto.costoEnvio || 0);
     const costoTotal =
       (Number(producto.precio || 0) +
@@ -281,6 +299,13 @@ app.post("/ventas", authMiddleware, async (req, res) => {
         tipoVenta === "mayoreo"
           ? Number(precioGlobalMayoreo)
           : null,
+
+      porcentajeDescuento:
+        tipoVenta === "mayoreo"
+          ? Number(porcentajeDescuento || 0)
+          : 0,
+
+      cliente: cliente || "",
 
       ventaConPerdida: utilidad < 0,
       

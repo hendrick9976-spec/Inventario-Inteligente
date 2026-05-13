@@ -83,6 +83,7 @@ function App() {
   // ----------------------
 
   const [seccionActiva, setSeccionActiva] = useState("inicio");
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   // ----------------------
   // REGISTRO DE VENTAS Y MOVIMIENTOS
@@ -94,6 +95,10 @@ function App() {
   const [tipoVentaSeleccionado, setTipoVentaSeleccionado] = useState("detalle");
   const [precioUnitarioNegociado, setPrecioUnitarioNegociado] = useState("");
   const [precioGlobalMayoreo, setPrecioGlobalMayoreo] = useState("");
+  const [porcentajeDescuento, setPorcentajeDescuento] = useState("");
+  const [clienteVenta, setClienteVenta] = useState("");
+  const [proveedorReposicion, setProveedorReposicion] = useState("");
+  const [proveedorProductoNuevo, setProveedorProductoNuevo] = useState("");
 
   // ----------------------
   // HISTORIAL Y REPORTES
@@ -388,7 +393,7 @@ function App() {
     }
     
     else {
-      await fetch(`${API_URL}/productos`, {
+      const res = await fetch(`${API_URL}/productos`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -402,8 +407,18 @@ function App() {
           precioVenta: Number(precioVenta),
           stock: Number(stock),
           stockMinimo: Number(stockMinimo || 0),
+          proveedorInicial: proveedorProductoNuevo,
         }),
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Error al crear producto");
+        return;
+      }
+
+      alert("Producto agregado correctamente");
     }
 
     setNombre("");
@@ -413,6 +428,7 @@ function App() {
     setPrecioVenta("");
     setStock("");
     setStockMinimo("");
+    setProveedorProductoNuevo("");
 
     obtenerProductos();
   };
@@ -469,12 +485,39 @@ function App() {
       return;
     }
 
-    if (
-      tipoVentaSeleccionado === "mayoreo" &&
-      (precioGlobalMayoreo === "" || Number(precioGlobalMayoreo) < 0)
-    ) {
-      alert("Ingresa un precio global válido para la venta al mayoreo");
-      return;
+    if (tipoVentaSeleccionado === "mayoreo") {
+
+      const sinPrecioGlobal =
+        precioGlobalMayoreo === "";
+
+      const sinDescuento =
+        porcentajeDescuento === "";
+
+      if (sinPrecioGlobal && sinDescuento) {
+        alert(
+          "Ingresa un precio global o un porcentaje de descuento"
+        );
+        return;
+      }
+
+      if (
+        precioGlobalMayoreo !== "" &&
+        Number(precioGlobalMayoreo) < 0
+      ) {
+        alert("El precio global no puede ser negativo");
+        return;
+      }
+
+      if (
+        porcentajeDescuento !== "" &&
+        (
+          Number(porcentajeDescuento) < 0 ||
+          Number(porcentajeDescuento) > 100
+        )
+      ) {
+        alert("El descuento debe estar entre 0 y 100");
+        return;
+      }
     }
 
     if (
@@ -508,20 +551,34 @@ function App() {
         tipoMovimiento === "venta"
           ? {
               productoId: productoMovimientoId,
+
               cantidad: Number(cantidadMovimiento),
+
               tipoVenta: tipoVentaSeleccionado,
+
               precioUnitarioNegociado:
                 tipoVentaSeleccionado === "detalle" &&
                 precioUnitarioNegociado !== ""
                   ? Number(precioUnitarioNegociado)
                   : null,
+
               precioGlobalMayoreo:
-                tipoVentaSeleccionado === "mayoreo"
+                tipoVentaSeleccionado === "mayoreo" &&
+                precioGlobalMayoreo !== ""
                   ? Number(precioGlobalMayoreo)
                   : null,
+
+              porcentajeDescuento:
+                tipoVentaSeleccionado === "mayoreo" &&
+                porcentajeDescuento !== ""
+                  ? Number(porcentajeDescuento)
+                  : 0,
+
+              cliente: clienteVenta,
             }
           : {
               cantidad: Number(cantidadMovimiento),
+              proveedor: proveedorReposicion,
             };
 
       const res = await fetch(url, {
@@ -550,6 +607,9 @@ function App() {
       setCantidadMovimiento("");
       setPrecioUnitarioNegociado("");
       setPrecioGlobalMayoreo("");
+      setPorcentajeDescuento("");
+      setClienteVenta("");
+      setProveedorReposicion("");
       setTipoMovimiento("venta");
       setTipoVentaSeleccionado("detalle");
       setSeccionActiva("inventario");
@@ -583,6 +643,7 @@ function App() {
         },
         body: JSON.stringify({
           cantidad: Number(cantidadReposicion),
+          proveedor:proveedorReposicion,
         }),
       });
 
@@ -917,7 +978,8 @@ function App() {
     cantidadMovimiento &&
     (
       tipoVentaSeleccionado === "detalle" ||
-      precioGlobalMayoreo !== ""
+      precioGlobalMayoreo !== "" ||
+      porcentajeDescuento !== ""
     );
 
   const ingresoVentaNormalMovimiento =
@@ -929,7 +991,15 @@ function App() {
   const ingresoEstimadoMovimiento =
     ventaListaParaCalcular
       ? tipoVentaSeleccionado === "mayoreo"
-        ? Number(precioGlobalMayoreo)
+        ? (
+            precioGlobalMayoreo !== ""
+              ? Number(precioGlobalMayoreo)
+              : (
+                  Number(productoMovimientoSeleccionado?.precioVenta || 0) *
+                  Number(cantidadMovimiento || 0)
+                ) *
+                (1 - Number(porcentajeDescuento || 0) / 100)
+          )
         : precioUnitarioUsado * Number(cantidadMovimiento || 0)
       : 0;
 
@@ -1236,6 +1306,8 @@ function App() {
   // Sidebar, encabezado, contenido y diseño base
   // ======================================================
 
+  const esMovil = window.innerWidth <= 768;
+
   const layoutStyles = {
     appShell: {
       minHeight: "100vh",
@@ -1259,6 +1331,12 @@ function App() {
       top: 0,
       bottom: 0,
       zIndex: 10,
+      transform:
+        esMovil && !sidebarAbierto
+          ? "translateX(-100%)"
+          : "translateX(0)",
+
+      transition: "0.3s ease",
     },
 
     logoBox: {
@@ -1350,14 +1428,15 @@ function App() {
     mainContent: {
       flex: 1,
       minWidth: 0,
-      marginLeft: "240px",
+      marginLeft: esMovil ? "0" : "240px",
     },
 
     topbar: {
       minHeight: "74px",
       backgroundColor: "white",
       borderBottom: "1px solid #e5e7eb",
-      padding: "24px 42px",
+      padding: esMovil ? "18px 16px" : "24px 42px",
+      gap: "10px",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -1379,7 +1458,9 @@ function App() {
     },
 
     contentArea: {
-      padding: "12px 42px 26px",
+      padding: esMovil
+        ? "12px 14px 22px"
+        : "12px 42px 26px",
       boxSizing: "border-box",
     },
   };
@@ -1548,6 +1629,22 @@ function App() {
         ====================================================== */}
 
         <header style={layoutStyles.topbar}>
+
+          {esMovil && (
+            <button
+              onClick={() => setSidebarAbierto(!sidebarAbierto)}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: "28px",
+                cursor: "pointer",
+                marginRight: "12px",
+              }}
+            >
+              ☰
+            </button>
+          )}
+
           <div>
             <h1 style={layoutStyles.pageTitle}>{tituloSeccion}</h1>
             <p style={layoutStyles.pageSubtitle}>{subtituloSeccion}</p>
@@ -2256,8 +2353,38 @@ function App() {
                 marginBottom: "15px",
               }}
             />
+
+            <input
+              type="number"
+              placeholder="Descuento % (opcional)"
+              value={porcentajeDescuento}
+              onChange={(e) => setPorcentajeDescuento(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                marginTop: "10px",
+                boxSizing: "border-box",
+              }}
+            />
           </>
         )}
+
+        <input
+          type="text"
+          placeholder="Cliente (opcional)"
+          value={clienteVenta}
+          onChange={(e) => setClienteVenta(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #d1d5db",
+            marginTop: "10px",
+            boxSizing: "border-box",
+          }}
+        />
 
         {productoMovimientoSeleccionado && cantidadMovimiento && (
           <div
@@ -2429,14 +2556,12 @@ function App() {
               backgroundColor: tipoHistorial === "ventas" ? "#0d6efd" : "white",
               color: tipoHistorial === "ventas" ? "white" : "#222",
               border: "1px solid #ddd",
-              padding: "9px 12px",
+              padding: "8px 12px",
               borderRadius: "8px",
               fontSize: "12px",
-              fontWeight: "500",
-              lineHeight: "1",
+              fontWeight: "600",
               cursor: "pointer",
               marginRight: "10px",
-              fontWeight: "600",
             }}
           >
             Ventas
@@ -2451,13 +2576,11 @@ function App() {
               ? "#198754"
               : "white",              color: tipoHistorial === "reposiciones" ? "white" : "#222",
               border: "1px solid #ddd",
-              padding: "9px 12px",
+              padding: "8px 12px",
               borderRadius: "8px",
               fontSize: "12px",
-              fontWeight: "500",
-              lineHeight: "1",
-              cursor: "pointer",
               fontWeight: "600",
+              cursor: "pointer",
             }}
           >
             Reposiciones
@@ -2787,6 +2910,7 @@ function App() {
                     <tr>
                       <th style={{ padding: "8px", textAlign: "center" }}>Producto</th>
                       <th style={{ padding: "8px", textAlign: "center" }}>Tipo</th>
+                      <th style={{ padding: "8px", textAlign: "center" }}>Cliente</th>
                       <th style={{ padding: "8px", textAlign: "center" }}>Cantidad</th>
                       <th style={{ padding: "8px", textAlign: "center" }}>Ingreso</th>
                       <th style={{ padding: "8px", textAlign: "center" }}>Costo total</th>
@@ -2799,12 +2923,17 @@ function App() {
                   <tbody>
                     {ventasFiltradas.map((venta) => (
                       <tr key={venta._id}>
+
                         <td style={{ padding: "8px", textAlign: "center" }}>
                           {venta.nombreProducto}
                         </td>
 
                         <td style={{ padding: "8px", textAlign: "center" }}>
                           {venta.tipoVenta === "mayoreo" ? "Mayoreo" : "Normal"}
+                        </td>
+
+                        <td style={{ padding: "8px", textAlign: "center" }}>
+                          {venta.cliente || "—"}
                         </td>
 
                         <td style={{ padding: "8px", textAlign: "center" }}>
@@ -2904,6 +3033,7 @@ function App() {
                     <th style={{ padding: "8px" }}>Cantidad</th>
                     <th style={{ padding: "8px" }}>Stock antes</th>
                     <th style={{ padding: "8px" }}>Stock después</th>
+                    <th style={{ padding: "8px" }}>Proveedor</th>
                     <th style={{ padding: "8px" }}>Fecha</th>
                   </tr>
                 </thead>
@@ -2915,6 +3045,7 @@ function App() {
                       <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.cantidad}</td>
                       <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.stockAntes}</td>
                       <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.stockDespues}</td>
+                      <td style={{ padding: "8px", textAlign: "center" }}>{reposicion.proveedor || "—"}</td>
                       <td style={{ padding: "8px", textAlign: "center" }}>
                         {new Date(reposicion.createdAt).toLocaleString()}
                       </td>
@@ -3137,6 +3268,25 @@ function App() {
                 fontSize: "12.5px",
               }}
             />
+
+            <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+              Proveedor inicial
+            </p>
+
+            <input
+              type="text"
+              placeholder="Proveedor (opcional)"
+              value={proveedorProductoNuevo}
+              onChange={(e) => setProveedorProductoNuevo(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                marginBottom: "15px",
+                boxSizing: "border-box",
+              }}
+            />
             <div style={{ height: "14px" }} />
           </>
         )}
@@ -3267,6 +3417,25 @@ function App() {
               Cantidad a reponer
             </p>
 
+            <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+              Proveedor
+            </p>
+
+            <input
+              type="text"
+              placeholder="Proveedor (opcional)"
+              value={proveedorReposicion}
+              onChange={(e) => setProveedorReposicion(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                marginBottom: "15px",
+                boxSizing: "border-box",
+              }}
+            />
+
             <input
               type="number"
               min="1"
@@ -3282,6 +3451,21 @@ function App() {
                 border: "1px solid #ccc",
                 fontSize: "12.5px",
                 marginBottom: "15px",
+              }}
+            />
+
+            <input
+              type="text"
+              placeholder="Proveedor (opcional)"
+              value={proveedorReposicion}
+              onChange={(e) => setProveedorReposicion(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                marginTop: "10px",
+                boxSizing: "border-box",
               }}
             />
 
@@ -3309,6 +3493,7 @@ function App() {
               onClick={() => {
                 setProductoReposicionId("");
                 setCantidadReposicion("");
+                setProveedorReposicion("");
                 setModoRegistro("nuevo");
                 setSeccionActiva("inventario");
               }}
