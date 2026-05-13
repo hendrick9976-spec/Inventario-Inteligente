@@ -1628,6 +1628,21 @@ function App() {
   
       </aside>
 
+      {esMovil && sidebarAbierto && (
+        <div
+          onClick={() => setSidebarAbierto(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.35)",
+            zIndex: 5,
+          }}
+        />
+      )}
+
       <main style={layoutStyles.mainContent}>
 
         {/* ======================================================
@@ -2364,6 +2379,7 @@ function App() {
             <input
               type="number"
               placeholder="Descuento % (opcional)"
+              onWheel={(e) => e.target.blur()}
               value={porcentajeDescuento}
               onChange={(e) => setPorcentajeDescuento(e.target.value)}
               style={{
