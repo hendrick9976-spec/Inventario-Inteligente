@@ -1320,7 +1320,8 @@ function App() {
 
     sidebar: {
       width: "240px",
-      height: "100vh",
+      height: "100dvh",
+      overflowY:"auto",
       backgroundColor: "white",
       borderRight: "1px solid #e5e7eb",
       padding: "18px 12px",
@@ -1476,6 +1477,10 @@ function App() {
     }
 
     setSeccionActiva(seccion);
+
+    if (esMovil) {
+      setSidebarAbierto(false);
+    }
   };
 
   const opcionMenu = (clave, texto, icono) => (
