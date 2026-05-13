@@ -1546,71 +1546,72 @@ function App() {
       ====================================================== */}
 
       <aside style={layoutStyles.sidebar}>
-        <div style={layoutStyles.logoBox}>
-          <div style={layoutStyles.logoIcon}>⚡</div>
+        <div>
+          <div style={layoutStyles.logoBox}>
+            <div style={layoutStyles.logoIcon}>⚡</div>
 
-          <div>
-            <h2 style={{ margin: 0, fontSize: "22px", color: "#6d28d9" }}>
-              Inventario
-            </h2>
-            <p style={{ margin: 0, fontSize: "13px", color: "#374151" }}>
-              Inteligente
-            </p>
-          </div>
-        </div>
-
-        <div
-          style={{
-            ...layoutStyles.userBox,
-            cursor: "pointer",
-
-            backgroundColor:
-              seccionActiva === "perfil"
-                ? "#f3f0ff"
-                : "transparent",
-
-            borderLeft:
-              seccionActiva === "perfil"
-                ? "4px solid #7c3aed"
-                : "4px solid transparent",
-
-            borderRadius: "10px",
-            paddingLeft: "10px",
-          }}
-          onClick={() => setSeccionActiva("perfil")}
-        >
-          <div style={layoutStyles.avatar}>
-            {usuario?.name?.charAt(0)?.toUpperCase() || "U"}
+            <div>
+              <h2 style={{ margin: 0, fontSize: "22px", color: "#6d28d9" }}>
+                Inventario
+              </h2>
+              <p style={{ margin: 0, fontSize: "13px", color: "#374151" }}>
+                Inteligente
+              </p>
+            </div>
           </div>
 
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontWeight: "800",
-                fontSize: "12.5px",
-                color:
-                  seccionActiva === "perfil"
-                    ? "#7c3aed"
-                    : "#111827",
-              }}
-            >
-              {usuario?.name}
-            </p>
+          <div
+            style={{
+              ...layoutStyles.userBox,
+              cursor: "pointer",
 
-            <p
-              style={{
-                margin: "3px 0 0",
-                color:
-                  seccionActiva === "perfil"
-                    ? "#7c3aed"
-                    : "#64748b",
-                fontSize: "13px",
-              }}
-            >
-              Administrador
-            </p>
-          </div>
+              backgroundColor:
+                seccionActiva === "perfil"
+                  ? "#f3f0ff"
+                  : "transparent",
+
+              borderLeft:
+                seccionActiva === "perfil"
+                  ? "4px solid #7c3aed"
+                  : "4px solid transparent",
+
+              borderRadius: "10px",
+              paddingLeft: "10px",
+            }}
+            onClick={() => cambiarSeccion("perfil")}
+          >
+            <div style={layoutStyles.avatar}>
+              {usuario?.name?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+
+            <div>
+              <p
+                style={{
+                  margin: 0,
+                  fontWeight: "800",
+                  fontSize: "12.5px",
+                  color:
+                    seccionActiva === "perfil"
+                      ? "#7c3aed"
+                      : "#111827",
+                }}
+              >
+                {usuario?.name}
+              </p>
+
+              <p
+                style={{
+                  margin: "3px 0 0",
+                  color:
+                    seccionActiva === "perfil"
+                      ? "#7c3aed"
+                      : "#64748b",
+                  fontSize: "13px",
+                }}
+              >
+                Administrador
+              </p>
+            </div>
         </div>
 
         <nav style={layoutStyles.sidebarNav}>
@@ -1619,11 +1620,12 @@ function App() {
           {opcionMenu("ventas", "Ventas", "🛒")}
           {opcionMenu("historial", "Historial", "📊")}
         </nav>
-
+      </div>
         <button type="button" onClick={cerrarSesion} style={layoutStyles.logoutButton}>
           <span>↪</span>
           <span>Cerrar Sesión</span>
         </button>
+  
       </aside>
 
       <main style={layoutStyles.mainContent}>
