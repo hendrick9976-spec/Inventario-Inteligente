@@ -1669,7 +1669,7 @@ function App() {
 
           <div
             style={{
-              marginLeft: esMovil ? "4px" : "0",
+              marginLeft: esMovil ? "0px" : "0",
             }}
           >
             <h1 style={layoutStyles.pageTitle}>{tituloSeccion}</h1>
