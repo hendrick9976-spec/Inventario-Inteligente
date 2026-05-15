@@ -1667,7 +1667,11 @@ function App() {
             </button>
           )}
 
-          <div>
+          <div
+            style={{
+              marginLeft: esMovil ? "4px" : "0",
+            }}
+          >
             <h1 style={layoutStyles.pageTitle}>{tituloSeccion}</h1>
             <p style={layoutStyles.pageSubtitle}>{subtituloSeccion}</p>
           </div>
