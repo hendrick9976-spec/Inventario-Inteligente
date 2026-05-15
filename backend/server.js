@@ -247,28 +247,42 @@ app.post("/ventas", authMiddleware, async (req, res) => {
 
     let ingresoTotal = 0;
 
-    if (tipoVenta === "mayoreo") {
+      if (tipoVenta === "mayoreo") {
 
-      // Precio negociado manual
-      if (
-        precioGlobalMayoreo !== null &&
-        precioGlobalMayoreo !== undefined &&
-        precioGlobalMayoreo !== ""
-      ) {
-        ingresoTotal = Number(precioGlobalMayoreo);
+        // Precio negociado manual
+        if (
+          precioGlobalMayoreo !== null &&
+          precioGlobalMayoreo !== undefined &&
+          precioGlobalMayoreo !== ""
+        ) {
+          ingresoTotal = Number(precioGlobalMayoreo);
+        }
+
+        // Descuento porcentual
+        else {
+          const precioBase =
+            Number(producto.precioVenta) * Number(cantidad);
+
+          const descuento = Number(porcentajeDescuento || 0);
+
+          ingresoTotal =
+            precioBase - (precioBase * descuento) / 100;
+        }
       }
 
-      // Descuento porcentual
+      // VENTA NORMAL
       else {
-        const precioBase =
-          Number(producto.precioVenta) * Number(cantidad);
 
-        const descuento = Number(porcentajeDescuento || 0);
+        const precioUnitarioFinal =
+          precioUnitarioNegociado !== null &&
+          precioUnitarioNegociado !== undefined &&
+          precioUnitarioNegociado !== ""
+            ? Number(precioUnitarioNegociado)
+            : Number(producto.precioVenta);
 
         ingresoTotal =
-          precioBase - (precioBase * descuento) / 100;
+          precioUnitarioFinal * Number(cantidad);
       }
-    }
 
     const costoUnitarioTotal = Number(producto.precio) + Number(producto.costoEnvio || 0);
     const costoTotal =
