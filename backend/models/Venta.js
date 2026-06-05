@@ -87,7 +87,7 @@ const ventaSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 module.exports = mongoose.model("Venta", ventaSchema);

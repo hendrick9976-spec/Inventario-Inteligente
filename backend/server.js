@@ -33,7 +33,9 @@ app.get("/perfil", authMiddleware, (req, res) => {
 // Obtener todos los productos
 app.get("/productos", authMiddleware, async (req, res) => {
   try {
-    const productos = await Product.find({ user: req.user.userId }).sort({ createdAt: -1 });
+    const productos = await Product.find({ user: req.user.userId }).sort({
+      createdAt: -1,
+    });
     res.json(productos);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener productos" });
@@ -43,7 +45,16 @@ app.get("/productos", authMiddleware, async (req, res) => {
 // Crear producto
 app.post("/productos", authMiddleware, async (req, res) => {
   try {
-    const { nombre, descripcion, precio, costoEnvio, precioVenta, stock, stockMinimo, proveedorInicial } = req.body;
+    const {
+      nombre,
+      descripcion,
+      precio,
+      costoEnvio,
+      precioVenta,
+      stock,
+      stockMinimo,
+      proveedorInicial,
+    } = req.body;
 
     if (
       !nombre ||
@@ -98,7 +109,7 @@ app.delete("/productos/:id", authMiddleware, async (req, res) => {
       _id: req.params.id,
       user: req.user.userId,
     });
-    
+
     if (!productoEliminado) {
       return res.status(404).json({ error: "Producto no encontrado" });
     }
@@ -113,7 +124,14 @@ app.delete("/productos/:id", authMiddleware, async (req, res) => {
 // Editar producto
 app.put("/productos/:id", authMiddleware, async (req, res) => {
   try {
-    const { nombre, descripcion, precio, costoEnvio, precioVenta, stockMinimo} = req.body;
+    const {
+      nombre,
+      descripcion,
+      precio,
+      costoEnvio,
+      precioVenta,
+      stockMinimo,
+    } = req.body;
 
     if (
       !nombre ||
@@ -139,7 +157,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
         precioVenta: Number(precioVenta),
         stockMinimo: Number(stockMinimo || 5),
       },
-      { returnDocument:"after" }
+      { returnDocument: "after" },
     );
 
     if (!productoActualizado) {
@@ -247,48 +265,43 @@ app.post("/ventas", authMiddleware, async (req, res) => {
 
     let ingresoTotal = 0;
 
-      if (tipoVenta === "mayoreo") {
-
-        // Precio negociado manual
-        if (
-          precioGlobalMayoreo !== null &&
-          precioGlobalMayoreo !== undefined &&
-          precioGlobalMayoreo !== ""
-        ) {
-          ingresoTotal = Number(precioGlobalMayoreo);
-        }
-
-        // Descuento porcentual
-        else {
-          const precioBase =
-            Number(producto.precioVenta) * Number(cantidad);
-
-          const descuento = Number(porcentajeDescuento || 0);
-
-          ingresoTotal =
-            precioBase - (precioBase * descuento) / 100;
-        }
+    if (tipoVenta === "mayoreo") {
+      // Precio negociado manual
+      if (
+        precioGlobalMayoreo !== null &&
+        precioGlobalMayoreo !== undefined &&
+        precioGlobalMayoreo !== ""
+      ) {
+        ingresoTotal = Number(precioGlobalMayoreo);
       }
 
-      // VENTA NORMAL
+      // Descuento porcentual
       else {
+        const precioBase = Number(producto.precioVenta) * Number(cantidad);
 
-        const precioUnitarioFinal =
-          precioUnitarioNegociado !== null &&
-          precioUnitarioNegociado !== undefined &&
-          precioUnitarioNegociado !== ""
-            ? Number(precioUnitarioNegociado)
-            : Number(producto.precioVenta);
+        const descuento = Number(porcentajeDescuento || 0);
 
-        ingresoTotal =
-          precioUnitarioFinal * Number(cantidad);
+        ingresoTotal = precioBase - (precioBase * descuento) / 100;
       }
+    }
 
-    const costoUnitarioTotal = Number(producto.precio) + Number(producto.costoEnvio || 0);
+    // VENTA NORMAL
+    else {
+      const precioUnitarioFinal =
+        precioUnitarioNegociado !== null &&
+        precioUnitarioNegociado !== undefined &&
+        precioUnitarioNegociado !== ""
+          ? Number(precioUnitarioNegociado)
+          : Number(producto.precioVenta);
+
+      ingresoTotal = precioUnitarioFinal * Number(cantidad);
+    }
+
+    const costoUnitarioTotal =
+      Number(producto.precio) + Number(producto.costoEnvio || 0);
     const costoTotal =
-      (Number(producto.precio || 0) +
-        Number(producto.costoEnvio || 0)) *
-      Number(cantidad);    
+      (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) *
+      Number(cantidad);
     const utilidad = ingresoTotal - costoTotal;
 
     const nuevaVenta = new Venta({
@@ -310,19 +323,15 @@ app.post("/ventas", authMiddleware, async (req, res) => {
           : null,
 
       precioGlobalMayoreo:
-        tipoVenta === "mayoreo"
-          ? Number(precioGlobalMayoreo)
-          : null,
+        tipoVenta === "mayoreo" ? Number(precioGlobalMayoreo) : null,
 
       porcentajeDescuento:
-        tipoVenta === "mayoreo"
-          ? Number(porcentajeDescuento || 0)
-          : 0,
+        tipoVenta === "mayoreo" ? Number(porcentajeDescuento || 0) : 0,
 
       cliente: cliente || "",
 
       ventaConPerdida: utilidad < 0,
-      
+
       user: req.user.userId,
     });
 
@@ -345,7 +354,9 @@ app.post("/ventas", authMiddleware, async (req, res) => {
 // Obtener historial de ventas
 app.get("/ventas", authMiddleware, async (req, res) => {
   try {
-    const ventas = await Venta.find({ user: req.user.userId }).sort({ createdAt: -1 });
+    const ventas = await Venta.find({ user: req.user.userId }).sort({
+      createdAt: -1,
+    });
     res.json(ventas);
   } catch (error) {
     console.error("Error al obtener ventas:", error);
@@ -362,7 +373,11 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
     const ahora = new Date();
 
     if (periodo === "dia") {
-      fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+      fechaInicio = new Date(
+        ahora.getFullYear(),
+        ahora.getMonth(),
+        ahora.getDate(),
+      );
     }
 
     if (periodo === "mes") {
@@ -379,10 +394,22 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
 
     const ventas = await Venta.find(filtro);
 
-    const ingresosTotales = ventas.reduce((sum, venta) => sum + venta.ingresoTotal, 0);
-    const costosTotales = ventas.reduce((sum, venta) => sum + venta.costoTotal, 0);
-    const utilidadTotal = ventas.reduce((sum, venta) => sum + venta.utilidad, 0);
-    const productosVendidos = ventas.reduce((sum, venta) => sum + venta.cantidad, 0);
+    const ingresosTotales = ventas.reduce(
+      (sum, venta) => sum + venta.ingresoTotal,
+      0,
+    );
+    const costosTotales = ventas.reduce(
+      (sum, venta) => sum + venta.costoTotal,
+      0,
+    );
+    const utilidadTotal = ventas.reduce(
+      (sum, venta) => sum + venta.utilidad,
+      0,
+    );
+    const productosVendidos = ventas.reduce(
+      (sum, venta) => sum + venta.cantidad,
+      0,
+    );
 
     res.json({
       ingresosTotales,

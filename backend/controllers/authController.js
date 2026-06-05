@@ -79,7 +79,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     return res.status(200).json({
@@ -146,7 +146,7 @@ const actualizarPerfil = async (req, res) => {
     const usuarioActualizado = await User.findByIdAndUpdate(
       req.user.userId,
       datosActualizados,
-      { new: true }
+      { new: true },
     ).select("-password");
 
     return res.json({
