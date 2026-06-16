@@ -424,6 +424,83 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
   }
 });
 
+// ==========================================
+// NUEVAS RUTAS PÚBLICAS PARA LA TIENDA (DÍA 2)
+// ==========================================
+
+// 1. Obtener productos de forma pública para la tienda de un usuario específico
+app.get("/api/tienda/:userId/productos", async (req, res) => {
+  try {
+    // Buscamos los productos que pertenecen al administrador usando el parámetro de la URL
+    const productos = await Product.find({ user: req.params.userId }).sort({
+      nombre: 1,
+    });
+    res.json(productos);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener los productos de la tienda" });
+  }
+});
+
+// 2. Simular una compra desde la tienda (Descuenta stock y registra la venta)
+app.post("/api/tienda/compra", async (req, res) => {
+  try {
+    const { productoId, cantidad, cliente } = req.body;
+
+    if (!productoId || cantidad === undefined || Number(cantidad) <= 0) {
+      return res.status(400).json({ error: "Datos de compra inválidos" });
+    }
+
+    // Buscamos el producto en la base de datos
+    const producto = await Product.findById(productoId);
+
+    if (!producto) {
+      return res.status(404).json({ error: "El producto ya no existe" });
+    }
+
+    // Validamos si hay suficiente stock disponible
+    if (Number(producto.stock) < Number(cantidad)) {
+      return res.status(400).json({ error: "Lo sentimos, no hay suficiente stock disponible" });
+    }
+
+    // Calculamos los aspectos financieros de la venta simulada
+    const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
+    const costoTotal = (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) * Number(cantidad);
+    const utilidad = ingresoTotal - costoTotal;
+
+    // Registramos la venta en el historial del dueño del producto
+    const nuevaVenta = new Venta({
+      productoId: producto._id,
+      nombreProducto: producto.nombre,
+      cantidad: Number(cantidad),
+      costoUnitario: Number(producto.precio),
+      precioVentaUnitario: Number(producto.precioVenta),
+      ingresoTotal,
+      costoTotal,
+      utilidad,
+      tipoVenta: "detalle", // Al ser tienda online, cuenta como venta al detalle por defecto
+      cliente: cliente || "Cliente Tienda Virtual",
+      ventaConPerdida: utilidad < 0,
+      user: producto.user, // Se asocia automáticamente al dueño del producto
+    });
+
+    await nuevaVenta.save();
+
+    // Descontamos el stock del producto
+    producto.stock = Number(producto.stock) - Number(cantidad);
+    await producto.save();
+
+    res.status(201).json({
+      mensaje: "¡Compra simulada con éxito! El stock ha sido actualizado.",
+      venta: nuevaVenta,
+      productoUpdated: producto
+    });
+
+  } catch (error) {
+    console.error("Error en la compra simulada:", error);
+    res.status(500).json({ error: "Error al procesar la compra simulada" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
