@@ -84,7 +84,20 @@ const ventaSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
+      origenVenta: {
+      type: String,
+      enum: ['Web', 'App', 'Fisica', 'Simulador Tienda'],
+      default: 'Simulador Tienda'
+    },
+
+    estado: {
+      type: String,
+      enum: ['Pendiente', 'Procesando', 'Completado', 'Cancelado'],
+      default: 'Completado' // Como es venta directa, puede caer en completado directo
+    },
   },
+  
   {
     timestamps: true,
   },

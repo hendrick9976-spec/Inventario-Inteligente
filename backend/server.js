@@ -313,26 +313,21 @@ app.post("/ventas", authMiddleware, async (req, res) => {
       ingresoTotal,
       costoTotal,
       utilidad,
-
       tipoVenta: tipoVenta || "detalle",
-
       precioUnitarioNegociado:
         precioUnitarioNegociado !== null &&
         precioUnitarioNegociado !== undefined
           ? Number(precioUnitarioNegociado)
           : null,
-
       precioGlobalMayoreo:
         tipoVenta === "mayoreo" ? Number(precioGlobalMayoreo) : null,
-
       porcentajeDescuento:
         tipoVenta === "mayoreo" ? Number(porcentajeDescuento || 0) : 0,
-
       cliente: cliente || "",
-
       ventaConPerdida: utilidad < 0,
-
       user: req.user.userId,
+      origenVenta: "Fisica",
+      estado: "Completado"
     });
 
     await nuevaVenta.save();
@@ -441,7 +436,7 @@ app.get("/api/tienda/:userId/productos", async (req, res) => {
   }
 });
 
-// 2. Simular una compra desde la tienda (Descuenta stock y registra la venta)
+// 2. Simular una compra desde la tienda (Descuenta stock de forma atómica y registra la venta)
 app.post("/api/tienda/compra", async (req, res) => {
   try {
     const { productoId, cantidad, cliente } = req.body;
@@ -450,19 +445,31 @@ app.post("/api/tienda/compra", async (req, res) => {
       return res.status(400).json({ error: "Datos de compra inválidos" });
     }
 
-    // Buscamos el producto en la base de datos
-    const producto = await Product.findById(productoId);
+    // === OPERACIÓN ATÓMICA DE CONCURRENCIA ===
+    // Intenta buscar el producto Y restar el stock en un solo paso, solo si hay suficiente stock
+    const producto = await Product.findOneAndUpdate(
+      {
+        _id: productoId,
+        stock: { $gte: Number(cantidad) } // Condición crítica: stock mayor o igual a la cantidad
+      },
+      {
+        $inc: { stock: -Number(cantidad) } // Resta la cantidad directamente en la BD
+      },
+      { returnDocument: "after" } // Nos devuelve el producto ya actualizado
+    );
 
+    // Si no se pudo hacer la actualización, es porque el producto no existe o no hay stock
     if (!producto) {
-      return res.status(404).json({ error: "El producto ya no existe" });
-    }
-
-    // Validamos si hay suficiente stock disponible
-    if (Number(producto.stock) < Number(cantidad)) {
+      // Hacemos una verificación rápida para responder con el error exacto
+      const existeProducto = await Product.findById(productoId);
+      if (!existeProducto) {
+        return res.status(404).json({ error: "El producto ya no existe" });
+      }
       return res.status(400).json({ error: "Lo sentimos, no hay suficiente stock disponible" });
     }
 
-    // Calculamos los aspectos financieros de la venta simulada
+    // Calculamos los aspectos financieros usando los datos del producto actualizado
+    // (Como el stock ya se restó, sumamos la cantidad para calcular los costos basados en lo que costaba originalmente)
     const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
     const costoTotal = (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) * Number(cantidad);
     const utilidad = ingresoTotal - costoTotal;
@@ -477,22 +484,20 @@ app.post("/api/tienda/compra", async (req, res) => {
       ingresoTotal,
       costoTotal,
       utilidad,
-      tipoVenta: "detalle", // Al ser tienda online, cuenta como venta al detalle por defecto
+      tipoVenta: "detalle",
       cliente: cliente || "Cliente Tienda Virtual",
       ventaConPerdida: utilidad < 0,
-      user: producto.user, // Se asocia automáticamente al dueño del producto
+      user: producto.user,
+      origenVenta: "Web",
+      estado: "Completado"
     });
 
     await nuevaVenta.save();
 
-    // Descontamos el stock del producto
-    producto.stock = Number(producto.stock) - Number(cantidad);
-    await producto.save();
-
     res.status(201).json({
       mensaje: "¡Compra simulada con éxito! El stock ha sido actualizado.",
       venta: nuevaVenta,
-      productoUpdated: producto
+      productoUpdated: producto // Ya lleva el stock descontado de forma segura
     });
 
   } catch (error) {
