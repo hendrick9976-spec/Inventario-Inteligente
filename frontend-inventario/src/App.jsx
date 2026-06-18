@@ -65,6 +65,7 @@ function App() {
   const [precioVenta, setPrecioVenta] = useState("");
   const [stock, setStock] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
+  const [mostrarOpcionesProducto, setMostrarOpcionesProducto] = useState(false);
 
   // ----------------------
   // EDICIÓN DE PRODUCTOS
@@ -98,6 +99,7 @@ function App() {
   const [clienteVenta, setClienteVenta] = useState("");
   const [proveedorReposicion, setProveedorReposicion] = useState("");
   const [proveedorProductoNuevo, setProveedorProductoNuevo] = useState("");
+  const [mostrarOpcionesVenta, setMostrarOpcionesVenta] = useState(false);
 
   // ----------------------
   // HISTORIAL Y REPORTES
@@ -340,34 +342,39 @@ function App() {
 
   const guardarProducto = async (e) => {
     e.preventDefault();
+    
     if (!nombre.trim()) {
       alert("El nombre del producto es obligatorio");
       return;
     }
 
-    if (precio === "" || Number(precio) < 0) {
-      alert("El precio debe ser un número mayor o igual a 0");
+    // 1. Precio de venta es obligatorio
+    if (precioVenta === "" || Number(precioVenta) < 0) {
+      alert("El precio de venta es obligatorio y debe ser mayor o igual a 0");
       return;
     }
 
-    if (precioVenta === "" || Number(precioVenta) < 0) {
-      alert("El precio de venta debe ser un número mayor o igual a 0");
+    // 2. Costo del producto ya es opcional (solo valida si escribe algo)
+    if (precio !== "" && Number(precio) < 0) {
+      alert("El costo del producto no puede ser negativo");
       return;
     }
 
     if (costoEnvio !== "" && Number(costoEnvio) < 0) {
-      alert("El costo de envío/manejo debe ser mayor o igual a 0");
+      alert("El costo de envío/manejo no puede ser negativo");
       return;
     }
 
-    const costoTotalUnitario = Number(precio) + Number(costoEnvio || 0);
+    const costoTotalUnitario = Number(precio || 0) + Number(costoEnvio || 0);
 
-    if (Number(precioVenta) < costoTotalUnitario) {
-      alert(
-        "El precio de venta no puede ser menor que el costo total unitario",
-      );
+    // Solo lanza alerta de pérdida si realmente registró costos
+    if (costoTotalUnitario > 0 && Number(precioVenta) < costoTotalUnitario) {
+      alert("El precio de venta no puede ser menor que el costo total unitario");
       return;
     }
+
+    // 3. Regla del stock mínimo: Si lo deja en blanco, asume 1
+    const stockMinimoCalculado = stockMinimo === "" ? 1 : Number(stockMinimo);
 
     if (editandoId) {
       const confirmado = window.confirm(
@@ -384,10 +391,10 @@ function App() {
         body: JSON.stringify({
           nombre,
           descripcion,
-          precio: Number(precio),
+          precio: Number(precio || 0),
           costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
-          stockMinimo: Number(stockMinimo || 0),
+          stockMinimo: stockMinimoCalculado, // Aplicamos el default de 1
         }),
       });
 
@@ -406,11 +413,11 @@ function App() {
         body: JSON.stringify({
           nombre,
           descripcion,
-          precio: Number(precio),
+          precio: Number(precio || 0),
           costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
-          stock: Number(stock),
-          stockMinimo: Number(stockMinimo || 0),
+          stock: Number(stock || 0),
+          stockMinimo: stockMinimoCalculado, // Aplicamos el default de 1
           proveedorInicial: proveedorProductoNuevo,
         }),
       });
@@ -425,6 +432,7 @@ function App() {
       alert("Producto agregado correctamente");
     }
 
+    // Limpiar el formulario
     setNombre("");
     setDescripcion("");
     setPrecio("");
@@ -622,7 +630,7 @@ function App() {
       setProveedorReposicion("");
       setTipoMovimiento("venta");
       setTipoVentaSeleccionado("detalle");
-      setSeccionActiva("inventario");
+      setSeccionActiva("ventas");
 
       obtenerProductos();
       obtenerVentas();
@@ -1232,8 +1240,6 @@ function App() {
   // ----------------------
 
   const recomendaciones = [];
-  let maxUtilidadVerde = 500; 
-  let productoMasRentable = null;
 
   productos.forEach((producto) => {
     const stockNum = Number(producto.stock);
@@ -1257,25 +1263,7 @@ function App() {
         productoId: producto._id, // NUEVO: Guardamos el ID para el atajo
       });
     }
-
-    // Buscar el producto para la REGLA VERDE
-    const ventasProducto = ventas.filter((v) => v.nombreProducto === producto.nombre);
-    const utilidadProducto = ventasProducto.reduce((total, v) => total + Number(v.utilidad), 0);
-
-    if (utilidadProducto > maxUtilidadVerde) {
-      maxUtilidadVerde = utilidadProducto;
-      productoMasRentable = producto;
-    }
   });
-
-  // REGLA VERDE: Solo el producto ganador de utilidad
-  if (productoMasRentable) {
-    recomendaciones.push({
-      tipo: "bajo",
-      icono: "🟢",
-      mensaje: `${productoMasRentable.nombre}: Genera alta ganancia. Priorizar disponibilidad.`,
-    });
-  }
 
   // ======================================================
   // ESTILOS GENERALES DEL DASHBOARD
@@ -2279,203 +2267,130 @@ function App() {
                   border: "1px solid #ccc",
                   fontSize: "12.5px",
                   marginBottom: "15px",
+                  display: "block",
                 }}
               />
 
-              {tipoVentaSeleccionado === "detalle" &&
-                productoMovimientoSeleccionado && (
-                  <>
-                    <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                      Precio unitario negociado opcional
-                    </p>
-
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder={`Precio normal: $${Number(
-                        productoMovimientoSeleccionado.precioVenta || 0,
-                      ).toFixed(2)}`}
-                      value={precioUnitarioNegociado}
-                      onChange={(e) => setPrecioUnitarioNegociado(e.target.value)}
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: "350px",
-                        maxWidth: "100%",
-                        padding: "8px",
-                        borderRadius: "8px",
-                        border: "1px solid #ccc",
-                        fontSize: "12.5px",
-                        marginBottom: "15px",
-                      }}
-                    />
-                  </>
-                )}
-
-              {tipoVentaSeleccionado === "mayoreo" && (
-                <>
-                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                    Precio global negociado
-                  </p>
-
+              {/* NUEVO: CAMPOS OBLIGATORIOS PARA MAYOREO (FUERA DEL ACORDEÓN) */}
+              {tipoVentaSeleccionado === "mayoreo" && productoMovimientoSeleccionado && (
+                <div style={{ width: "350px", maxWidth: "100%", padding: "12px", backgroundColor: "#fff8f1", borderLeft: "4px solid #fd7e14", borderRadius: "0 8px 8px 0", marginBottom: "15px", boxSizing: "border-box" }}>
+                  <p style={{ margin: "0 0 10px", fontWeight: "700", color: "#fd7e14", fontSize: "13px" }}>📦 Condición de Mayoreo</p>
+                  
+                  <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "12px" }}>Precio global negociado</p>
                   <input
                     type="number"
                     min="0"
-                    placeholder="Monto total negociado"
+                    disabled={!!porcentajeDescuento}
+                    placeholder="Monto total cobrado"
                     value={precioGlobalMayoreo}
                     onChange={(e) => setPrecioGlobalMayoreo(e.target.value)}
                     onWheel={(e) => e.target.blur()}
-                    style={{
-                      width: "350px",
-                      maxWidth: "100%",
-                      padding: "8px",
-                      borderRadius: "8px",
-                      border: "1px solid #ccc",
-                      fontSize: "12.5px",
-                      marginBottom: "15px",
-                    }}
+                    style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "10px", backgroundColor: !!porcentajeDescuento ? "#e9ecef" : "white", boxSizing: "border-box" }}
                   />
 
-                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                    Descuento % (opcional)
-                  </p>
+                  <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "12px" }}>O aplica un descuento %</p>
                   <input
                     type="number"
+                    min="0"
+                    disabled={!!precioGlobalMayoreo}
                     placeholder="Ejemplo: 10"
-                    onWheel={(e) => e.target.blur()}
                     value={porcentajeDescuento}
                     onChange={(e) => setPorcentajeDescuento(e.target.value)}
-                    style={{
-                      width: "350px",
-                      maxWidth: "100%",
-                      padding: "8px",
-                      borderRadius: "8px",
-                      border: "1px solid #ccc",
-                      fontSize: "12.5px",
-                      marginBottom: "15px",
-                    }}
+                    onWheel={(e) => e.target.blur()}
+                    style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "12.5px", backgroundColor: !!precioGlobalMayoreo ? "#e9ecef" : "white", boxSizing: "border-box" }}
                   />
-                </>
-              )}
-
-              <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                Cliente (opcional)
-              </p>
-              <input
-                type="text"
-                placeholder="Nombre del cliente"
-                value={clienteVenta}
-                onChange={(e) => setClienteVenta(e.target.value)}
-                style={{
-                  width: "350px",
-                  maxWidth: "100%",
-                  padding: "8px",
-                  borderRadius: "8px",
-                  border: "1px solid #ccc",
-                  fontSize: "12.5px",
-                  marginBottom: "15px",
-                }}
-              />
-
-              {productoMovimientoSeleccionado && cantidadMovimiento && (
-                <div
-                  style={{
-                    backgroundColor: "#f8f9fa",
-                    color: "#333",
-                    padding: "12px",
-                    borderRadius: "10px",
-                    marginBottom: "15px",
-                    fontWeight: "600",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  <h3 style={{ margin: "0 0 10px", color: "#222" }}>
-                    Referencia con precio normal
-                  </h3>
-
-                  <p style={{ margin: "0 0 6px" }}>
-                    Ingreso normal: ${ingresoVentaNormalMovimiento.toFixed(2)}
-                  </p>
-
-                  <p style={{ margin: "0 0 6px" }}>
-                    Costo total: ${costoEstimadoMovimiento.toFixed(2)}
-                  </p>
-
-                  <p style={{ margin: 0, color: "#198754" }}>
-                    Utilidad normal estimada: $
-                    {(
-                      ingresoVentaNormalMovimiento - costoEstimadoMovimiento
-                    ).toFixed(2)}
-                  </p>
                 </div>
               )}
 
-              {productoMovimientoSeleccionado &&
-                cantidadMovimiento &&
-                ventaListaParaCalcular && (
+              {/* ACORDEÓN DE MÁS OPCIONES */}
+              {productoMovimientoSeleccionado && (
+                <div style={{ display: "block", width: "100%" }}>
                   <div
+                    onClick={() => setMostrarOpcionesVenta(!mostrarOpcionesVenta)}
                     style={{
-                      backgroundColor:
-                        stockDespuesMovimiento < 0 ? "#f8d7da" : "#e7f1ff",
-                      color: stockDespuesMovimiento < 0 ? "#842029" : "#084298",
-                      padding: "12px",
-                      borderRadius: "10px",
-                      marginBottom: "15px",
+                      cursor: "pointer",
+                      color: "#0d6efd",
                       fontWeight: "600",
+                      marginBottom: "15px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      fontSize: "13px"
                     }}
                   >
-                    <h3 style={{ margin: "0 0 10px", color: "#084298" }}>
-                      Resumen de la operación
-                    </h3>
-
-                    <p style={{ margin: "0 0 6px" }}>
-                      Stock después del movimiento: {stockDespuesMovimiento}
-                    </p>
-
-                    <p style={{ margin: "0 0 6px" }}>
-                      Ingreso de esta venta: $
-                      {ingresoEstimadoMovimiento.toFixed(2)}
-                    </p>
-
-                    {tipoVentaSeleccionado === "mayoreo" && (
-                      <p style={{ margin: "0 0 6px" }}>
-                        Ingreso si fuera venta normal: $
-                        {ingresoVentaNormalMovimiento.toFixed(2)}
-                      </p>
-                    )}
-
-                    <p style={{ margin: "0 0 6px" }}>
-                      Costo total de esta venta: $
-                      {costoEstimadoMovimiento.toFixed(2)}
-                    </p>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        color:
-                          utilidadEstimadaMovimiento < 0 ? "#dc3545" : "#198754",
-                        fontWeight: "700",
-                      }}
-                    >
-                      Utilidad real estimada: $
-                      {utilidadEstimadaMovimiento.toFixed(2)}
-                    </p>
-
-                    {ventaConPerdida && (
-                      <div
-                        style={{
-                          backgroundColor: "#f8d7da",
-                          color: "#842029",
-                          padding: "8px",
-                          borderRadius: "8px",
-                          marginTop: "10px",
-                          fontWeight: "700",
-                        }}
-                      >
-                        ⚠ Advertencia: esta venta generará pérdida.
-                      </div>
-                    )}
+                    {mostrarOpcionesVenta ? "▲ Ocultar opciones" : "▼ Mostrar más opciones (Cliente" + (tipoVentaSeleccionado === "detalle" ? ", Precio negociado)" : ")")}
                   </div>
-                )}
+                </div>
+              )}
+
+              {mostrarOpcionesVenta && productoMovimientoSeleccionado && (
+                <div style={{ paddingLeft: "12px", borderLeft: "3px solid #0d6efd", marginBottom: "20px", display: "block" }}>
+                  
+                  {tipoVentaSeleccionado === "detalle" && (
+                    <>
+                      <p style={{ marginBottom: "6px", marginTop: 0, fontWeight: "600" }}>Precio negociado <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Precio especial por cada pieza"
+                        value={precioUnitarioNegociado}
+                        onChange={(e) => setPrecioUnitarioNegociado(e.target.value)}
+                        onWheel={(e) => e.target.blur()}
+                        style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "15px", display: "block" }}
+                      />
+                    </>
+                  )}
+
+                  <p style={{ marginBottom: "6px", fontWeight: "600", marginTop: tipoVentaSeleccionado === "mayoreo" ? 0 : "auto" }}>Cliente <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                  <input
+                    type="text"
+                    placeholder="Nombre del cliente"
+                    value={clienteVenta}
+                    onChange={(e) => setClienteVenta(e.target.value)}
+                    style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "5px", display: "block" }}
+                  />
+                </div>
+              )}
+
+              {/* === NUEVO: TOTAL A COBRAR (Súper visible) === */}
+              {productoMovimientoSeleccionado && cantidadMovimiento !== "" && (
+                <div style={{
+                  backgroundColor: "#f8f9fa",
+                  border: "2px solid #198754",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  marginBottom: "15px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "350px",
+                  maxWidth: "100%",
+                  boxSizing: "border-box"
+                }}>
+                  <span style={{ fontSize: "14px", fontWeight: "700", color: "#333" }}>Total a cobrar:</span>
+                  <span style={{ fontSize: "22px", fontWeight: "900", color: "#198754" }}>
+                    ${ingresoEstimadoMovimiento.toFixed(2)}
+                  </span>
+                </div>
+              )}
+
+              {/* ÚNICA ALERTA PERMITIDA Y CORREGIDA */}
+              {ventaListaParaCalcular && ventaConPerdida && (
+                  <div
+                    style={{
+                      backgroundColor: "#f8d7da",
+                      color: "#842029",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      marginBottom: "15px",
+                      fontWeight: "700",
+                      fontSize: "13px",
+                      display: "block"
+                    }}
+                  >
+                    ⚠ Advertencia: El precio ingresado generará pérdida.
+                  </div>
+              )}
 
               <div style={{ height: "10px" }} />
 
@@ -3252,280 +3167,80 @@ function App() {
 
             {(editandoId || modoRegistro === "nuevo") && (
               <form onSubmit={guardarProducto} style={{}}>
-                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Nombre del producto
-                </p>
-                <input
-                  type="text"
-                  placeholder="Nombre del producto"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  style={{
-                    width: "350px",
-                    maxWidth: "100%",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    fontSize: "12.5px",
-                  }}
-                />
-                <div style={{ height: "14px" }} />
+              
+              {/* 1. CAMPOS OBLIGATORIOS (SIEMPRE VISIBLES) */}
+              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Nombre del producto</p>
+              <input type="text" placeholder="Nombre del producto" value={nombre} onChange={(e) => setNombre(e.target.value)} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
+              <div style={{ height: "14px" }} />
 
-                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Descripción del producto
-                </p>
+              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Precio de venta</p>
+              <input type="number" placeholder="Precio al que lo venderás" value={precioVenta} min="0" onChange={(e) => setPrecioVenta(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
+              <div style={{ height: "14px" }} />
 
-                <textarea
-                  placeholder="Ejemplo: Audífonos Bluetooth, marca X, color negro"
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  style={{
-                    width: "350px",
-                    maxWidth: "100%",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    fontSize: "12.5px",
-                    minHeight: "80px",
-                    resize: "vertical",
-                  }}
-                />
-                <div style={{ height: "14px" }} />
+              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Costo del producto <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                  <input type="number" placeholder="¿Cuánto te costó?" value={precio} min="0" onChange={(e) => setPrecio(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
+                  <div style={{ height: "14px" }} />
 
-                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Costo del producto
-                </p>
-                <input
-                  type="number"
-                  placeholder="Costo"
-                  value={precio}
-                  min="0"
-                  onChange={(e) => setPrecio(e.target.value)}
-                  onWheel={(e) => e.target.blur()}
-                  style={{
-                    width: "350px",
-                    maxWidth: "100%",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    fontSize: "12.5px",
-                  }}
-                />
-                <div style={{ height: "14px" }} />
+              {!editandoId && (
+                <>
+                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Stock inicial</p>
+                  <input type="number" placeholder="¿Cuántos tienes ahora?" value={stock} min="0" onChange={(e) => setStock(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
+                  <div style={{ height: "14px" }} />
+                </>
+              )}
 
-                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Costo de envío/manejo por unidad
-                </p>
+              {/* 2. BOTÓN DEL ACORDEÓN */}
+              <div
+                onClick={() => setMostrarOpcionesProducto(!mostrarOpcionesProducto)}
+                style={{ cursor: "pointer", color: "#0d6efd", fontWeight: "600", marginBottom: "15px", display: "flex", alignItems: "center", gap: "5px", fontSize: "13px" }}
+              >
+                {mostrarOpcionesProducto ? "▲ Ocultar opciones avanzadas" : "▼ Mostrar opciones avanzadas (Costo, Proveedor, etc.)"}
+              </div>
 
-                <input
-                  type="number"
-                  placeholder="Ejemplo: 15"
-                  value={costoEnvio}
-                  min="0"
-                  onChange={(e) => setCostoEnvio(e.target.value)}
-                  onWheel={(e) => e.target.blur()}
-                  style={{
-                    width: "350px",
-                    maxWidth: "100%",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    fontSize: "12.5px",
-                  }}
-                />
-                <div style={{ height: "14px" }} />
+              {/* 3. CAMPOS OPCIONALES (DENTRO DEL ACORDEÓN) */}
+              {mostrarOpcionesProducto && (
+                <div style={{ paddingLeft: "10px", borderLeft: "2px solid #0d6efd", marginBottom: "15px" }}>
+                  
+                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Descripción del producto <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                  <textarea placeholder="Ejemplo: Audífonos Bluetooth, marca X, color negro" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", minHeight: "60px", resize: "vertical" }} />
+                  <div style={{ height: "14px" }} />
 
-                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Precio de venta
-                </p>
-                <input
-                  type="number"
-                  placeholder="Precio de venta"
-                  value={precioVenta}
-                  min="0"
-                  onChange={(e) => setPrecioVenta(e.target.value)}
-                  onWheel={(e) => e.target.blur()}
-                  style={{
-                    width: "350px",
-                    maxWidth: "100%",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    fontSize: "12.5px",
-                  }}
-                />
-                <div style={{ height: "14px" }} />
+                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Costo de envío/manejo por unidad <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                  <input type="number" placeholder="Costo de envio" value={costoEnvio} min="0" onChange={(e) => setCostoEnvio(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
+                  <div style={{ height: "14px" }} />
 
-                {precio !== "" && precioVenta !== "" && (
-                  <div
-                    style={{
-                      backgroundColor:
-                        Number(precioVenta) <
-                        Number(precio) + Number(costoEnvio || 0)
-                          ? "#f8d7da"
-                          : "#e7f1ff",
-                      color:
-                        Number(precioVenta) <
-                        Number(precio) + Number(costoEnvio || 0)
-                          ? "#842029"
-                          : "#084298",
-                      padding: "12px",
-                      borderRadius: "10px",
-                      marginBottom: "15px",
-                      fontWeight: "600",
-                    }}
-                  >
-                    <p style={{ margin: "0 0 6px" }}>
-                      Costo del producto por unidad: $
-                      {Number(precio || 0).toFixed(2)}
-                    </p>
+                  {/* Cuadro de utilidad, solo se muestra si metió precios */}
+                  {precio !== "" && precioVenta !== "" && (
+                    <div style={{ backgroundColor: Number(precioVenta) < Number(precio) + Number(costoEnvio || 0) ? "#f8d7da" : "#e7f1ff", color: Number(precioVenta) < Number(precio) + Number(costoEnvio || 0) ? "#842029" : "#084298", padding: "12px", borderRadius: "10px", marginBottom: "15px", fontWeight: "600", width: "316px", maxWidth: "100%" }}>
+                      <p style={{ margin: "0 0 6px" }}>Costo total unitario: ${(Number(precio || 0) + Number(costoEnvio || 0)).toFixed(2)}</p>
+                      <p style={{ margin: 0 }}>Utilidad estimada por unidad: ${(Number(precioVenta || 0) - (Number(precio || 0) + Number(costoEnvio || 0))).toFixed(2)}</p>
+                    </div>
+                  )}
 
-                    <p style={{ margin: "0 0 6px" }}>
-                      Costo de envío/manejo por unidad: $
-                      {Number(costoEnvio || 0).toFixed(2)}
-                    </p>
+                  {!editandoId && (
+                    <>
+                      <p style={{ marginBottom: "6px", fontWeight: "600" }}>Proveedor inicial <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                      <input type="text" placeholder="Nombre del proveedor" value={proveedorProductoNuevo} onChange={(e) => setProveedorProductoNuevo(e.target.value)} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "15px", boxSizing: "border-box" }} />
+                    </>
+                  )}
 
-                    <p style={{ margin: "0 0 6px" }}>
-                      Costo total unitario: $
-                      {(Number(precio || 0) + Number(costoEnvio || 0)).toFixed(
-                        2,
-                      )}
-                    </p>
+                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Stock mínimo recomendado <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
+                  <input type="number" placeholder="Asume 1 por defecto" value={stockMinimo} min="0" onChange={(e) => setStockMinimo(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
+                  <div style={{ height: "14px" }} />
 
-                    <p style={{ margin: 0 }}>
-                      Utilidad estimada por unidad: $
-                      {(
-                        Number(precioVenta || 0) -
-                        (Number(precio || 0) + Number(costoEnvio || 0))
-                      ).toFixed(2)}
-                    </p>
-                  </div>
-                )}
-
-                {!editandoId && (
-                  <>
-                    <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                      Stock inicial
-                    </p>
-                    <input
-                      type="number"
-                      placeholder="Stock inicial"
-                      value={stock}
-                      min="0"
-                      onChange={(e) => setStock(e.target.value)}
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: "350px",
-                        maxWidth: "100%",
-                        padding: "8px",
-                        borderRadius: "8px",
-                        border: "1px solid #ccc",
-                        fontSize: "12.5px",
-                      }}
-                    />
-
-                    <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                      Proveedor inicial
-                    </p>
-
-                    <input
-                      type="text"
-                      placeholder="Proveedor (opcional)"
-                      value={proveedorProductoNuevo}
-                      onChange={(e) =>
-                        setProveedorProductoNuevo(e.target.value)
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: "8px",
-                        border: "1px solid #d1d5db",
-                        marginBottom: "15px",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                    <div style={{ height: "14px" }} />
-                  </>
-                )}
-
-                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Stock mínimo recomendado
-                </p>
-
-                <input
-                  type="number"
-                  placeholder="Ejemplo: 5"
-                  value={stockMinimo}
-                  min="0"
-                  onChange={(e) => setStockMinimo(e.target.value)}
-                  onWheel={(e) => e.target.blur()}
-                  style={{
-                    width: "350px",
-                    maxWidth: "100%",
-                    padding: "8px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    fontSize: "12.5px",
-                  }}
-                />
-                <div style={{ height: "14px" }} />
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    marginTop: "15px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <button
-                    type="submit"
-                    style={{
-                      display: "block",
-                      backgroundColor: editandoId ? "#0d6efd" : "#7c3aed",
-                      color: "white",
-                      border: "none",
-                      padding: "9px 12px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {editandoId ? "Actualizar producto" : "Guardar producto"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNombre("");
-                      setDescripcion("");
-                      setPrecio("");
-                      setCostoEnvio("");
-                      setPrecioVenta("");
-                      setStock("");
-                      setStockMinimo("");
-                      setProductoReposicionId("");
-                      setCantidadReposicion("");
-                      setEditandoId(null);
-                      setModoRegistro("nuevo");
-                      setSeccionActiva("inventario");
-                    }}
-                    style={{
-                      backgroundColor: "#dc3545",
-                      color: "white",
-                      border: "none",
-                      padding: "9px 12px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      fontWeight: "600",
-                    }}
-                  >
-                    Cancelar
-                  </button>
                 </div>
-              </form>
+              )}
+
+              {/* 4. BOTONES DE ACCIÓN */}
+              <div style={{ display: "flex", gap: "10px", marginTop: "5px", flexWrap: "wrap" }}>
+                <button type="submit" style={{ display: "block", backgroundColor: editandoId ? "#0d6efd" : "#7c3aed", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                  {editandoId ? "Actualizar producto" : "Guardar producto"}
+                </button>
+                <button type="button" onClick={() => { setNombre(""); setDescripcion(""); setPrecio(""); setCostoEnvio(""); setPrecioVenta(""); setStock(""); setStockMinimo(""); setProductoReposicionId(""); setCantidadReposicion(""); setEditandoId(null); setModoRegistro("nuevo"); setSeccionActiva("inventario"); setMostrarOpcionesProducto(false); }} style={{ backgroundColor: "#dc3545", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
             )}
 
             {/* ----------------------
@@ -4141,5 +3856,3 @@ function App() {
 }
 
 export default App;
-
-//forzando despliegue
