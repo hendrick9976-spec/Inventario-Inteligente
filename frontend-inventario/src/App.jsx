@@ -83,6 +83,7 @@ function App() {
   const [productoReposicionId, setProductoReposicionId] = useState("");
   const [cantidadReposicion, setCantidadReposicion] = useState("");
   const [modoRegistro, setModoRegistro] = useState("nuevo");
+  const [cantidadesMasivas, setCantidadesMasivas] = useState({});
 
   // ----------------------
   // NAVEGACIÓN DEL DASHBOARD
@@ -508,6 +509,7 @@ function App() {
     const itemsIniciales = productosBajos.map(p => ({
       id: p._id,
       nombre: p.nombre,
+      descripcion: p.descripcion || "", // <--- NUEVO
       stockActual: Number(p.stock),
       cantidad: "" // Empieza vacío para que él decida cuánto pedir
     }));
@@ -527,6 +529,7 @@ function App() {
       setItemsPedido([...itemsPedido, {
         id: producto._id,
         nombre: producto.nombre,
+        descripcion: producto.descripcion || "", // <--- NUEVO
         stockActual: Number(producto.stock),
         cantidad: ""
       }]);
@@ -549,7 +552,9 @@ function App() {
 
     let texto = "📦 *Pedido de Mercancía*\n\n";
     itemsValidos.forEach(item => {
-      texto += `▪️ ${item.cantidad}x ${item.nombre}\n`; // Puedes añadir "(Stock actual: ${item.stockActual})" si crees que le sirve al proveedor
+      // Si tiene descripción, la agregamos al mensaje
+      const detalle = item.descripcion ? ` (${item.descripcion})` : "";
+      texto += `▪️ ${item.cantidad}x ${item.nombre}${detalle}\n`; 
     });
 
     navigator.clipboard.writeText(texto).then(() => {
@@ -767,6 +772,47 @@ function App() {
     } catch (error) {
       console.error("Error al reponer inventario:", error);
       alert("Error al reponer inventario");
+    }
+  };
+
+  const guardarReposicionMasiva = async (e) => {
+    e.preventDefault();
+    
+    // Filtramos solo los productos a los que el usuario les escribió un número mayor a 0
+    const itemsAReponer = Object.entries(cantidadesMasivas).filter(([id, cant]) => Number(cant) > 0);
+
+    if (itemsAReponer.length === 0) {
+      alert("Ingresa al menos una cantidad para reponer.");
+      return;
+    }
+
+    try {
+      // Promise.all enviará todas las reposiciones al backend simultáneamente
+      await Promise.all(
+        itemsAReponer.map(([id, cant]) =>
+          fetch(`${API_URL}/productos/${id}/reponer`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              cantidad: Number(cant),
+              proveedor: proveedorReposicion, // El mismo proveedor global para todo este lote
+            }),
+          })
+        )
+      );
+
+      alert("¡Inventario repuesto masivamente! 📥✅");
+      setCantidadesMasivas({});
+      setProveedorReposicion("");
+      setSeccionActiva("inventario");
+      obtenerProductos();
+      obtenerReposiciones();
+    } catch (error) {
+      console.error("Error en reposición masiva:", error);
+      alert("Hubo un error al procesar algunas reposiciones.");
     }
   };
 
@@ -2041,18 +2087,16 @@ function App() {
                       {icono} {rec.mensaje}
                     </div>
 
-                    {/* NUEVO: Botón de atajo (solo aparece si el aviso tiene productoId) */}
+                    {/* NUEVO: Botón que lanza advertencia y abre pedidos */}
                     {rec.productoId && (
                       <button
                         onClick={() => {
-                          setProductoReposicionId(rec.productoId);
-                          setCantidadReposicion("");
-                          setProveedorReposicion("");
-                          setModoRegistro("reposicion");
-                          setSeccionActiva("registrar");
+                          alert("💡 Nota: Esto te llevará a generar el pedido. Cuando la mercancía llegue a tu tienda, usa el botón '📥 Reponer todo' en la sección de Inventario.");
+                          setSeccionActiva("inventario"); // ¡Esto soluciona el bug de la pantalla blanca!
+                          abrirGeneradorPedido();
                         }}
                         style={{
-                          backgroundColor: colorTexto, // Usa el color del texto (rojo oscuro o amarillo oscuro)
+                          backgroundColor: colorTexto,
                           color: "white",
                           border: "none",
                           padding: "5px 10px",
@@ -2060,11 +2104,11 @@ function App() {
                           cursor: "pointer",
                           fontSize: "11px",
                           fontWeight: "700",
-                          whiteSpace: "nowrap", // Evita que el botón se parta en dos líneas
+                          whiteSpace: "nowrap",
                           marginLeft: "10px",
                         }}
                       >
-                        Reponer 📥
+                        Pedir 📋
                       </button>
                     )}
                   </div>
@@ -2938,6 +2982,8 @@ function App() {
                       padding: "12px",
                       borderRadius: "12px",
                       marginBottom: "25px",
+                      boxSizing: "border-box", // <--- Esta es la magia que lo mete al cuadro
+                      overflow: "hidden" // <--- Esto evita que la gráfica se salga por los lados
                     }}
                   >
                     <h3 style={{ marginTop: 0, color: "#222" }}>
@@ -2967,7 +3013,10 @@ function App() {
                 ---------------------- */}
 
                     <ResponsiveContainer width="100%" height="85%">
-                      <LineChart data={datosGraficaVentas}>
+                      <LineChart 
+                        data={datosGraficaVentas}
+                        margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="fecha" />
                         <YAxis />
@@ -3511,6 +3560,60 @@ function App() {
                 </button>
               </form>
             )}
+
+            {/* ----------------------
+            FORMULARIO DE REPOSICIÓN MASIVA
+            ---------------------- */}
+            {!editandoId && modoRegistro === "reposicionMasiva" && (
+              <form onSubmit={guardarReposicionMasiva}>
+                <p style={{ color: "#666", marginBottom: "15px", marginTop: 0 }}>
+                  Agrega unidades a varios productos al mismo tiempo. Deja en blanco los que no vas a reponer hoy.
+                </p>
+
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Proveedor global <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span>
+                </p>
+                <input
+                  type="text"
+                  placeholder="Nombre del proveedor de este lote"
+                  value={proveedorReposicion}
+                  onChange={(e) => setProveedorReposicion(e.target.value)}
+                  style={{
+                    width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "15px", boxSizing: "border-box"
+                  }}
+                />
+
+                {/* Lista de todos los productos */}
+                <div style={{ maxHeight: "400px", overflowY: "auto", border: "1px solid #eee", borderRadius: "8px", padding: "10px", marginBottom: "15px", backgroundColor: "#f8f9fa" }}>
+                  {productos.map((producto) => (
+                    <div key={producto._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #e5e7eb" }}>
+                      <div style={{ flex: 1, paddingRight: "10px" }}>
+                        <p style={{ margin: 0, fontWeight: "600", fontSize: "13px", color: "#333" }}>{producto.nombre}</p>
+                        <p style={{ margin: 0, fontSize: "11px", color: Number(producto.stock) === 0 ? "#dc3545" : "#666", fontWeight: "500" }}>Stock actual: {producto.stock}</p>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="+0"
+                        value={cantidadesMasivas[producto._id] || ""}
+                        onChange={(e) => setCantidadesMasivas(prev => ({...prev, [producto._id]: e.target.value}))}
+                        onWheel={(e) => e.target.blur()}
+                        style={{ width: "65px", padding: "6px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px", textAlign: "center" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <button type="submit" style={{ backgroundColor: "#198754", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12.5px", fontWeight: "600" }}>
+                    Guardar reposición masiva
+                  </button>
+                  <button type="button" onClick={() => { setCantidadesMasivas({}); setProveedorReposicion(""); setModoRegistro("nuevo"); setSeccionActiva("inventario"); }} style={{ backgroundColor: "#dc3545", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12.5px", fontWeight: "600" }}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           {/* ======================================================
@@ -3562,6 +3665,30 @@ function App() {
                 }}
               >
                 + Agregar producto
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  cancelarEdicion();
+                  setCantidadesMasivas({});
+                  setProveedorReposicion("");
+                  setModoRegistro("reposicionMasiva");
+                  setSeccionActiva("registrar");
+                }}
+                style={{
+                  backgroundColor: "#198754", // Verde oscuro
+                  color: "white",
+                  border: "none",
+                  padding: "9px 13px",
+                  borderRadius: "9px",
+                  cursor: "pointer",
+                  fontSize: "12.5px",
+                  fontWeight: "700",
+                  boxShadow: "0 6px 14px rgba(25, 135, 84, 0.22)",
+                }}
+              >
+                📥 Reponer todo
               </button>
 
               <button
@@ -4035,6 +4162,12 @@ function App() {
                       <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", marginBottom: "8px", border: "1px solid #eee" }}>
                         <div style={{ flex: 1, paddingRight: "10px" }}>
                           <p style={{ margin: 0, fontWeight: "600", fontSize: "13px", color: "#333" }}>{item.nombre}</p>
+                          {/* === NUEVO: Muestra la descripción === */}
+                          {item.descripcion && (
+                            <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#777", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }}>
+                              {item.descripcion}
+                            </p>
+                          )}
                           <p style={{ margin: 0, fontSize: "11px", color: Number(item.stockActual) === 0 ? "#dc3545" : "#fd7e14", fontWeight: "600" }}>Stock actual: {item.stockActual}</p>
                         </div>
                         
@@ -4064,20 +4197,45 @@ function App() {
                         style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "13px", boxSizing: "border-box" }}
                       />
                       
-                      {busquedaExtra.length > 1 && (
-                        <div style={{ marginTop: "5px", border: "1px solid #eee", borderRadius: "8px", maxHeight: "120px", overflowY: "auto", backgroundColor: "white", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-                          {productos.filter(p => p.nombre.toLowerCase().includes(busquedaExtra.toLowerCase()) && !itemsPedido.find(i => i.id === p._id)).map(p => (
-                            <div 
-                              key={p._id} 
-                              onClick={() => agregarProductoExtraAlPedido(p)}
-                              style={{ padding: "8px 10px", borderBottom: "1px solid #eee", fontSize: "12px", cursor: "pointer", display: "flex", justifyContent: "space-between" }}
-                            >
-                              <span>{p.nombre}</span>
-                              <span style={{ color: "#198754", fontWeight: "600" }}>+ Agregar</span>
+                      {/* === LISTA PERMANENTE DE PRODUCTOS (Filtrable y ordenada por stock) === */}
+                      <div style={{ marginTop: "10px", border: "1px solid #eee", borderRadius: "8px", maxHeight: "160px", overflowY: "auto", backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+                        {productos
+                          .filter(p => !itemsPedido.find(i => i.id === p._id)) // Oculta los que ya están en la lista de arriba
+                          .filter(p => p.nombre.toLowerCase().includes(busquedaExtra.toLowerCase())) // Aplica el buscador si escribe algo
+                          .sort((a, b) => Number(a.stock) - Number(b.stock)) // Ordena del que tiene menos stock al que tiene más
+                          .map(p => (
+                          <div 
+                            key={p._id} 
+                            onClick={() => agregarProductoExtraAlPedido(p)}
+                            style={{ padding: "10px", borderBottom: "1px solid #eee", fontSize: "13px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                          >
+                            <div style={{ flex: 1, paddingRight: "10px", minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+                                <span style={{ fontWeight: "600", color: "#333" }}>{p.nombre}</span>
+                                <span style={{ fontSize: "11px", color: Number(p.stock) === 0 ? "#dc3545" : "#666", marginLeft: "8px", fontWeight: "500" }}>
+                                  (Stock: {p.stock})
+                                </span>
+                              </div>
+                              {/* === NUEVO: Muestra la descripción === */}
+                              {p.descripcion && (
+                                <div style={{ fontSize: "11px", color: "#888", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {p.descripcion}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            <span style={{ color: "#0d6efd", fontWeight: "700", fontSize: "12px", backgroundColor: "#eef6ff", padding: "4px 8px", borderRadius: "6px", whiteSpace: "nowrap" }}>
+                              + Agregar
+                            </span>
+                          </div>
+                      ))}
+                        
+                        {/* Mensaje por si la búsqueda no arroja resultados */}
+                        {productos.filter(p => !itemsPedido.find(i => i.id === p._id) && p.nombre.toLowerCase().includes(busquedaExtra.toLowerCase())).length === 0 && (
+                          <div style={{ padding: "12px", textAlign: "center", color: "#999", fontSize: "12px" }}>
+                            No hay más productos para agregar.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
