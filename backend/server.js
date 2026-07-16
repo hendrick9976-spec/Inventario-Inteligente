@@ -100,6 +100,7 @@ app.post("/productos", authMiddleware, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Error al crear producto" });
   }
+  
 });
 
 // Eliminar producto
@@ -423,13 +424,17 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
 // NUEVAS RUTAS PÚBLICAS PARA LA TIENDA (DÍA 2)
 // ==========================================
 
-// 1. Obtener productos de forma pública para la tienda de un usuario específico
-app.get("/api/tienda/:userId/productos", async (req, res) => {
+// 1. Obtener productos de forma pública para la tienda (Búsqueda Inteligente - Parche Temporal)
+app.get("/api/tienda/productos", async (req, res) => {
   try {
-    // Buscamos los productos que pertenecen al administrador usando el parámetro de la URL
-    const productos = await Product.find({ user: req.params.userId }).sort({
+    // Parche temporal: ID de tu cuenta principal forzado para pruebas locales
+    const miIdPrincipal = "69e94a11daadc496134df33c";
+    
+    // Traemos todo el catálogo exclusivamente de este usuario
+    const productos = await Product.find({ user: miIdPrincipal }).sort({
       nombre: 1,
     });
+    
     res.json(productos);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener los productos de la tienda" });
