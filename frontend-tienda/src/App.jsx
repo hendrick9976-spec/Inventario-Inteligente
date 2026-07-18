@@ -60,10 +60,16 @@ function App() {
   const subtotalCarrito = carrito.reduce((acc, item) => acc + (item.precioVenta * item.cantidadSeleccionada), 0);
 
   const agregarAlCarrito = (producto) => {
+    // Validación 1: Verificar el stock antes de hacer nada
+    const existe = carrito.find(item => item._id === producto._id);
+    if (existe && existe.cantidadSeleccionada >= producto.stock) {
+      alert(`⚠️ Stock insuficiente: Solo hay ${producto.stock} unidades disponibles de ${producto.nombre}.`);
+      return; // Detenemos la función aquí
+    }
+
     setCarrito(prev => {
-      const existe = prev.find(item => item._id === producto._id);
-      if (existe) {
-        if (existe.cantidadSeleccionada >= producto.stock) return prev;
+      const existeInterno = prev.find(item => item._id === producto._id);
+      if (existeInterno) {
         return prev.map(item => item._id === producto._id
           ? { ...item, cantidadSeleccionada: item.cantidadSeleccionada + 1 }
           : item
@@ -75,6 +81,13 @@ function App() {
   };
 
   const modificarCantidad = (id, delta) => {
+    // Validación 2: Verificar stock cuando se suma desde dentro del carrito
+    const item = carrito.find(i => i._id === id);
+    if (item && delta > 0 && item.cantidadSeleccionada + delta > item.stock) {
+      alert(`⚠️ Stock insuficiente: Solo hay ${item.stock} unidades disponibles de ${item.nombre}.`);
+      return; // Detenemos la función aquí
+    }
+
     setCarrito(prev => prev.map(item => {
       if (item._id === id) {
         const nuevaCantidad = item.cantidadSeleccionada + delta;
@@ -106,7 +119,8 @@ function App() {
           body: JSON.stringify({
             productoId: item._id,
             cantidad: item.cantidadSeleccionada,
-            cliente: `${nombreCliente} ${apellidoCliente}`.trim() || "Cliente Tienda Virtual"
+            cliente: `${nombreCliente} ${apellidoCliente}`.trim() || "Cliente Tienda Virtual",
+            origenVenta: 'Web'
           })
         }).then(async (res) => {
            if (!res.ok) {
@@ -241,9 +255,10 @@ function App() {
         <nav style={{ display: 'flex', gap: '25px', fontWeight: '600', fontSize: '13px', color: theme.textMuted }}>
           <span style={{ color: theme.primary, cursor: 'pointer' }}>INICIO</span>
           <span style={{ cursor: 'pointer' }}>MÁS VENDIDOS</span>
-          <span style={{ cursor: 'pointer' }}>AUDIO</span>
-          <span style={{ cursor: 'pointer' }}>CABLES</span>
-          <span style={{ cursor: 'pointer' }}>CONTACTO</span>
+          <span style={{ cursor: 'pointer' }}>ELECTRÓNICOS</span>
+          <span style={{ cursor: 'pointer' }}>ALIMENTOS</span>
+          <span style={{ cursor: 'pointer' }}>ROPA</span>
+          <span style={{ cursor: 'pointer' }}>HOGAR</span>
         </nav>
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <span style={{ cursor: 'pointer', fontSize: '18px' }}>🔍</span>
@@ -342,24 +357,36 @@ function App() {
             </div>
             <p style={{ fontSize: '13px', lineHeight: '1.6' }}>Conectando tu vida con la mejor tecnología. Accesorios, fundas y cables de alta duración.</p>
           </div>
+          
+          {/* Columna de Contacto Modificada */}
           <div>
-            <h4 style={{ color: theme.text, marginBottom: '20px', fontSize: '15px' }}>Enlaces Rápidos</h4>
+            <h4 style={{ color: theme.text, marginBottom: '20px', fontSize: '15px' }}>Contacto</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <li style={{ cursor: 'pointer' }}>Nuevos Ingresos</li>
-              <li style={{ cursor: 'pointer' }}>Ofertas Especiales</li>
-              <li style={{ cursor: 'pointer' }}>Seguimiento de Pedido</li>
-              <li style={{ cursor: 'pointer' }}>Contacto</li>
+              <li style={{ fontWeight: 'bold', color: theme.text }}>Hendrick Pérez Mena</li>
+              <li>
+                <a 
+                  href="mailto:hendrick9976@gmail.com" 
+                  style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none', transition: 'color 0.2s' }}
+                  onMouseEnter={(e) => e.target.style.color = theme.primary}
+                  onMouseLeave={(e) => e.target.style.color = theme.textMuted}
+                >
+                  hendrick9976@gmail.com
+                </a>
+              </li>
             </ul>
           </div>
+          
+          {/* Columna Legal con enlaces simulados */}
           <div>
             <h4 style={{ color: theme.text, marginBottom: '20px', fontSize: '15px' }}>Soporte Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <li style={{ cursor: 'pointer' }}>Términos del Servicio</li>
-              <li style={{ cursor: 'pointer' }}>Política de Privacidad</li>
-              <li style={{ cursor: 'pointer' }}>Política de Reembolso</li>
-              <li style={{ cursor: 'pointer' }}>Políticas de Envío</li>
+              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Términos del Servicio</a></li>
+              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Política de Privacidad</a></li>
+              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Política de Reembolso</a></li>
+              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Políticas de Envío</a></li>
             </ul>
           </div>
+          
           <div>
             <h4 style={{ color: theme.text, marginBottom: '20px', fontSize: '15px' }}>Suscríbete al Club Tech</h4>
             <div style={{ display: 'flex', gap: '5px' }}>

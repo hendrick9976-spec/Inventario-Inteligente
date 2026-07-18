@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
+  PieChart,
+  Pie,
+  Cell,
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
@@ -119,6 +124,7 @@ function App() {
   const [rangoGrafica, setRangoGrafica] = useState("10");
   const [ordenVentas, setOrdenVentas] = useState("");
   const [reposiciones, setReposiciones] = useState([]);
+  const [datosOrigenVentas, setDatosOrigenVentas] = useState([]);
 
   // ----------------------
   // FILTROS Y BÚSQUEDAS
@@ -340,6 +346,28 @@ function App() {
       setReposiciones(data);
     } catch (error) {
       console.error("Error al obtener reposiciones:", error);
+    }
+  };
+
+  const obtenerDatosOrigen = async () => {
+    try {
+      // Asegúrate de que la ruta coincida con cómo registraste el endpoint en Node
+      const res = await fetch(`${API_URL}/ventas/dashboard/origen`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setDatosOrigenVentas([]);
+        return;
+      }
+
+      setDatosOrigenVentas(data);
+    } catch (error) {
+      console.error("Error al obtener el consolidado de origen:", error);
     }
   };
 
@@ -582,6 +610,14 @@ function App() {
       alert("La cantidad debe ser mayor a 0");
       return;
     }
+
+    // --- NUEVA VALIDACIÓN DE STOCK ---
+    const prodVerificar = productos.find((p) => p._id === productoMovimientoId);
+    if (prodVerificar && Number(cantidadMovimiento) > Number(prodVerificar.stock)) {
+      alert(`⚠️ Stock insuficiente: Solo tienes ${prodVerificar.stock} unidades de ${prodVerificar.nombre}.`);
+      return; // Esto detiene la venta
+    }
+    // ---------------------------------
 
     if (tipoVentaSeleccionado === "mayoreo") {
       const sinPrecioGlobal = precioGlobalMayoreo === "";
@@ -836,6 +872,7 @@ function App() {
       obtenerProductos();
       obtenerVentas();
       obtenerReposiciones();
+      obtenerDatosOrigen();
     }
   }, [token]);
 
@@ -1134,11 +1171,8 @@ function App() {
       : Number(productoMovimientoSeleccionado?.precioVenta || 0);
 
   const ventaListaParaCalcular =
-    productoMovimientoSeleccionado &&
-    cantidadMovimiento &&
-    (tipoVentaSeleccionado === "detalle" ||
-      precioGlobalMayoreo !== "" ||
-      porcentajeDescuento !== "");
+      productoMovimientoSeleccionado &&
+      cantidadMovimiento;
 
   const ingresoVentaNormalMovimiento =
     productoMovimientoSeleccionado && cantidadMovimiento
@@ -1275,7 +1309,7 @@ function App() {
   // Ventas e ingresos por día
   // ----------------------
 
-  const ventasPorDia = ventas.reduce((acc, venta) => {
+  const ventasPorDia = ventas.filter(venta => venta.origenVenta !== 'Web').reduce((acc, venta) => {
     const fechaObj = new Date(venta.createdAt);
 
     const fecha = `${fechaObj.getFullYear()}-${String(
@@ -1336,7 +1370,7 @@ function App() {
   // ----------------------
 
   const resumenProductos = Object.values(
-    ventas.reduce((acc, venta) => {
+    ventas.filter(venta => venta.origenVenta !== 'Web').reduce((acc, venta) => {
       const nombre = venta.nombreProducto;
 
       if (!acc[nombre]) {
@@ -2434,9 +2468,26 @@ function App() {
               <input
                 type="number"
                 min="1"
+                max={productoMovimientoSeleccionado ? productoMovimientoSeleccionado.stock : ""}
                 placeholder="Ejemplo: 2"
                 value={cantidadMovimiento}
-                onChange={(e) => setCantidadMovimiento(e.target.value)}
+                onChange={(e) => {
+                  const nuevaCantidad = e.target.value;
+                  
+                  // Si hay un producto seleccionado y se está escribiendo un número
+                  if (productoMovimientoSeleccionado && nuevaCantidad !== "") {
+                    // Si lo que teclea es mayor al stock disponible
+                    if (Number(nuevaCantidad) > Number(productoMovimientoSeleccionado.stock)) {
+                      alert(`⚠️ Stock insuficiente: Solo tienes ${productoMovimientoSeleccionado.stock} unidades de ${productoMovimientoSeleccionado.nombre}.`);
+                      // Forzamos a que el valor se quede en el máximo stock disponible
+                      setCantidadMovimiento(productoMovimientoSeleccionado.stock);
+                      return; // Detenemos la ejecución
+                    }
+                  }
+                  
+                  // Si no supera el límite, permitimos que se escriba normal
+                  setCantidadMovimiento(nuevaCantidad);
+                }}
                 onWheel={(e) => e.target.blur()}
                 style={{
                   width: "350px",
@@ -3041,6 +3092,34 @@ function App() {
                   </div>
                 )}
 
+                {/* --- NUEVA GRÁFICA: VENTAS WEB VS LOCAL --- */}
+                {datosOrigenVentas.length > 0 && (
+                  <div style={{ width: "100%", height: 320, backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "12px", marginBottom: "25px", boxSizing: "border-box" }}>
+                    <h3 style={{ marginTop: 0, color: "#222" }}>🌐 Distribución de Ingresos: Web vs Local</h3>
+                    <ResponsiveContainer width="100%" height="85%">
+                      <PieChart>
+                        <Pie
+                          data={datosOrigenVentas}
+                          dataKey="totalIngresos"
+                          nameKey="_id"
+                          cx="50%" cy="50%"
+                          outerRadius={80}
+                          label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {datosOrigenVentas.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry._id === 'Web' ? '#7c3aed' : '#0d6efd'} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <p style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
+                      *Haz clic en las secciones o pasa el mouse para ver el detalle de operaciones.
+                    </p>
+                  </div>
+                )}
+
                 <h3 style={{ marginBottom: "10px", color: "#222" }}>
                   📄 Historial de ventas
                 </h3>
@@ -3114,7 +3193,7 @@ function App() {
                     >
                       <thead>
                         <tr>
-                          {["Producto", "Tipo", "Cliente", "Cantidad", "Ingreso", "Costo total", "Utilidad", "Margen %", "Fecha"].map((titulo) => (
+                          {["Producto", "Tipo", "Origen", "Cliente", "Cantidad", "Ingreso", "Costo total", "Utilidad", "Margen %", "Fecha"].map((titulo) => (
                             <th 
                               key={titulo} 
                               style={{ 
@@ -3148,6 +3227,21 @@ function App() {
                                 ? "Mayoreo"
                                 : "Normal"}
                             </td>
+
+                            {/* --- NUEVA CELDA DE ORIGEN --- */}
+                            <td style={{ padding: "8px", textAlign: "center" }}>
+                              <span style={{
+                                backgroundColor: venta.origenVenta === 'Web' ? '#cff4fc' : '#e2e3e5',
+                                color: venta.origenVenta === 'Web' ? '#055160' : '#41464b',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                              }}>
+                                {venta.origenVenta || "Local"}
+                              </span>
+                            </td>
+                            {/* ----------------------------- */}
 
                             <td style={{ padding: "8px", textAlign: "center" }}>
                               {venta.cliente || "—"}

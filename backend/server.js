@@ -347,6 +347,33 @@ app.post("/ventas", authMiddleware, async (req, res) => {
   }
 });
 
+// ==========================================
+// NUEVO: Consolidado de ventas por origen (Dashboard E-business)
+// ==========================================
+app.get("/ventas/dashboard/origen", authMiddleware, async (req, res) => {
+  try {
+    const ventasUsuario = await Venta.find({ user: req.user.userId });
+
+    const consolidado = ventasUsuario.reduce((acc, venta) => {
+      // Unificamos: Todo lo que NO sea 'Web' se convierte en 'Local'
+      let categoria = venta.origenVenta === 'Web' ? 'Web' : 'Local';
+      
+      if (!acc[categoria]) {
+        acc[categoria] = { _id: categoria, totalIngresos: 0, cantidadVentas: 0 };
+      }
+      
+      acc[categoria].totalIngresos += Number(venta.ingresoTotal);
+      acc[categoria].cantidadVentas += 1;
+      
+      return acc;
+    }, {});
+
+    res.json(Object.values(consolidado));
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener consolidado" });
+  }
+});
+
 // Obtener historial de ventas
 app.get("/ventas", authMiddleware, async (req, res) => {
   try {
