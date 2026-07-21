@@ -75,7 +75,7 @@ function App() {
           : item
         );
       }
-      return [...prev, { ...producto, cantidadSeleccionada: 1 }];
+      return [{ ...producto, cantidadSeleccionada: 1 }, ...prev];
     });
     setCarritoAbierto(true);
   };
@@ -119,7 +119,7 @@ function App() {
           body: JSON.stringify({
             productoId: item._id,
             cantidad: item.cantidadSeleccionada,
-            cliente: `${nombreCliente} ${apellidoCliente}`.trim() || "Cliente Tienda Virtual",
+            cliente: `${nombreCliente} ${apellidoCliente}`.trim(),
             origenVenta: 'Web'
           })
         }).then(async (res) => {

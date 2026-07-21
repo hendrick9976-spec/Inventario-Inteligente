@@ -517,7 +517,7 @@ app.post("/api/tienda/compra", async (req, res) => {
       costoTotal,
       utilidad,
       tipoVenta: "detalle",
-      cliente: cliente || "Cliente Tienda Virtual",
+      cliente: cliente || "",
       ventaConPerdida: utilidad < 0,
       user: producto.user,
       origenVenta: "Web",
