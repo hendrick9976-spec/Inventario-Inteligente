@@ -44,4 +44,6 @@ const reposicionSchema = new mongoose.Schema(
   },
 );
 
+reposicionSchema.index({ user: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Reposicion", reposicionSchema);

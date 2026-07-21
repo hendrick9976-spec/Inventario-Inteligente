@@ -451,14 +451,13 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
 // NUEVAS RUTAS PÚBLICAS PARA LA TIENDA (DÍA 2)
 // ==========================================
 
-// 1. Obtener productos de forma pública para la tienda (Búsqueda Inteligente - Parche Temporal)
-app.get("/api/tienda/productos", async (req, res) => {
+// 1. Obtener productos de forma pública para la tienda (Ruta Dinámica)
+app.get("/api/tienda/:usuarioId/productos", async (req, res) => {
   try {
-    // Parche temporal: ID de tu cuenta principal forzado para pruebas locales
-    const miIdPrincipal = "69e94a11daadc496134df33c";
+    const { usuarioId } = req.params;
     
-    // Traemos todo el catálogo exclusivamente de este usuario
-    const productos = await Product.find({ user: miIdPrincipal }).sort({
+    // Se extrae el catálogo exclusivamente del usuario especificado en la URL
+    const productos = await Product.find({ user: usuarioId }).sort({
       nombre: 1,
     });
     
@@ -468,45 +467,41 @@ app.get("/api/tienda/productos", async (req, res) => {
   }
 });
 
-// 2. Simular una compra desde la tienda (Descuenta stock de forma atómica y registra la venta)
-app.post("/api/tienda/compra", async (req, res) => {
+// 2. Simular una compra desde la tienda (Ruta Dinámica)
+app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
   try {
     const { productoId, cantidad, cliente } = req.body;
+    const { usuarioId } = req.params;
 
     if (!productoId || cantidad === undefined || Number(cantidad) <= 0) {
       return res.status(400).json({ error: "Datos de compra inválidos" });
     }
 
     // === OPERACIÓN ATÓMICA DE CONCURRENCIA ===
-    // Intenta buscar el producto Y restar el stock en un solo paso, solo si hay suficiente stock
     const producto = await Product.findOneAndUpdate(
       {
         _id: productoId,
-        stock: { $gte: Number(cantidad) } // Condición crítica: stock mayor o igual a la cantidad
+        user: usuarioId, // Validación extra de seguridad
+        stock: { $gte: Number(cantidad) }
       },
       {
-        $inc: { stock: -Number(cantidad) } // Resta la cantidad directamente en la BD
+        $inc: { stock: -Number(cantidad) }
       },
-      { returnDocument: "after" } // Nos devuelve el producto ya actualizado
+      { returnDocument: "after" }
     );
 
-    // Si no se pudo hacer la actualización, es porque el producto no existe o no hay stock
     if (!producto) {
-      // Hacemos una verificación rápida para responder con el error exacto
-      const existeProducto = await Product.findById(productoId);
+      const existeProducto = await Product.findOne({ _id: productoId, user: usuarioId });
       if (!existeProducto) {
-        return res.status(404).json({ error: "El producto ya no existe" });
+        return res.status(404).json({ error: "El producto ya no existe en esta tienda" });
       }
       return res.status(400).json({ error: "Lo sentimos, no hay suficiente stock disponible" });
     }
 
-    // Calculamos los aspectos financieros usando los datos del producto actualizado
-    // (Como el stock ya se restó, sumamos la cantidad para calcular los costos basados en lo que costaba originalmente)
     const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
     const costoTotal = (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) * Number(cantidad);
     const utilidad = ingresoTotal - costoTotal;
 
-    // Registramos la venta en el historial del dueño del producto
     const nuevaVenta = new Venta({
       productoId: producto._id,
       nombreProducto: producto.nombre,
@@ -529,7 +524,7 @@ app.post("/api/tienda/compra", async (req, res) => {
     res.status(201).json({
       mensaje: "¡Compra simulada con éxito! El stock ha sido actualizado.",
       venta: nuevaVenta,
-      productoUpdated: producto // Ya lleva el stock descontado de forma segura
+      productoUpdated: producto 
     });
 
   } catch (error) {

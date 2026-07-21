@@ -31,7 +31,14 @@ function App() {
   // =========================================
   const fetchProductos = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/tienda/productos');
+      // Extraemos el ID de la URL. Si la URL es localhost:5173/ID_USUARIO, tomará el último fragmento
+      const pathParts = window.location.pathname.split('/');
+      const usuarioId = pathParts[pathParts.length - 1]; 
+      
+      // Validamos que exista un ID en la URL
+      if (!usuarioId) throw new Error("ID de tienda no encontrado en la URL");
+
+      const res = await fetch(`http://localhost:5000/api/tienda/${usuarioId}/productos`);
       if (!res.ok) throw new Error("Error al cargar el catálogo");
       const data = await res.json();
       setProductos(data);
@@ -106,14 +113,21 @@ function App() {
   // =========================================
   // 3. CONEXIÓN CON API DE VENTAS
   // =========================================
+  // =========================================
+  // 3. CONEXIÓN CON API DE VENTAS (Ruta Dinámica)
+  // =========================================
   const procesarCompra = async (e) => {
     if (e) e.preventDefault(); 
     if (carrito.length === 0) return;
     setProcesando(true);
+    
+    // Extraemos el ID de la tienda desde la URL nuevamente
+    const pathParts = window.location.pathname.split('/');
+    const usuarioId = pathParts[pathParts.length - 1];
 
     try {
       const promesasCompra = carrito.map(item =>
-        fetch('http://localhost:5000/api/tienda/compra', { 
+        fetch(`http://localhost:5000/api/tienda/${usuarioId}/compra`, { 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -130,14 +144,11 @@ function App() {
            return res.json();
         })
       );
-
       await Promise.all(promesasCompra);
-
       alert('¡Compra realizada con éxito! El inventario se ha descontado.');
       setCarrito([]);
       setEnCheckout(false);
       
-      // Refrescamos los productos para actualizar el stock visible en la tienda
       await fetchProductos();
       
     } catch (error) {
@@ -246,13 +257,14 @@ function App() {
   // VISTA 1: TIENDA PRINCIPAL
   // =========================================
   return (
-    <div style={{ backgroundColor: theme.bg, minHeight: '100vh', fontFamily: "'Segoe UI', sans-serif", color: theme.text }}>
-      <header style={{ backgroundColor: theme.white, borderBottom: `1px solid ${theme.border}`, padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+    <div style={{ backgroundColor: theme.bg, minHeight: '100vh', fontFamily: "'Segoe UI', sans-serif", color: theme.text, overflowX: 'hidden', width: '100%' }}>
+      <header style={{ backgroundColor: theme.white, borderBottom: `1px solid ${theme.border}`, padding: 'clamp(10px, 3vw, 15px) clamp(15px, 5vw, 40px)', display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 10px rgba(0,0,0,0.02)', boxSizing: 'border-box', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: theme.blue, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>⚡</div>
           <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '800', letterSpacing: '-0.5px', color: theme.text }}>Tech<span style={{ color: theme.primary }}>Store</span></h2>
         </div>
-        <nav style={{ display: 'flex', gap: '25px', fontWeight: '600', fontSize: '13px', color: theme.textMuted }}>
+        
+        <nav style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(10px, 2vw, 25px)', fontWeight: '600', fontSize: '13px', color: theme.textMuted, flex: '1 1 auto' }}>
           <span style={{ color: theme.primary, cursor: 'pointer' }}>INICIO</span>
           <span style={{ cursor: 'pointer' }}>MÁS VENDIDOS</span>
           <span style={{ cursor: 'pointer' }}>ELECTRÓNICOS</span>
@@ -260,21 +272,23 @@ function App() {
           <span style={{ cursor: 'pointer' }}>ROPA</span>
           <span style={{ cursor: 'pointer' }}>HOGAR</span>
         </nav>
+        
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <span style={{ cursor: 'pointer', fontSize: '18px' }}>🔍</span>
           <span style={{ cursor: 'pointer', fontSize: '18px' }}>👤</span>
-          <button onClick={() => setCarritoAbierto(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <button onClick={() => setCarritoAbierto(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', padding: 0 }}>
             <span style={{ fontSize: '22px' }}>🛍️</span>
             <span style={{ position: 'absolute', top: '-5px', right: '-8px', backgroundColor: theme.primary, color: 'white', fontSize: '11px', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{totalArticulos}</span>
           </button>
         </div>
       </header>
 
-      <section style={{ padding: '30px 40px' }}>
-        <div style={{ backgroundColor: theme.white, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '40px', display: 'grid', gridTemplateColumns: '8fr 2fr', alignItems: 'stretch', gap: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'left' }}>
+      <section style={{ padding: 'clamp(15px, 3vw, 30px) clamp(15px, 4vw, 40px)', boxSizing: 'border-box', width: '100%', maxWidth: '100vw' }}>
+        <div style={{ backgroundColor: theme.white, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: 'clamp(15px, 4vw, 40px)', display: 'flex', flexWrap: 'wrap', gap: 'clamp(20px, 4vw, 40px)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', overflow: 'hidden', boxSizing: 'border-box', width: '100%' }}>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'left', flex: '1 1 280px', minWidth: 0, boxSizing: 'border-box' }}>
             <div style={{ backgroundColor: '#f3f0ff', color: theme.primary, padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', marginBottom: '15px', width: 'fit-content', letterSpacing: '1px', textTransform: 'uppercase' }}>¡Especial de Verano!</div>
-            <h1 style={{ color: theme.text, fontSize: '44px', margin: '0 0 10px 0', fontWeight: '900', lineHeight: '1.1' }}>HASTA 30% OFF <br/> <span style={{ color: theme.primary, fontSize: '32px' }}>EN TODA LA TIENDA</span></h1>
+            <h1 style={{ color: theme.text, fontSize: 'clamp(32px, 5vw, 44px)', margin: '0 0 10px 0', fontWeight: '900', lineHeight: '1.1' }}>HASTA 30% OFF <br/> <span style={{ color: theme.primary, fontSize: 'clamp(24px, 4vw, 32px)' }}>EN TODA LA TIENDA</span></h1>
             <p style={{ color: theme.textMuted, fontSize: '15px', maxWidth: '450px', margin: '10px 0 25px 0', lineHeight: '1.5' }}>Lleva los mejores accesorios tecnológicos al mejor precio con liquidaciones de inventario por tiempo limitado.</p>
             <div>
               <button style={{ backgroundColor: theme.primary, color: 'white', border: 'none', padding: '14px 32px', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124, 58, 237, 0.2)' }}>
@@ -282,13 +296,15 @@ function App() {
               </button>
             </div>
           </div>
-          <div style={{ backgroundColor: theme.bg, borderRadius: '12px', padding: '25px', border: `1px solid ${theme.border}`, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', height: '100%', boxSizing: 'border-box' }}>
+
+          <div style={{ backgroundColor: theme.bg, borderRadius: '12px', padding: 'clamp(15px, 4vw, 25px)', border: `1px solid ${theme.border}`, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', minHeight: '350px', flex: '1 1 280px', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
             <span style={{ position: 'absolute', top: '15px', left: '15px', backgroundColor: theme.red, color: 'white', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', zIndex: 2 }}>OFERTA TOP</span>
-            <button onClick={anteriorSlide} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${theme.border}`, backgroundColor: theme.white, color: theme.text, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>←</button>
+            <button onClick={anteriorSlide} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', width: '32px', height: '32px', borderRadius: '50%', border: `1px solid ${theme.border}`, backgroundColor: theme.white, color: theme.text, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>←</button>
+            
             <div style={{ width: '100%', flex: 1, overflow: 'hidden', position: 'relative', display: 'flex' }}>
               <div style={{ display: 'flex', width: '100%', transition: 'transform 0.5s ease-in-out', transform: `translateX(-${slideActual * 100}%)`, alignItems: 'center' }}>
                 {productosOferta.map((producto) => (
-                  <div key={producto._id} style={{ flex: '0 0 100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '0 40px', boxSizing: 'border-box' }}>
+                  <div key={producto._id} style={{ flex: '0 0 100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '0 clamp(20px, 8vw, 40px)', boxSizing: 'border-box' }}>
                     <div style={{ width: '140px', height: '140px', backgroundColor: '#f1f3f5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '60px', marginBottom: '15px' }}>📸</div>
                     <h3 style={{ margin: '0 0 5px 0', fontSize: '16px', color: theme.text, fontWeight: '700' }}>{producto.nombre}</h3>
                     <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: theme.textMuted }}>{producto.descripcion}</p>
@@ -300,16 +316,18 @@ function App() {
                 ))}
               </div>
             </div>
-            <button onClick={siguienteSlide} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${theme.border}`, backgroundColor: theme.white, color: theme.text, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>→</button>
+            
+            <button onClick={siguienteSlide} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', width: '32px', height: '32px', borderRadius: '50%', border: `1px solid ${theme.border}`, backgroundColor: theme.white, color: theme.text, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>→</button>
             {productosOferta.length > 0 && (
               <button 
                 onClick={() => agregarAlCarrito(productosOferta[slideActual])}
-                style={{ width: '100%', padding: '12px', backgroundColor: theme.blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', transition: 'background-color 0.2s', marginTop: 'auto', zIndex: 2 }}
+                style={{ width: '100%', padding: '12px', backgroundColor: theme.blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', transition: 'background-color 0.2s', marginTop: 'auto', zIndex: 2, boxSizing: 'border-box' }}
               >
                 Añadir al carrito
               </button>
             )}
           </div>
+          
         </div>
       </section>
 

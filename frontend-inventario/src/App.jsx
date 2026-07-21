@@ -2152,6 +2152,57 @@ function App() {
           </div>
 
           {/* ======================================================
+              ACCESO RÁPIDO A LA TIENDA EN LÍNEA *oculto temporalmente
+              ====================================================== */}
+          
+          {/*{seccionActiva === "inicio" && (
+            <div style={{
+              backgroundColor: "#7c3aed",
+              color: "white",
+              padding: "18px 20px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              boxShadow: "0 4px 15px rgba(124, 58, 237, 0.25)",
+              flexWrap: "wrap",
+              gap: "15px"
+            }}>
+              <div>
+                <h3 style={{ margin: "0 0 5px 0", fontSize: "17px", fontWeight: "800" }}>
+                  🛍️ Tu Tienda en Línea
+                </h3>
+                <p style={{ margin: 0, fontSize: "13px", opacity: 0.9 }}>
+                  Comparte tu enlace exclusivo para que tus clientes compren de forma directa.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  // Se corrigió a usuario?.id para evitar el "undefined"
+                  const urlTienda = `http://localhost:5174/${usuario?.id}`;
+                  // Esto abre la pestaña nueva automáticamente
+                  window.open(urlTienda, '_blank');
+                }}
+                style={{
+                  backgroundColor: "white",
+                  color: "#7c3aed",
+                  border: "none",
+                  padding: "10px 18px",
+                  borderRadius: "8px",
+                  fontWeight: "800",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
+                }}
+              >
+                Ir a mi Tienda ➔
+              </button>
+            </div>
+          )}*/}
+
+          {/* ======================================================
               CIERRE DE CAJA (RESUMEN DEL DÍA)
               ====================================================== */}
           {seccionActiva === "inicio" && (
