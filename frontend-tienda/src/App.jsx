@@ -3,6 +3,27 @@ import { useState, useEffect } from 'react';
 function App() {
   const [carritoAbierto, setCarritoAbierto] = useState(false);
   const [enCheckout, setEnCheckout] = useState(false);
+
+  // === NUEVO: ESTADO Y CONTROL DEL HISTORIAL DEL NAVEGADOR ===
+  const [vistaLegal, setVistaLegal] = useState(false);
+  useEffect(() => {
+    const manejarBotonAtras = () => {
+      // Si el usuario presiona la flecha de "Atrás" en su navegador, cerramos la vista
+      setVistaLegal(false);
+      // Extra: también podemos aprovechar para cerrar el checkout si estaba ahí
+      setEnCheckout(false); 
+    };
+    window.addEventListener('popstate', manejarBotonAtras);
+    return () => window.removeEventListener('popstate', manejarBotonAtras);
+  }, []);
+
+  // Función para abrir la vista y crear un "paso falso" en el historial
+  const abrirVistaLegal = () => {
+    window.history.pushState({ pagina: 'legal' }, ''); 
+    setVistaLegal(true);
+    window.scrollTo(0, 0);
+  };
+  // ==========================================================
   const [slideActual, setSlideActive] = useState(0);
   const [nombreCliente, setNombreCliente] = useState('');
   const [apellidoCliente, setApellidoCliente] = useState('');
@@ -254,6 +275,45 @@ function App() {
   }
 
   // =========================================
+  // VISTA 3: POLÍTICAS LEGALES
+  // =========================================
+  if (vistaLegal) {
+    return (
+      <div style={{ backgroundColor: theme.bg, minHeight: '100vh', fontFamily: "'Segoe UI', sans-serif", color: theme.text }}>
+        <header style={{ backgroundColor: theme.white, borderBottom: `1px solid ${theme.border}`, padding: '20px 40px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: theme.blue, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold' }}>⚡</div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: theme.text }}>Tech<span style={{ color: theme.primary }}>Store</span></h2>
+          </div>
+        </header>
+        
+        <div style={{ maxWidth: '800px', margin: '40px auto', padding: '40px', backgroundColor: theme.white, borderRadius: '12px', border: `1px solid ${theme.border}` }}>
+          <h1 style={{ textAlign: 'center', marginBottom: '40px', color: theme.text }}>Información Legal y Soporte</h1>          
+          <section style={{ marginBottom: '40px' }}>
+            <h2 style={{ borderBottom: '2px solid #eee', paddingBottom: '10px', color: theme.text }}>Política de Reembolso y Devoluciones</h2>
+            <p style={{ lineHeight: '1.6', color: theme.textMuted }}>
+              Nuestra política de devoluciones tiene una duración de 30 días. Si han pasado 30 días desde su compra, lamentablemente no podemos ofrecerle un reembolso ni un cambio. Para ser elegible para una devolución, el artículo debe estar sin usar y en las mismas condiciones en que lo recibió. También debe estar en su embalaje original. 
+            </p>
+            <p style={{ lineHeight: '1.6', color: theme.textMuted }}>
+              Para completar su devolución, requerimos un recibo o comprobante de compra. Una vez que se reciba e inspeccione su devolución, le enviaremos un mensaje para notificarle la aprobación o rechazo de su reembolso.
+            </p>
+          </section>
+
+          <section>
+            <h2 style={{ borderBottom: '2px solid #eee', paddingBottom: '10px', color: theme.text }}>Términos de Servicio</h2>
+            <p style={{ lineHeight: '1.6', color: theme.textMuted }}>
+              Al visitar nuestro sitio y/o comprarnos algo, usted interactúa con nuestro "Servicio" y acepta estar sujeto a los siguientes términos y condiciones. Nos reservamos el derecho de rechazar el servicio a cualquier persona por cualquier motivo en cualquier momento. 
+            </p>
+            <p style={{ lineHeight: '1.6', color: theme.textMuted }}>
+              Los precios de nuestros productos están sujetos a cambios sin previo aviso. Hemos hecho todo lo posible para mostrar con la mayor precisión posible los colores y las imágenes de nuestros productos que aparecen en la tienda.
+            </p>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================
   // VISTA 1: TIENDA PRINCIPAL
   // =========================================
   return (
@@ -394,14 +454,25 @@ function App() {
             </ul>
           </div>
           
-          {/* Columna Legal con enlaces simulados */}
+          {/* Columna Legal conectada al historial del navegador */}
           <div>
             <h4 style={{ color: theme.text, marginBottom: '20px', fontSize: '15px' }}>Soporte Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Términos del Servicio</a></li>
-              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Política de Privacidad</a></li>
-              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Política de Reembolso</a></li>
-              <li><a href="#" style={{ cursor: 'pointer', color: theme.textMuted, textDecoration: 'none' }}>Políticas de Envío</a></li>
+              <li>
+                <span onClick={abrirVistaLegal} style={{ cursor: 'pointer', color: theme.textMuted, transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = theme.primary} onMouseLeave={(e) => e.target.style.color = theme.textMuted}>
+                  Términos del Servicio
+                </span>
+              </li>
+              <li>
+                <span onClick={abrirVistaLegal} style={{ cursor: 'pointer', color: theme.textMuted, transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = theme.primary} onMouseLeave={(e) => e.target.style.color = theme.textMuted}>
+                  Política de Privacidad
+                </span>
+              </li>
+              <li>
+                <span onClick={abrirVistaLegal} style={{ cursor: 'pointer', color: theme.textMuted, transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = theme.primary} onMouseLeave={(e) => e.target.style.color = theme.textMuted}>
+                  Política de Reembolso
+                </span>
+              </li>
             </ul>
           </div>
           

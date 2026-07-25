@@ -62,6 +62,15 @@ function App() {
   // Lista de productos y formulario principal
   // ----------------------
 
+  const [inventarioExpandido, setInventarioExpandido] = useState(false);
+  const [productoDetalle, setProductoDetalle] = useState(null);
+  
+  // VARIABLES DEL TICKET (Faltaban estas)
+  const [ticketAbierto, setTicketAbierto] = useState(false);
+  const [datosTicket, setDatosTicket] = useState(null);
+  const [diasGarantia, setDiasGarantia] = useState(15);
+  const [ventaConfirmada, setVentaConfirmada] = useState(false); // NUEVO ESTADO DE CONFIRMACIÓN
+  
   const [productos, setProductos] = useState([]);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -678,87 +687,87 @@ function App() {
       }
     }
 
+    if (tipoMovimiento === "venta") {
+      // --- PRE-VENTA: SOLO ABRIR TICKET, NO DESCONTAR STOCK AÚN ---
+      setDatosTicket({
+        producto: productoMovimientoSeleccionado.nombre,
+        cantidad: cantidadMovimiento,
+        monto: ingresoEstimadoMovimiento,
+        fecha: new Date().toLocaleString()
+      });
+      setVentaConfirmada(false); // Reiniciamos la confirmación
+      setTicketAbierto(true);    // Abrimos el modal
+      return;                    // 🛑 DETENEMOS AQUÍ LA FUNCIÓN
+    }
+
+    // --- FLUJO ORIGINAL PARA REPOSICIÓN (tipoMovimiento !== "venta") ---
     try {
-      const url =
-        tipoMovimiento === "venta"
-          ? `${API_URL}/ventas`
-          : `${API_URL}/productos/${productoMovimientoId}/reponer`;
-
-      const method = tipoMovimiento === "venta" ? "POST" : "PUT";
-
-      const body =
-        tipoMovimiento === "venta"
-          ? {
-              productoId: productoMovimientoId,
-
-              cantidad: Number(cantidadMovimiento),
-
-              tipoVenta: tipoVentaSeleccionado,
-
-              precioUnitarioNegociado:
-                tipoVentaSeleccionado === "detalle" &&
-                precioUnitarioNegociado !== ""
-                  ? Number(precioUnitarioNegociado) / Number(cantidadMovimiento)
-                  : null,
-
-              precioGlobalMayoreo:
-                tipoVentaSeleccionado === "mayoreo" &&
-                precioGlobalMayoreo !== ""
-                  ? Number(precioGlobalMayoreo)
-                  : null,
-
-              porcentajeDescuento:
-                tipoVentaSeleccionado === "mayoreo" &&
-                porcentajeDescuento !== ""
-                  ? Number(porcentajeDescuento)
-                  : 0,
-
-              cliente: clienteVenta,
-            }
-          : {
-              cantidad: Number(cantidadMovimiento),
-              proveedor: proveedorReposicion,
-            };
-
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`${API_URL}/productos/${productoMovimientoId}/reponer`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          cantidad: Number(cantidadMovimiento),
+          proveedor: proveedorReposicion,
+        }),
       });
-
       const data = await res.json();
+      if (!res.ok) { alert(data.error || "Error al guardar movimiento"); return; }
+      
+      alert("¡Inventario repuesto correctamente! 📥");
+      setProductoMovimientoId("");
+      setCantidadMovimiento("");
+      setProveedorReposicion("");
+      setTipoMovimiento("venta");
+      obtenerProductos();
+      obtenerReposiciones();
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error al guardar movimiento");
+    }
+  };
 
-      if (!res.ok) {
-        alert(data.error || "Error al guardar movimiento");
-        return;
-      }
+  // === NUEVA FUNCIÓN: CONFIRMAR Y DESCONTAR STOCK DESDE EL TICKET ===
+  const confirmarVentaFinal = async () => {
+    try {
+      const res = await fetch(`${API_URL}/ventas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          productoId: productoMovimientoId,
+          cantidad: Number(cantidadMovimiento),
+          tipoVenta: tipoVentaSeleccionado,
+          precioUnitarioNegociado: tipoVentaSeleccionado === "detalle" && precioUnitarioNegociado !== "" ? Number(precioUnitarioNegociado) / Number(cantidadMovimiento) : null,
+          precioGlobalMayoreo: tipoVentaSeleccionado === "mayoreo" && precioGlobalMayoreo !== "" ? Number(precioGlobalMayoreo) : null,
+          porcentajeDescuento: tipoVentaSeleccionado === "mayoreo" && porcentajeDescuento !== "" ? Number(porcentajeDescuento) : 0,
+          cliente: clienteVenta, // Ahora el cliente se extrae de lo que escriban en el ticket
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Error al procesar la venta"); return; }
+      
+      // Si todo sale bien, marcamos como confirmada y refrescamos bases de datos
+      setVentaConfirmada(true); 
+      obtenerProductos();
+      obtenerVentas();
+      obtenerDatosOrigen();
+      
+      // Lanzamos la alerta nativa que ya usas en el resto del sistema
+      alert("¡Venta registrada satisfactoriamente! 🎉");
 
-      if (tipoMovimiento === "venta") {
-        alert("¡Venta registrada satisfactoriamente! 🎉");
-      } else {
-        alert("¡Inventario repuesto correctamente! 📥");
-      }
-
+      // Limpiamos la pantalla trasera de ventas
       setProductoMovimientoId("");
       setCantidadMovimiento("");
       setPrecioUnitarioNegociado("");
       setPrecioGlobalMayoreo("");
       setPorcentajeDescuento("");
-      setClienteVenta("");
-      setProveedorReposicion("");
-      setTipoMovimiento("venta");
       setTipoVentaSeleccionado("detalle");
-      setSeccionActiva("ventas");
-
-      obtenerProductos();
-      obtenerVentas();
-      obtenerReposiciones();
+      
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al guardar movimiento");
+      alert("Error de conexión al confirmar la venta");
     }
   };
 
@@ -1415,34 +1424,39 @@ function App() {
     .slice(0, 3);
 
   // ----------------------
-  // AVISOS Y RECOMENDACIONES (Lógica nueva)
+  // AVISOS Y RECOMENDACIONES (Lógica agrupada)
   // ----------------------
-
   const recomendaciones = [];
+  const nombresProductosBajos = [];
 
   productos.forEach((producto) => {
     const stockNum = Number(producto.stock);
     const stockMin = Number(producto.stockMinimo || 5);
-
-    // REGLA ROJA: Se acabó el stock
+    
+    // REGLA ROJA: Se acabó el stock (Se mantienen individuales por urgencia)
     if (stockNum === 0) {
       recomendaciones.push({
         tipo: "critico",
         icono: "🔴",
         mensaje: `${producto.nombre}: Se acabó. Repón de inmediato.`,
-        productoId: producto._id, // NUEVO: Guardamos el ID para el atajo
+        productoId: producto._id, 
       });
     } 
-    // REGLA AMARILLA: Queda poco stock (pero no es cero)
+    // REGLA AMARILLA: Queda poco stock -> Los mandamos a la lista de espera
     else if (stockNum <= stockMin) {
-      recomendaciones.push({
-        tipo: "medio",
-        icono: "🟡",
-        mensaje: `${producto.nombre}: Se está acabando (quedan ${stockNum}). Prepárate para reponer.`,
-        productoId: producto._id, // NUEVO: Guardamos el ID para el atajo
-      });
+      nombresProductosBajos.push(producto.nombre);
     }
   });
+
+  // Si hubo productos bajos, creamos UN SOLO aviso amarillo
+  if (nombresProductosBajos.length > 0) {
+    recomendaciones.push({
+      tipo: "medio",
+      icono: "🟡",
+      mensaje: `Tienes ${nombresProductosBajos.length} producto(s) con inventario bajo: ${nombresProductosBajos.join(', ')}.`,
+      productoId: "aviso-agrupado", // Este ID simulado permite que el botón "Pedir 📋" siga funcionando
+    });
+  }
 
   // ======================================================
   // ESTILOS GENERALES DEL DASHBOARD
@@ -2200,7 +2214,7 @@ function App() {
                 Ir a mi Tienda ➔
               </button>
             </div>
-          )}*/}
+          )}   */}
 
           {/* ======================================================
               CIERRE DE CAJA (RESUMEN DEL DÍA)
@@ -2606,41 +2620,6 @@ function App() {
                     onChange={(e) => setPorcentajeDescuento(e.target.value)}
                     onWheel={(e) => e.target.blur()}
                     style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "12.5px", backgroundColor: !!precioGlobalMayoreo ? "#e9ecef" : "white", boxSizing: "border-box" }}
-                  />
-                </div>
-              )}
-
-              {/* ACORDEÓN DE MÁS OPCIONES */}
-              {productoMovimientoSeleccionado && (
-                <div style={{ display: "block", width: "100%" }}>
-                  <div
-                    onClick={() => setMostrarOpcionesVenta(!mostrarOpcionesVenta)}
-                    style={{
-                      cursor: "pointer",
-                      color: "#0d6efd",
-                      fontWeight: "600",
-                      marginBottom: "15px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "5px",
-                      fontSize: "13px"
-                    }}
-                  >
-                    {mostrarOpcionesVenta ? "▲ Ocultar opciones" : "▼ Mostrar más opciones (Cliente)"}
-                  </div>
-                </div>
-              )}
-
-              {mostrarOpcionesVenta && productoMovimientoSeleccionado && (
-                <div style={{ paddingLeft: "12px", borderLeft: "3px solid #0d6efd", marginBottom: "20px", display: "block" }}>
-
-                  <p style={{ marginBottom: "6px", fontWeight: "600", marginTop: tipoVentaSeleccionado === "mayoreo" ? 0 : "auto" }}>Cliente <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
-                  <input
-                    type="text"
-                    placeholder="Nombre del cliente"
-                    value={clienteVenta}
-                    onChange={(e) => setClienteVenta(e.target.value)}
-                    style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "5px", display: "block" }}
                   />
                 </div>
               )}
@@ -3776,20 +3755,50 @@ function App() {
               boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
               marginTop: "0",
               marginBottom: "25px",
+              position: inventarioExpandido ? "fixed" : "static",
+              top: 0, left: 0, width: "100%", height: "100%", zIndex: 9999,
+              overflowY: "auto",
+              boxSizing: "border-box"
             }}
           >
-            <div
-              id="listaProductos"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "12px",
-                flexWrap: "wrap",
-                marginTop: "4px",
-                marginBottom: "16px",
-              }}
-            >
+            {/* BOTONES DE CONTROL DE VISTA EXPANDIDA */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
+              <button
+                type="button"
+                onClick={() => setInventarioExpandido(!inventarioExpandido)}
+                style={{ backgroundColor: "#0d6efd", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+              >
+                {inventarioExpandido ? "↙️ Volver a vista normal" : "↗️ Expandir (Modo Celular)"}
+              </button>
+              
+              {inventarioExpandido && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const texto = productosFiltrados.map(p => `▪️ ${p.nombre} - ${p.descripcion || 'Sin descripción'}`).join('\n');
+                    navigator.clipboard.writeText(texto).then(() => alert("¡Lista copiada al portapapeles!"));
+                  }}
+                  style={{ backgroundColor: "#198754", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  📋 Copiar Todo
+                </button>
+              )}
+            </div>
+
+            {/* ENVOLVEMOS TODO LO DE ARRIBA (BOTONES Y BUSCADORES) EN UN CONTENEDOR QUE SE OCULTA CON CSS */}
+            <div style={{ display: inventarioExpandido ? "none" : "block" }}>
+              <div
+                id="listaProductos"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                  marginTop: "4px",
+                  marginBottom: "16px",
+                }}
+              >
               <button
                 type="button"
                 onClick={() => {
@@ -3925,9 +3934,28 @@ function App() {
               Mostrando {productosFiltrados.length} de {productos.length}{" "}
               productos
             </p>
+            </div> {/* <-- AQUÍ CERRAMOS EL DIV QUE OCULTA LOS FILTROS */}
 
             {seccionActiva === "inventario" ? (
-              productos.length === 0 ? (
+              inventarioExpandido ? (
+                // --- VISTA MÓVIL SIMPLIFICADA ---
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingBottom: "20px" }}>
+                  {productosFiltrados.map(producto => (
+                    <div key={producto._id} style={{ border: "1px solid #ccc", padding: "12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ paddingRight: "10px" }}>
+                        <p style={{ margin: 0, fontWeight: "bold", fontSize: "16px", color: "#222" }}>{producto.nombre}</p>
+                        <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>{producto.descripcion || "Sin descripción"}</p>
+                      </div>
+                      <button 
+                        onClick={() => setProductoDetalle(producto)}
+                        style={{ backgroundColor: "#eef6ff", color: "#0d6efd", border: "none", padding: "8px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", whiteSpace: "nowrap" }}
+                      >
+                        Detalles
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : productos.length === 0 ? (
                 <p>No hay productos registrados.</p>
               ) : (
                 <div
@@ -4285,6 +4313,44 @@ function App() {
                 </div>
               )
             ) : null}
+            
+            {/* ======================================================
+              MODAL DE DETALLES DEL PRODUCTO (VISTA EXPANDIDA)
+              ====================================================== */}
+            {productoDetalle && (
+              <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center", padding: "20px", boxSizing: "border-box" }}>
+                <div style={{ backgroundColor: "white", padding: "20px", borderRadius: "12px", width: "100%", maxWidth: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+                  <h3 style={{ margin: "0 0 15px 0", color: "#222" }}>{productoDetalle.nombre}</h3>
+                  <div style={{ display: "grid", gap: "10px", fontSize: "14px", color: "#333", marginBottom: "20px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
+                      <strong>Descripción:</strong> <span style={{textAlign: "right", maxWidth: "60%"}}>{productoDetalle.descripcion || "—"}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
+                      <strong>Precio Venta:</strong> <span style={{ color: "#198754", fontWeight: "bold" }}>${Number(productoDetalle.precioVenta || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
+                      <strong>Costo Total:</strong> <span>${(Number(productoDetalle.precio || 0) + Number(productoDetalle.costoEnvio || 0)).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
+                      <strong>Stock Actual:</strong> <span style={{ fontWeight: "bold" }}>{productoDetalle.stock}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
+                      <strong>Estado:</strong>
+                      <span style={{ color: Number(productoDetalle.stock) === 0 ? "#dc3545" : Number(productoDetalle.stock) <= Number(productoDetalle.stockMinimo || 5) ? "#fd7e14" : "#198754", fontWeight: "bold" }}>
+                        {Number(productoDetalle.stock) === 0 ? "Agotado" : Number(productoDetalle.stock) <= Number(productoDetalle.stockMinimo || 5) ? "Bajo" : "Suficiente"}
+                      </span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setProductoDetalle(null)}
+                    style={{ width: "100%", backgroundColor: "#dc3545", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                  >
+                    Cerrar Detalles
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* ======================================================
               MODAL GENERADOR DE PEDIDOS (WHATSAPP)
               ====================================================== */}
@@ -4394,11 +4460,107 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
+          </div> {/* <-- Aquí cierra la zonaInventario */}
+
+          {/* ======================================================
+            MODAL DEL TICKET DE VENTA (CONFIRMACIÓN Y COMPROBANTE)
+            ====================================================== */}
+          {ticketAbierto && datosTicket && (
+            <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center", padding: "20px", boxSizing: "border-box" }}>
+              <div style={{ backgroundColor: "white", padding: "20px", borderRadius: "12px", width: "100%", maxWidth: "350px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+                
+                <div id="ticket-imprimible" style={{ padding: "15px", border: "1px dashed #ccc", marginBottom: "15px", textAlign: "left" }}>
+                  <h3 style={{ textAlign: "center", margin: "0 0 10px 0", color: "#222" }}>📄 Ticket de Compra</h3>
+                  <p style={{ margin: "2px 0", fontSize: "14px" }}><strong>Fecha:</strong> {datosTicket.fecha}</p>
+                  
+                  {/* CAMPO DE CLIENTE AHORA DENTRO DEL TICKET */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "8px 0" }}>
+                    <strong style={{ fontSize: "14px" }}>Cliente:</strong>
+                    <input
+                      type="text"
+                      placeholder="Nombre (Opcional)"
+                      value={clienteVenta}
+                      onChange={(e) => setClienteVenta(e.target.value)}
+                      disabled={ventaConfirmada} // Se bloquea si ya se confirmó la venta
+                      style={{ flex: 1, padding: "4px 8px", borderRadius: "4px", border: "1px solid #ccc", fontSize: "13px", backgroundColor: ventaConfirmada ? "#f1f3f5" : "white" }}
+                    />
+                  </div>
+                  
+                  <hr style={{ borderTop: "1px dashed #eee", margin: "10px 0" }} />
+                  <p style={{ margin: "5px 0", fontSize: "14px" }}>{datosTicket.cantidad}x {datosTicket.producto}</p>
+                  <p style={{ margin: "10px 0", fontSize: "20px", fontWeight: "900", color: "#198754" }}>Total: ${datosTicket.monto.toFixed(2)}</p>
+                  <p style={{ margin: "2px 0", fontSize: "14px" }}><strong>Pago en:</strong> Efectivo</p>
+                  <hr style={{ borderTop: "1px dashed #eee", margin: "10px 0" }} />
+                  
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+                    <label style={{ fontSize: "14px", fontWeight: "bold" }}>Garantía (días):</label>
+                    <input 
+                      type="number" 
+                      value={diasGarantia} 
+                      onChange={(e) => setDiasGarantia(e.target.value)} 
+                      disabled={ventaConfirmada}
+                      style={{ width: "60px", padding: "4px", borderRadius: "4px", border: "1px solid #ccc", textAlign: "center", backgroundColor: ventaConfirmada ? "#f1f3f5" : "white" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {!ventaConfirmada ? (
+                    // --- BOTONES DE PRE-VENTA (AÚN NO SE DESCUENTA STOCK) ---
+                    <>
+                      <button 
+                        onClick={confirmarVentaFinal}
+                        style={{ backgroundColor: "#198754", color: "white", padding: "12px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", fontSize: "15px" }}
+                      >
+                        ✅ Confirmar y Descontar Stock
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setTicketAbierto(false);
+                          setClienteVenta(""); // Reseteamos por si acaso
+                        }}
+                        style={{ backgroundColor: "#dc3545", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                      >
+                        ❌ Cancelar Venta
+                      </button>
+                    </>
+                  ) : (
+                    // --- BOTONES POST-VENTA (YA SE CONFIRMÓ, SOLO IMPRIMIR/COPIAR) ---
+                    <>
+                      <button 
+                        onClick={() => {
+                          const textoTicket = `📄 *TICKET DE COMPRA*\nFecha: ${datosTicket.fecha}\nCliente: ${clienteVenta || 'Público en general'}\n\n▪️ ${datosTicket.cantidad}x ${datosTicket.producto}\n*Total pagado: $${datosTicket.monto.toFixed(2)} (Efectivo)*\n\n🛡️ Garantía válida por ${diasGarantia} días.\n¡Gracias por su compra!`;
+                          navigator.clipboard.writeText(textoTicket).then(() => alert("¡Ticket copiado para enviar por WhatsApp!"));
+                        }}
+                        style={{ backgroundColor: "#2563eb", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                      >
+                        📋 Copiar Texto a WhatsApp
+                      </button>
+                      <button 
+                        onClick={() => window.print()}
+                        style={{ backgroundColor: "#198754", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                      >
+                        🖨️ Imprimir / Guardar PDF
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setTicketAbierto(false);
+                          setClienteVenta(""); // Limpiamos para la próxima venta
+                        }}
+                        style={{ backgroundColor: "transparent", color: "#666", padding: "10px", borderRadius: "8px", border: "1px solid #ccc", fontWeight: "bold", cursor: "pointer" }}
+                      >
+                        Cerrar Ticket
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </section>
       </main>
     </div>
   );
 }
-
 export default App;
