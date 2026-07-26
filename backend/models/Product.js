@@ -41,6 +41,17 @@ const productSchema = new mongoose.Schema(
       default: 5,
     },
 
+    categoria: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Categoria",
+      required: true,
+    },
+    fotos: [
+      {
+        type: String,
+      },
+    ],
+
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

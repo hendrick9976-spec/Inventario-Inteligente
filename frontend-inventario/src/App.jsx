@@ -64,13 +64,13 @@ function App() {
 
   const [inventarioExpandido, setInventarioExpandido] = useState(false);
   const [productoDetalle, setProductoDetalle] = useState(null);
-  
+
   // VARIABLES DEL TICKET (Faltaban estas)
   const [ticketAbierto, setTicketAbierto] = useState(false);
   const [datosTicket, setDatosTicket] = useState(null);
-  const [diasGarantia, setDiasGarantia] = useState(15);
+  const [diasGarantia, setDiasGarantia] = useState(7);
   const [ventaConfirmada, setVentaConfirmada] = useState(false); // NUEVO ESTADO DE CONFIRMACIÓN
-  
+
   const [productos, setProductos] = useState([]);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -80,6 +80,12 @@ function App() {
   const [stock, setStock] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
   const [mostrarOpcionesProducto, setMostrarOpcionesProducto] = useState(false);
+
+  // ESTADOS PARA CATEGORÍAS
+  const [categorias, setCategorias] = useState([]);
+  const [categoriaId, setCategoriaId] = useState("");
+  const [creandoCategoria, setCreandoCategoria] = useState(false);
+  const [nombreNuevaCategoria, setNombreNuevaCategoria] = useState("");
 
   // ----------------------
   // GENERADOR DE PEDIDOS (WHATSAPP)
@@ -316,6 +322,24 @@ function App() {
     }
   };
 
+  const obtenerCategorias = async () => {
+    try {
+      const res = await fetch(`${API_URL}/categorias`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCategorias([]);
+        return;
+      }
+      setCategorias(data);
+    } catch (error) {
+      console.error("Error al obtener categorías:", error);
+    }
+  };
+
   const obtenerVentas = async () => {
     try {
       const res = await fetch(`${API_URL}/ventas`, {
@@ -387,7 +411,7 @@ function App() {
 
   const guardarProducto = async (e) => {
     e.preventDefault();
-    
+
     if (!nombre.trim()) {
       alert("El nombre del producto es obligatorio");
       return;
@@ -395,7 +419,9 @@ function App() {
 
     // Stock obligatorio
     if (!editandoId && stock === "") {
-      alert("El stock inicial es obligatorio. Si es un producto nuevo que aún no llega, coloca 0 explícitamente.");
+      alert(
+        "El stock inicial es obligatorio. Si es un producto nuevo que aún no llega, coloca 0 explícitamente.",
+      );
       return;
     }
 
@@ -420,12 +446,63 @@ function App() {
 
     // Solo lanza alerta de pérdida si realmente registró costos
     if (costoTotalUnitario > 0 && Number(precioVenta) < costoTotalUnitario) {
-      alert("El precio de venta no puede ser menor que el costo total unitario");
+      alert(
+        "El precio de venta no puede ser menor que el costo total unitario",
+      );
       return;
     }
 
     // 3. Regla del stock mínimo: Si lo deja en blanco, asume 1
     const stockMinimoCalculado = stockMinimo === "" ? 1 : Number(stockMinimo);
+
+    // === LÓGICA DE CATEGORÍAS ANTES DE GUARDAR EL PRODUCTO ===
+    let idCategoriaFinal = categoriaId;
+
+    if (creandoCategoria) {
+      const nombreLimpio = nombreNuevaCategoria.trim();
+
+      if (!nombreLimpio) {
+        alert("Escribe el nombre de la nueva categoría");
+        return;
+      }
+
+      // 1. Buscamos si ya existe una categoría con ese nombre (ignorando mayúsculas/minúsculas)
+      const categoriaExistente = categorias.find(
+        (cat) => cat.nombre.toLowerCase() === nombreLimpio.toLowerCase(),
+      );
+
+      if (categoriaExistente) {
+        // Si ya existe, atrapamos su ID y nos saltamos la creación
+        idCategoriaFinal = categoriaExistente._id;
+      } else {
+        // 2. Si realmente no existe, entonces sí hacemos el fetch al backend para crearla
+        try {
+          const resCat = await fetch(`${API_URL}/categorias`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ nombre: nombreLimpio }),
+          });
+          const dataCat = await resCat.json();
+          if (!resCat.ok) {
+            alert(dataCat.error || "Error al crear la categoría");
+            return;
+          }
+          idCategoriaFinal = dataCat._id;
+          setCategorias([...categorias, dataCat]); // Actualizamos la lista local
+        } catch (error) {
+          console.error("Error:", error);
+          alert("Error de conexión al crear la categoría");
+          return;
+        }
+      }
+    } else if (!idCategoriaFinal && !editandoId) {
+      alert("Por favor selecciona o crea una categoría para el producto.");
+      return;
+    }
+    // ==========================================================
 
     if (editandoId) {
       const confirmado = window.confirm(
@@ -446,6 +523,7 @@ function App() {
           costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
           stockMinimo: stockMinimoCalculado, // Aplicamos el default de 1
+          categoria: idCategoriaFinal,
         }),
       });
 
@@ -470,6 +548,7 @@ function App() {
           stock: Number(stock || 0),
           stockMinimo: stockMinimoCalculado, // Aplicamos el default de 1
           proveedorInicial: proveedorProductoNuevo,
+          categoria: idCategoriaFinal,
         }),
       });
 
@@ -492,6 +571,9 @@ function App() {
     setStock("");
     setStockMinimo("");
     setProveedorProductoNuevo("");
+    setCategoriaId("");
+    setCreandoCategoria(false);
+    setNombreNuevaCategoria("");
 
     obtenerProductos();
   };
@@ -530,6 +612,9 @@ function App() {
     setPrecioVenta("");
     setStock("");
     setStockMinimo("");
+    setCategoriaId(""); // <--- AÑADIR
+    setCreandoCategoria(false); // <--- AÑADIR
+    setNombreNuevaCategoria(""); // <--- AÑADIR
     setEditandoId(null);
     setSeccionActiva("inventario");
   };
@@ -540,67 +625,81 @@ function App() {
 
   const abrirGeneradorPedido = () => {
     // 1. Filtrar los productos que ya necesitan reposición (Agotados o bajos)
-    const productosBajos = productos.filter(p => Number(p.stock) <= Number(p.stockMinimo || 5));
-    
+    const productosBajos = productos.filter(
+      (p) => Number(p.stock) <= Number(p.stockMinimo || 5),
+    );
+
     // 2. Armar la lista inicial
-    const itemsIniciales = productosBajos.map(p => ({
+    const itemsIniciales = productosBajos.map((p) => ({
       id: p._id,
       nombre: p.nombre,
       descripcion: p.descripcion || "", // <--- NUEVO
       stockActual: Number(p.stock),
-      cantidad: "" // Empieza vacío para que él decida cuánto pedir
+      cantidad: "", // Empieza vacío para que él decida cuánto pedir
     }));
-    
+
     setItemsPedido(itemsIniciales);
     setBusquedaExtra("");
     setModalPedidoAbierto(true);
   };
 
   const actualizarCantidadPedido = (id, cantidad) => {
-    setItemsPedido(prev => prev.map(item => item.id === id ? { ...item, cantidad } : item));
+    setItemsPedido((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, cantidad } : item)),
+    );
   };
 
   const agregarProductoExtraAlPedido = (producto) => {
     // Evitar duplicados en la lista
-    if (!itemsPedido.find(item => item.id === producto._id)) {
-      setItemsPedido([...itemsPedido, {
-        id: producto._id,
-        nombre: producto.nombre,
-        descripcion: producto.descripcion || "", // <--- NUEVO
-        stockActual: Number(producto.stock),
-        cantidad: ""
-      }]);
+    if (!itemsPedido.find((item) => item.id === producto._id)) {
+      setItemsPedido([
+        ...itemsPedido,
+        {
+          id: producto._id,
+          nombre: producto.nombre,
+          descripcion: producto.descripcion || "", // <--- NUEVO
+          stockActual: Number(producto.stock),
+          cantidad: "",
+        },
+      ]);
     }
     setBusquedaExtra("");
   };
 
   const eliminarItemPedido = (id) => {
-    setItemsPedido(prev => prev.filter(item => item.id !== id));
+    setItemsPedido((prev) => prev.filter((item) => item.id !== id));
   };
 
   const copiarPedidoWhatsapp = () => {
     // Solo tomar los que tengan una cantidad escrita mayor a 0
-    const itemsValidos = itemsPedido.filter(item => item.cantidad !== "" && Number(item.cantidad) > 0);
-    
+    const itemsValidos = itemsPedido.filter(
+      (item) => item.cantidad !== "" && Number(item.cantidad) > 0,
+    );
+
     if (itemsValidos.length === 0) {
       alert("Ingresa al menos una cantidad para generar el pedido.");
       return;
     }
 
     let texto = "📦 *Pedido de Mercancía*\n\n";
-    itemsValidos.forEach(item => {
+    itemsValidos.forEach((item) => {
       // Si tiene descripción, la agregamos al mensaje
       const detalle = item.descripcion ? ` (${item.descripcion})` : "";
-      texto += `▪️ ${item.cantidad}x ${item.nombre}${detalle}\n`; 
+      texto += `▪️ ${item.cantidad}x ${item.nombre}${detalle}\n`;
     });
 
-    navigator.clipboard.writeText(texto).then(() => {
-      alert("¡Lista copiada! Ya puedes ir a WhatsApp y pegarla al proveedor. 📱");
-      setModalPedidoAbierto(false);
-    }).catch(err => {
-      console.error("Error al copiar: ", err);
-      alert("Hubo un error al copiar el texto.");
-    });
+    navigator.clipboard
+      .writeText(texto)
+      .then(() => {
+        alert(
+          "¡Lista copiada! Ya puedes ir a WhatsApp y pegarla al proveedor. 📱",
+        );
+        setModalPedidoAbierto(false);
+      })
+      .catch((err) => {
+        console.error("Error al copiar: ", err);
+        alert("Hubo un error al copiar el texto.");
+      });
   };
 
   // ======================================================
@@ -622,8 +721,13 @@ function App() {
 
     // --- NUEVA VALIDACIÓN DE STOCK ---
     const prodVerificar = productos.find((p) => p._id === productoMovimientoId);
-    if (prodVerificar && Number(cantidadMovimiento) > Number(prodVerificar.stock)) {
-      alert(`⚠️ Stock insuficiente: Solo tienes ${prodVerificar.stock} unidades de ${prodVerificar.nombre}.`);
+    if (
+      prodVerificar &&
+      Number(cantidadMovimiento) > Number(prodVerificar.stock)
+    ) {
+      alert(
+        `⚠️ Stock insuficiente: Solo tienes ${prodVerificar.stock} unidades de ${prodVerificar.nombre}.`,
+      );
       return; // Esto detiene la venta
     }
     // ---------------------------------
@@ -665,20 +769,26 @@ function App() {
       // Calculamos la utilidad real antes de registrar
       const prodSelect = productos.find((p) => p._id === productoMovimientoId);
       let ingresoEstimado = 0;
-      
+
       if (tipoVentaSeleccionado === "mayoreo") {
-        ingresoEstimado = precioGlobalMayoreo !== ""
-          ? Number(precioGlobalMayoreo)
-          : Number(prodSelect.precioVenta) * Number(cantidadMovimiento) * (1 - Number(porcentajeDescuento || 0) / 100);
+        ingresoEstimado =
+          precioGlobalMayoreo !== ""
+            ? Number(precioGlobalMayoreo)
+            : Number(prodSelect.precioVenta) *
+              Number(cantidadMovimiento) *
+              (1 - Number(porcentajeDescuento || 0) / 100);
       } else {
         // AHORA TOMA EL PRECIO NEGOCIADO COMO EL TOTAL GLOBAL
-        ingresoEstimado = precioUnitarioNegociado !== "" 
-          ? Number(precioUnitarioNegociado) 
-          : Number(prodSelect.precioVenta) * Number(cantidadMovimiento);
+        ingresoEstimado =
+          precioUnitarioNegociado !== ""
+            ? Number(precioUnitarioNegociado)
+            : Number(prodSelect.precioVenta) * Number(cantidadMovimiento);
       }
 
-      const costoTotal = (Number(prodSelect.precio) + Number(prodSelect.costoEnvio || 0)) * Number(cantidadMovimiento);
-      
+      const costoTotal =
+        (Number(prodSelect.precio) + Number(prodSelect.costoEnvio || 0)) *
+        Number(cantidadMovimiento);
+
       if (ingresoEstimado - costoTotal < 0) {
         const confirmado = window.confirm(
           "⚠ Esta venta generará pérdida. ¿Seguro que quieres registrarla?",
@@ -693,29 +803,35 @@ function App() {
         producto: productoMovimientoSeleccionado.nombre,
         cantidad: cantidadMovimiento,
         monto: ingresoEstimadoMovimiento,
-        fecha: new Date().toLocaleString()
+        fecha: new Date().toLocaleString(),
       });
       setVentaConfirmada(false); // Reiniciamos la confirmación
-      setTicketAbierto(true);    // Abrimos el modal
-      return;                    // 🛑 DETENEMOS AQUÍ LA FUNCIÓN
+      setTicketAbierto(true); // Abrimos el modal
+      return; // 🛑 DETENEMOS AQUÍ LA FUNCIÓN
     }
 
     // --- FLUJO ORIGINAL PARA REPOSICIÓN (tipoMovimiento !== "venta") ---
     try {
-      const res = await fetch(`${API_URL}/productos/${productoMovimientoId}/reponer`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${API_URL}/productos/${productoMovimientoId}/reponer`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            cantidad: Number(cantidadMovimiento),
+            proveedor: proveedorReposicion,
+          }),
         },
-        body: JSON.stringify({
-          cantidad: Number(cantidadMovimiento),
-          proveedor: proveedorReposicion,
-        }),
-      });
+      );
       const data = await res.json();
-      if (!res.ok) { alert(data.error || "Error al guardar movimiento"); return; }
-      
+      if (!res.ok) {
+        alert(data.error || "Error al guardar movimiento");
+        return;
+      }
+
       alert("¡Inventario repuesto correctamente! 📥");
       setProductoMovimientoId("");
       setCantidadMovimiento("");
@@ -734,26 +850,42 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/ventas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           productoId: productoMovimientoId,
           cantidad: Number(cantidadMovimiento),
           tipoVenta: tipoVentaSeleccionado,
-          precioUnitarioNegociado: tipoVentaSeleccionado === "detalle" && precioUnitarioNegociado !== "" ? Number(precioUnitarioNegociado) / Number(cantidadMovimiento) : null,
-          precioGlobalMayoreo: tipoVentaSeleccionado === "mayoreo" && precioGlobalMayoreo !== "" ? Number(precioGlobalMayoreo) : null,
-          porcentajeDescuento: tipoVentaSeleccionado === "mayoreo" && porcentajeDescuento !== "" ? Number(porcentajeDescuento) : 0,
+          precioUnitarioNegociado:
+            tipoVentaSeleccionado === "detalle" &&
+            precioUnitarioNegociado !== ""
+              ? Number(precioUnitarioNegociado) / Number(cantidadMovimiento)
+              : null,
+          precioGlobalMayoreo:
+            tipoVentaSeleccionado === "mayoreo" && precioGlobalMayoreo !== ""
+              ? Number(precioGlobalMayoreo)
+              : null,
+          porcentajeDescuento:
+            tipoVentaSeleccionado === "mayoreo" && porcentajeDescuento !== ""
+              ? Number(porcentajeDescuento)
+              : 0,
           cliente: clienteVenta, // Ahora el cliente se extrae de lo que escriban en el ticket
         }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || "Error al procesar la venta"); return; }
-      
+      if (!res.ok) {
+        alert(data.error || "Error al procesar la venta");
+        return;
+      }
+
       // Si todo sale bien, marcamos como confirmada y refrescamos bases de datos
-      setVentaConfirmada(true); 
+      setVentaConfirmada(true);
       obtenerProductos();
       obtenerVentas();
       obtenerDatosOrigen();
-      
+
       // Lanzamos la alerta nativa que ya usas en el resto del sistema
       alert("¡Venta registrada satisfactoriamente! 🎉");
 
@@ -764,7 +896,6 @@ function App() {
       setPrecioGlobalMayoreo("");
       setPorcentajeDescuento("");
       setTipoVentaSeleccionado("detalle");
-      
     } catch (error) {
       console.error("Error:", error);
       alert("Error de conexión al confirmar la venta");
@@ -822,9 +953,11 @@ function App() {
 
   const guardarReposicionMasiva = async (e) => {
     e.preventDefault();
-    
+
     // Filtramos solo los productos a los que el usuario les escribió un número mayor a 0
-    const itemsAReponer = Object.entries(cantidadesMasivas).filter(([id, cant]) => Number(cant) > 0);
+    const itemsAReponer = Object.entries(cantidadesMasivas).filter(
+      ([id, cant]) => Number(cant) > 0,
+    );
 
     if (itemsAReponer.length === 0) {
       alert("Ingresa al menos una cantidad para reponer.");
@@ -845,8 +978,8 @@ function App() {
               cantidad: Number(cant),
               proveedor: proveedorReposicion, // El mismo proveedor global para todo este lote
             }),
-          })
-        )
+          }),
+        ),
       );
 
       alert("¡Inventario repuesto masivamente! 📥✅");
@@ -882,6 +1015,7 @@ function App() {
       obtenerVentas();
       obtenerReposiciones();
       obtenerDatosOrigen();
+      obtenerCategorias();
     }
   }, [token]);
 
@@ -1141,7 +1275,7 @@ function App() {
       fechaObj.getMonth() + 1,
     ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
   };
-  
+
   // ----------------------
   // CIERRE DE CAJA (Ventas de Hoy)
   // ----------------------
@@ -1149,14 +1283,14 @@ function App() {
   const fechaHoyLocal = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
 
   const ventasDeHoy = ventas.filter(
-    (venta) => obtenerFechaLocal(venta.createdAt) === fechaHoyLocal
+    (venta) => obtenerFechaLocal(venta.createdAt) === fechaHoyLocal,
   );
-  
+
   const ingresosDeHoy = ventasDeHoy.reduce(
     (total, venta) => total + Number(venta.ingresoTotal),
-    0
+    0,
   );
-  
+
   const cantidadVentasHoy = ventasDeHoy.length;
 
   // ----------------------
@@ -1180,8 +1314,7 @@ function App() {
       : Number(productoMovimientoSeleccionado?.precioVenta || 0);
 
   const ventaListaParaCalcular =
-      productoMovimientoSeleccionado &&
-      cantidadMovimiento;
+    productoMovimientoSeleccionado && cantidadMovimiento;
 
   const ingresoVentaNormalMovimiento =
     productoMovimientoSeleccionado && cantidadMovimiento
@@ -1198,7 +1331,8 @@ function App() {
           (1 - Number(porcentajeDescuento || 0) / 100)
       : precioUnitarioNegociado !== ""
         ? Number(precioUnitarioNegociado) // Si hay precio negociado, ES EL TOTAL.
-        : Number(productoMovimientoSeleccionado?.precioVenta || 0) * Number(cantidadMovimiento || 0)
+        : Number(productoMovimientoSeleccionado?.precioVenta || 0) *
+          Number(cantidadMovimiento || 0)
     : 0;
 
   const costoEstimadoMovimiento =
@@ -1223,13 +1357,19 @@ function App() {
 
   const ventasFiltradas = ventas
     .filter((venta) => {
-      const coincideNombre = (venta.nombreProducto || "").toLowerCase().includes(busquedaVenta.toLowerCase());
-      const coincideCliente = (venta.cliente || "").toLowerCase().includes(filtroCliente.toLowerCase()); // NUEVO
+      const coincideNombre = (venta.nombreProducto || "")
+        .toLowerCase()
+        .includes(busquedaVenta.toLowerCase());
+      const coincideCliente = (venta.cliente || "")
+        .toLowerCase()
+        .includes(filtroCliente.toLowerCase()); // NUEVO
 
       if (!filtroFechaVenta) return coincideNombre && coincideCliente;
 
       const fechaVenta = obtenerFechaLocal(venta.createdAt);
-      return coincideNombre && coincideCliente && fechaVenta === filtroFechaVenta;
+      return (
+        coincideNombre && coincideCliente && fechaVenta === filtroFechaVenta
+      );
     })
 
     .sort((a, b) => {
@@ -1299,13 +1439,21 @@ function App() {
   // ----------------------
 
   const reposicionesFiltradas = reposiciones.filter((reposicion) => {
-    const coincideNombre = (reposicion.nombreProducto || "").toLowerCase().includes(busquedaReposicion.toLowerCase());
-    const coincideProveedor = (reposicion.proveedor || "").toLowerCase().includes(filtroProveedor.toLowerCase()); // NUEVO
+    const coincideNombre = (reposicion.nombreProducto || "")
+      .toLowerCase()
+      .includes(busquedaReposicion.toLowerCase());
+    const coincideProveedor = (reposicion.proveedor || "")
+      .toLowerCase()
+      .includes(filtroProveedor.toLowerCase()); // NUEVO
 
     if (!filtroFechaReposicion) return coincideNombre && coincideProveedor;
 
     const fechaReposicion = obtenerFechaLocal(reposicion.createdAt);
-    return coincideNombre && coincideProveedor && fechaReposicion === filtroFechaReposicion;
+    return (
+      coincideNombre &&
+      coincideProveedor &&
+      fechaReposicion === filtroFechaReposicion
+    );
   });
 
   const costosFiltrados = ventasFiltradas.reduce(
@@ -1318,26 +1466,28 @@ function App() {
   // Ventas e ingresos por día
   // ----------------------
 
-  const ventasPorDia = ventas.filter(venta => venta.origenVenta !== 'Web').reduce((acc, venta) => {
-    const fechaObj = new Date(venta.createdAt);
+  const ventasPorDia = ventas
+    .filter((venta) => venta.origenVenta !== "Web")
+    .reduce((acc, venta) => {
+      const fechaObj = new Date(venta.createdAt);
 
-    const fecha = `${fechaObj.getFullYear()}-${String(
-      fechaObj.getMonth() + 1,
-    ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
+      const fecha = `${fechaObj.getFullYear()}-${String(
+        fechaObj.getMonth() + 1,
+      ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
 
-    if (!acc[fecha]) {
-      acc[fecha] = {
-        fecha,
-        ingresos: 0,
-        utilidad: 0,
-      };
-    }
+      if (!acc[fecha]) {
+        acc[fecha] = {
+          fecha,
+          ingresos: 0,
+          utilidad: 0,
+        };
+      }
 
-    acc[fecha].ingresos += Number(venta.ingresoTotal);
-    acc[fecha].utilidad += Number(venta.utilidad);
+      acc[fecha].ingresos += Number(venta.ingresoTotal);
+      acc[fecha].utilidad += Number(venta.utilidad);
 
-    return acc;
-  }, {});
+      return acc;
+    }, {});
 
   const fechasVentas = Object.keys(ventasPorDia).sort();
 
@@ -1379,24 +1529,26 @@ function App() {
   // ----------------------
 
   const resumenProductos = Object.values(
-    ventas.filter(venta => venta.origenVenta !== 'Web').reduce((acc, venta) => {
-      const nombre = venta.nombreProducto;
+    ventas
+      .filter((venta) => venta.origenVenta !== "Web")
+      .reduce((acc, venta) => {
+        const nombre = venta.nombreProducto;
 
-      if (!acc[nombre]) {
-        acc[nombre] = {
-          nombre,
-          cantidad: 0,
-          ingresos: 0,
-          utilidad: 0,
-        };
-      }
+        if (!acc[nombre]) {
+          acc[nombre] = {
+            nombre,
+            cantidad: 0,
+            ingresos: 0,
+            utilidad: 0,
+          };
+        }
 
-      acc[nombre].cantidad += Number(venta.cantidad);
-      acc[nombre].ingresos += Number(venta.ingresoTotal);
-      acc[nombre].utilidad += Number(venta.utilidad);
+        acc[nombre].cantidad += Number(venta.cantidad);
+        acc[nombre].ingresos += Number(venta.ingresoTotal);
+        acc[nombre].utilidad += Number(venta.utilidad);
 
-      return acc;
-    }, {}),
+        return acc;
+      }, {}),
   );
 
   const productoMasVendido = resumenProductos.sort(
@@ -1432,16 +1584,16 @@ function App() {
   productos.forEach((producto) => {
     const stockNum = Number(producto.stock);
     const stockMin = Number(producto.stockMinimo || 5);
-    
+
     // REGLA ROJA: Se acabó el stock (Se mantienen individuales por urgencia)
     if (stockNum === 0) {
       recomendaciones.push({
         tipo: "critico",
         icono: "🔴",
         mensaje: `${producto.nombre}: Se acabó. Repón de inmediato.`,
-        productoId: producto._id, 
+        productoId: producto._id,
       });
-    } 
+    }
     // REGLA AMARILLA: Queda poco stock -> Los mandamos a la lista de espera
     else if (stockNum <= stockMin) {
       nombresProductosBajos.push(producto.nombre);
@@ -1453,7 +1605,7 @@ function App() {
     recomendaciones.push({
       tipo: "medio",
       icono: "🟡",
-      mensaje: `Tienes ${nombresProductosBajos.length} producto(s) con inventario bajo: ${nombresProductosBajos.join(', ')}.`,
+      mensaje: `Tienes ${nombresProductosBajos.length} producto(s) con inventario bajo: ${nombresProductosBajos.join(", ")}.`,
       productoId: "aviso-agrupado", // Este ID simulado permite que el botón "Pedir 📋" siga funcionando
     });
   }
@@ -1867,12 +2019,10 @@ function App() {
         </header>
 
         <section style={layoutStyles.contentArea}>
-
           {/* ======================================================
       MÓDULO DE PERFIL DE USUARIO
       Edición de nombre, correo y contraseña
       ====================================================== */}
-
           {seccionActiva === "perfil" && (
             <form
               onSubmit={actualizarPerfil}
@@ -2067,12 +2217,10 @@ function App() {
               </div>
             </form>
           )}
-
           {/* ======================================================
       DASHBOARD PRINCIPAL
       Resumen general del negocio
       ====================================================== */}
-
           <div
             style={{
               display: seccionActiva === "inicio" ? "block" : "none",
@@ -2139,7 +2287,9 @@ function App() {
                     {rec.productoId && (
                       <button
                         onClick={() => {
-                          alert("💡 Nota: Esto te llevará a generar el pedido. Cuando la mercancía llegue a tu tienda, usa el botón '📥 Reponer todo' en la sección de Inventario.");
+                          alert(
+                            "💡 Nota: Esto te llevará a generar el pedido. Cuando la mercancía llegue a tu tienda, usa el botón '📥 Reponer todo' en la sección de Inventario.",
+                          );
                           setSeccionActiva("inventario"); // ¡Esto soluciona el bug de la pantalla blanca!
                           abrirGeneradorPedido();
                         }}
@@ -2164,11 +2314,9 @@ function App() {
               })
             )}
           </div>
-
           {/* ======================================================
               ACCESO RÁPIDO A LA TIENDA EN LÍNEA *oculto temporalmente
               ====================================================== */}
-          
           {/*{seccionActiva === "inicio" && (
             <div style={{
               backgroundColor: "#7c3aed",
@@ -2215,40 +2363,59 @@ function App() {
               </button>
             </div>
           )}   */}
-
           {/* ======================================================
               CIERRE DE CAJA (RESUMEN DEL DÍA)
               ====================================================== */}
           {seccionActiva === "inicio" && (
-            <div style={{
-              backgroundColor: "#d1e7dd", 
-              color: "#0f5132",
-              padding: "12px 16px", 
-              borderRadius: "8px", 
-              marginBottom: "20px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              border: "1px solid #badbcc"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                backgroundColor: "#d1e7dd",
+                color: "#0f5132",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                marginBottom: "20px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                border: "1px solid #badbcc",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
                 <span style={{ fontSize: "24px" }}>💵</span>
                 <div>
-                  <p style={{ margin: 0, fontSize: "12px", fontWeight: "600", textTransform: "uppercase" }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                    }}
+                  >
                     Corte de caja de hoy
                   </p>
-                  <h2 style={{ margin: "2px 0 0", fontSize: "20px", fontWeight: "800" }}>
+                  <h2
+                    style={{
+                      margin: "2px 0 0",
+                      fontSize: "20px",
+                      fontWeight: "800",
+                    }}
+                  >
                     ${ingresosDeHoy.toFixed(2)}
                   </h2>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <p style={{ margin: 0, fontSize: "11px", fontWeight: "600" }}>Operaciones</p>
-                <p style={{ margin: 0, fontSize: "16px", fontWeight: "700" }}>{cantidadVentasHoy}</p>
+                <p style={{ margin: 0, fontSize: "11px", fontWeight: "600" }}>
+                  Operaciones
+                </p>
+                <p style={{ margin: 0, fontSize: "16px", fontWeight: "700" }}>
+                  {cantidadVentasHoy}
+                </p>
               </div>
             </div>
           )}
-
           <div
             style={{
               display: seccionActiva === "inicio" ? "grid" : "none",
@@ -2395,12 +2562,10 @@ function App() {
               </h2>
             </div>
           </div>
-
           {/* ----------------------
       PRODUCTOS DESTACADOS
       Más vendido y mayor utilidad
       ---------------------- */}
-
           <div
             style={{
               display: seccionActiva === "inicio" ? "grid" : "none",
@@ -2441,12 +2606,10 @@ function App() {
               </p>
             </div>
           </div>
-
           {/* ======================================================
           MÓDULO DE VENTAS
           Ventas normales, mayoreo y simulación financiera
           ====================================================== */}
-
           <div
             id="zonaVentas"
             style={{
@@ -2467,7 +2630,8 @@ function App() {
                   style={{
                     backgroundColor:
                       tipoVentaSeleccionado === "detalle" ? "#0d6efd" : "white",
-                    color: tipoVentaSeleccionado === "detalle" ? "white" : "#222",
+                    color:
+                      tipoVentaSeleccionado === "detalle" ? "white" : "#222",
                     border: "1px solid #ddd",
                     padding: "8px 12px",
                     borderRadius: "8px",
@@ -2484,7 +2648,8 @@ function App() {
                   style={{
                     backgroundColor:
                       tipoVentaSeleccionado === "mayoreo" ? "#fd7e14" : "white",
-                    color: tipoVentaSeleccionado === "mayoreo" ? "white" : "#222",
+                    color:
+                      tipoVentaSeleccionado === "mayoreo" ? "white" : "#222",
                     border: "1px solid #ddd",
                     padding: "8px 12px",
                     borderRadius: "8px",
@@ -2496,7 +2661,9 @@ function App() {
                 </button>
               </div>
 
-              <p style={{ color: "#666", marginTop: "0", marginBottom: "18px" }}>
+              <p
+                style={{ color: "#666", marginTop: "0", marginBottom: "18px" }}
+              >
                 {tipoVentaSeleccionado === "detalle"
                   ? "Registra ventas unitarias o por cantidad usando el precio de venta establecido. También puedes indicar un precio negociado si aplica."
                   : "Registra ventas al por mayor usando un precio global negociado para toda la operación."}
@@ -2533,23 +2700,34 @@ function App() {
               <input
                 type="number"
                 min="1"
-                max={productoMovimientoSeleccionado ? productoMovimientoSeleccionado.stock : ""}
+                max={
+                  productoMovimientoSeleccionado
+                    ? productoMovimientoSeleccionado.stock
+                    : ""
+                }
                 placeholder="Ejemplo: 2"
                 value={cantidadMovimiento}
                 onChange={(e) => {
                   const nuevaCantidad = e.target.value;
-                  
+
                   // Si hay un producto seleccionado y se está escribiendo un número
                   if (productoMovimientoSeleccionado && nuevaCantidad !== "") {
                     // Si lo que teclea es mayor al stock disponible
-                    if (Number(nuevaCantidad) > Number(productoMovimientoSeleccionado.stock)) {
-                      alert(`⚠️ Stock insuficiente: Solo tienes ${productoMovimientoSeleccionado.stock} unidades de ${productoMovimientoSeleccionado.nombre}.`);
+                    if (
+                      Number(nuevaCantidad) >
+                      Number(productoMovimientoSeleccionado.stock)
+                    ) {
+                      alert(
+                        `⚠️ Stock insuficiente: Solo tienes ${productoMovimientoSeleccionado.stock} unidades de ${productoMovimientoSeleccionado.nombre}.`,
+                      );
                       // Forzamos a que el valor se quede en el máximo stock disponible
-                      setCantidadMovimiento(productoMovimientoSeleccionado.stock);
+                      setCantidadMovimiento(
+                        productoMovimientoSeleccionado.stock,
+                      );
                       return; // Detenemos la ejecución
                     }
                   }
-                  
+
                   // Si no supera el límite, permitimos que se escriba normal
                   setCantidadMovimiento(nuevaCantidad);
                 }}
@@ -2567,80 +2745,172 @@ function App() {
               />
 
               {/* === PRECIO NEGOCIADO SIEMPRE VISIBLE (Solo en venta al detalle) === */}
-              {tipoVentaSeleccionado === "detalle" && productoMovimientoSeleccionado && (
-                <>
-                  <p style={{ marginBottom: "6px", marginTop: "0", fontWeight: "600" }}>
-                    Precio negociado <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span>
-                  </p>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Si le diste precio especial, ponlo aquí"
-                    value={precioUnitarioNegociado}
-                    onChange={(e) => setPrecioUnitarioNegociado(e.target.value)}
-                    onWheel={(e) => e.target.blur()}
+              {tipoVentaSeleccionado === "detalle" &&
+                productoMovimientoSeleccionado && (
+                  <>
+                    <p
+                      style={{
+                        marginBottom: "6px",
+                        marginTop: "0",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Precio negociado{" "}
+                      <span
+                        style={{
+                          color: "#666",
+                          fontWeight: "normal",
+                          fontSize: "11px",
+                        }}
+                      >
+                        (Opcional)
+                      </span>
+                    </p>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Si le diste precio especial, ponlo aquí"
+                      value={precioUnitarioNegociado}
+                      onChange={(e) =>
+                        setPrecioUnitarioNegociado(e.target.value)
+                      }
+                      onWheel={(e) => e.target.blur()}
+                      style={{
+                        width: "350px",
+                        maxWidth: "100%",
+                        padding: "8px",
+                        borderRadius: "8px",
+                        border: "1px solid #ccc",
+                        fontSize: "12.5px",
+                        marginBottom: "15px",
+                        display: "block",
+                      }}
+                    />
+                  </>
+                )}
+
+              {/* NUEVO: CAMPOS OBLIGATORIOS PARA MAYOREO (FUERA DEL ACORDEÓN) */}
+              {tipoVentaSeleccionado === "mayoreo" &&
+                productoMovimientoSeleccionado && (
+                  <div
                     style={{
                       width: "350px",
                       maxWidth: "100%",
-                      padding: "8px",
-                      borderRadius: "8px",
-                      border: "1px solid #ccc",
-                      fontSize: "12.5px",
+                      padding: "12px",
+                      backgroundColor: "#fff8f1",
+                      borderLeft: "4px solid #fd7e14",
+                      borderRadius: "0 8px 8px 0",
                       marginBottom: "15px",
-                      display: "block",
+                      boxSizing: "border-box",
                     }}
-                  />
-                </>
-              )}
+                  >
+                    <p
+                      style={{
+                        margin: "0 0 10px",
+                        fontWeight: "700",
+                        color: "#fd7e14",
+                        fontSize: "13px",
+                      }}
+                    >
+                      📦 Condición de Mayoreo
+                    </p>
 
-              {/* NUEVO: CAMPOS OBLIGATORIOS PARA MAYOREO (FUERA DEL ACORDEÓN) */}
-              {tipoVentaSeleccionado === "mayoreo" && productoMovimientoSeleccionado && (
-                <div style={{ width: "350px", maxWidth: "100%", padding: "12px", backgroundColor: "#fff8f1", borderLeft: "4px solid #fd7e14", borderRadius: "0 8px 8px 0", marginBottom: "15px", boxSizing: "border-box" }}>
-                  <p style={{ margin: "0 0 10px", fontWeight: "700", color: "#fd7e14", fontSize: "13px" }}>📦 Condición de Mayoreo</p>
-                  
-                  <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "12px" }}>Precio global negociado</p>
-                  <input
-                    type="number"
-                    min="0"
-                    disabled={!!porcentajeDescuento}
-                    placeholder="Monto total cobrado"
-                    value={precioGlobalMayoreo}
-                    onChange={(e) => setPrecioGlobalMayoreo(e.target.value)}
-                    onWheel={(e) => e.target.blur()}
-                    style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "10px", backgroundColor: !!porcentajeDescuento ? "#e9ecef" : "white", boxSizing: "border-box" }}
-                  />
+                    <p
+                      style={{
+                        margin: "0 0 6px",
+                        fontWeight: "600",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Precio global negociado
+                    </p>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={!!porcentajeDescuento}
+                      placeholder="Monto total cobrado"
+                      value={precioGlobalMayoreo}
+                      onChange={(e) => setPrecioGlobalMayoreo(e.target.value)}
+                      onWheel={(e) => e.target.blur()}
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        borderRadius: "6px",
+                        border: "1px solid #ccc",
+                        fontSize: "12.5px",
+                        marginBottom: "10px",
+                        backgroundColor: !!porcentajeDescuento
+                          ? "#e9ecef"
+                          : "white",
+                        boxSizing: "border-box",
+                      }}
+                    />
 
-                  <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "12px" }}>O aplica un descuento %</p>
-                  <input
-                    type="number"
-                    min="0"
-                    disabled={!!precioGlobalMayoreo}
-                    placeholder="Ejemplo: 10"
-                    value={porcentajeDescuento}
-                    onChange={(e) => setPorcentajeDescuento(e.target.value)}
-                    onWheel={(e) => e.target.blur()}
-                    style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "12.5px", backgroundColor: !!precioGlobalMayoreo ? "#e9ecef" : "white", boxSizing: "border-box" }}
-                  />
-                </div>
-              )}
+                    <p
+                      style={{
+                        margin: "0 0 6px",
+                        fontWeight: "600",
+                        fontSize: "12px",
+                      }}
+                    >
+                      O aplica un descuento %
+                    </p>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={!!precioGlobalMayoreo}
+                      placeholder="Ejemplo: 10"
+                      value={porcentajeDescuento}
+                      onChange={(e) => setPorcentajeDescuento(e.target.value)}
+                      onWheel={(e) => e.target.blur()}
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        borderRadius: "6px",
+                        border: "1px solid #ccc",
+                        fontSize: "12.5px",
+                        backgroundColor: !!precioGlobalMayoreo
+                          ? "#e9ecef"
+                          : "white",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                )}
 
               {/* === NUEVO: TOTAL A COBRAR (Súper visible) === */}
               {productoMovimientoSeleccionado && cantidadMovimiento !== "" && (
-                <div style={{
-                  backgroundColor: "#f8f9fa",
-                  border: "2px solid #198754",
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  marginBottom: "15px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  width: "350px",
-                  maxWidth: "100%",
-                  boxSizing: "border-box"
-                }}>
-                  <span style={{ fontSize: "14px", fontWeight: "700", color: "#333" }}>Total a cobrar:</span>
-                  <span style={{ fontSize: "22px", fontWeight: "900", color: "#198754" }}>
+                <div
+                  style={{
+                    backgroundColor: "#f8f9fa",
+                    border: "2px solid #198754",
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    marginBottom: "15px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "350px",
+                    maxWidth: "100%",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "700",
+                      color: "#333",
+                    }}
+                  >
+                    Total a cobrar:
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "22px",
+                      fontWeight: "900",
+                      color: "#198754",
+                    }}
+                  >
                     ${ingresoEstimadoMovimiento.toFixed(2)}
                   </span>
                 </div>
@@ -2648,20 +2918,20 @@ function App() {
 
               {/* ÚNICA ALERTA PERMITIDA Y CORREGIDA */}
               {ventaListaParaCalcular && ventaConPerdida && (
-                  <div
-                    style={{
-                      backgroundColor: "#f8d7da",
-                      color: "#842029",
-                      padding: "10px",
-                      borderRadius: "8px",
-                      marginBottom: "15px",
-                      fontWeight: "700",
-                      fontSize: "13px",
-                      display: "block"
-                    }}
-                  >
-                    ⚠ Advertencia: El precio ingresado generará pérdida.
-                  </div>
+                <div
+                  style={{
+                    backgroundColor: "#f8d7da",
+                    color: "#842029",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    marginBottom: "15px",
+                    fontWeight: "700",
+                    fontSize: "13px",
+                    display: "block",
+                  }}
+                >
+                  ⚠ Advertencia: El precio ingresado generará pérdida.
+                </div>
               )}
 
               <div style={{ height: "10px" }} />
@@ -2701,12 +2971,10 @@ function App() {
               </button>
             </form>
           </div>
-
           {/* ======================================================
       MÓDULO DE HISTORIAL
       Ventas, reposiciones y análisis financiero
       ====================================================== */}
-
           <div
             id="zonaHistorial"
             style={{
@@ -2959,19 +3227,49 @@ function App() {
                       >
                         <thead>
                           <tr>
-                            <th style={{ padding: "8px", textAlign: "center", width: "28%" }}>
+                            <th
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                width: "28%",
+                              }}
+                            >
                               Producto
                             </th>
-                            <th style={{ padding: "8px", textAlign: "center", width: "18%" }}>
+                            <th
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                width: "18%",
+                              }}
+                            >
                               Unidades
                             </th>
-                            <th style={{ padding: "8px", textAlign: "center", width: "18%" }}>
+                            <th
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                width: "18%",
+                              }}
+                            >
                               Ingresos
                             </th>
-                            <th style={{ padding: "8px", textAlign: "center", width: "18%" }}>
+                            <th
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                width: "18%",
+                              }}
+                            >
                               Utilidad
                             </th>
-                            <th style={{ padding: "8px", textAlign: "center", width: "18%" }}>
+                            <th
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                width: "18%",
+                              }}
+                            >
                               Margen %
                             </th>
                           </tr>
@@ -3064,7 +3362,7 @@ function App() {
                       borderRadius: "12px",
                       marginBottom: "25px",
                       boxSizing: "border-box", // <--- Esta es la magia que lo mete al cuadro
-                      overflow: "hidden" // <--- Esto evita que la gráfica se salga por los lados
+                      overflow: "hidden", // <--- Esto evita que la gráfica se salga por los lados
                     }}
                   >
                     <h3 style={{ marginTop: 0, color: "#222" }}>
@@ -3072,7 +3370,9 @@ function App() {
                     </h3>
 
                     <div style={{ marginBottom: "15px" }}>
-                      <label style={{ marginRight: "8px", fontWeight: "600" }}>Ver período: </label>
+                      <label style={{ marginRight: "8px", fontWeight: "600" }}>
+                        Ver período:{" "}
+                      </label>
                       <select
                         value={rangoGrafica}
                         onChange={(e) => setRangoGrafica(e.target.value)}
@@ -3094,7 +3394,7 @@ function App() {
                 ---------------------- */}
 
                     <ResponsiveContainer width="100%" height="85%">
-                      <LineChart 
+                      <LineChart
                         data={datosGraficaVentas}
                         margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
                       >
@@ -3124,28 +3424,55 @@ function App() {
 
                 {/* --- NUEVA GRÁFICA: VENTAS WEB VS LOCAL --- */}
                 {datosOrigenVentas.length > 0 && (
-                  <div style={{ width: "100%", height: 320, backgroundColor: "#f8f9fa", padding: "12px", borderRadius: "12px", marginBottom: "25px", boxSizing: "border-box" }}>
-                    <h3 style={{ marginTop: 0, color: "#222" }}>🌐 Distribución de Ingresos: Web vs Local</h3>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 320,
+                      backgroundColor: "#f8f9fa",
+                      padding: "12px",
+                      borderRadius: "12px",
+                      marginBottom: "25px",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <h3 style={{ marginTop: 0, color: "#222" }}>
+                      🌐 Distribución de Ingresos: Web vs Local
+                    </h3>
                     <ResponsiveContainer width="100%" height="85%">
                       <PieChart>
                         <Pie
                           data={datosOrigenVentas}
                           dataKey="totalIngresos"
                           nameKey="_id"
-                          cx="50%" cy="50%"
+                          cx="50%"
+                          cy="50%"
                           outerRadius={80}
-                          label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ name, percent }) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
                         >
                           {datosOrigenVentas.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry._id === 'Web' ? '#7c3aed' : '#0d6efd'} />
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry._id === "Web" ? "#7c3aed" : "#0d6efd"}
+                            />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
+                        <Tooltip
+                          formatter={(value) => `$${Number(value).toFixed(2)}`}
+                        />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
-                    <p style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
-                      *Haz clic en las secciones o pasa el mouse para ver el detalle de operaciones.
+                    <p
+                      style={{
+                        textAlign: "center",
+                        fontSize: "11px",
+                        color: "#666",
+                      }}
+                    >
+                      *Haz clic en las secciones o pasa el mouse para ver el
+                      detalle de operaciones.
                     </p>
                   </div>
                 )}
@@ -3197,8 +3524,12 @@ function App() {
                     <option value="ingresoMenor">Menor ingreso</option>
                     <option value="utilidadMayor">Mayor utilidad</option>
                     <option value="utilidadMenor">Menor utilidad</option>
-                    <option value="margenMayor">Mayor margen % de utilidad</option>
-                    <option value="margenMenor">Menor margen % de utilidad</option>
+                    <option value="margenMayor">
+                      Mayor margen % de utilidad
+                    </option>
+                    <option value="margenMenor">
+                      Menor margen % de utilidad
+                    </option>
                   </select>
                 </div>
 
@@ -3223,20 +3554,32 @@ function App() {
                     >
                       <thead>
                         <tr>
-                          {["Producto", "Tipo", "Origen", "Cliente", "Cantidad", "Ingreso", "Costo total", "Utilidad", "Margen %", "Fecha"].map((titulo) => (
-                            <th 
-                              key={titulo} 
-                              style={{ 
-                                padding: "10px 8px", 
-                                textAlign: "center", 
-                                position: "sticky", 
-                                top: 0, 
-                                backgroundColor: "#f1f3f5", 
-                                zIndex: 1, 
-                                fontSize: "13px", 
-                                fontWeight: "700", 
+                          {[
+                            "Producto",
+                            "Categoría",
+                            "Tipo",
+                            "Origen",
+                            "Cliente",
+                            "Cantidad",
+                            "Ingreso",
+                            "Costo total",
+                            "Utilidad",
+                            "Margen %",
+                            "Fecha",
+                          ].map((titulo) => (
+                            <th
+                              key={titulo}
+                              style={{
+                                padding: "10px 8px",
+                                textAlign: "center",
+                                position: "sticky",
+                                top: 0,
+                                backgroundColor: "#f1f3f5",
+                                zIndex: 1,
+                                fontSize: "13px",
+                                fontWeight: "700",
                                 color: "#333",
-                                borderBottom: "1px solid #e5e7eb"
+                                borderBottom: "1px solid #e5e7eb",
                               }}
                             >
                               {titulo}
@@ -3252,6 +3595,27 @@ function App() {
                               {venta.nombreProducto}
                             </td>
 
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                              }}
+                            >
+                              {(() => {
+                                const prod = productos.find(
+                                  (p) => p._id === venta.productoId,
+                                );
+                                const idCat =
+                                  typeof prod?.categoria === "object"
+                                    ? prod?.categoria?._id
+                                    : prod?.categoria;
+                                return (
+                                  categorias.find((c) => c._id === idCat)
+                                    ?.nombre || "—"
+                                );
+                              })()}
+                            </td>
+
                             <td style={{ padding: "8px", textAlign: "center" }}>
                               {venta.tipoVenta === "mayoreo"
                                 ? "Mayoreo"
@@ -3260,14 +3624,22 @@ function App() {
 
                             {/* --- NUEVA CELDA DE ORIGEN --- */}
                             <td style={{ padding: "8px", textAlign: "center" }}>
-                              <span style={{
-                                backgroundColor: venta.origenVenta === 'Web' ? '#cff4fc' : '#e2e3e5',
-                                color: venta.origenVenta === 'Web' ? '#055160' : '#41464b',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                fontWeight: 'bold'
-                              }}>
+                              <span
+                                style={{
+                                  backgroundColor:
+                                    venta.origenVenta === "Web"
+                                      ? "#cff4fc"
+                                      : "#e2e3e5",
+                                  color:
+                                    venta.origenVenta === "Web"
+                                      ? "#055160"
+                                      : "#41464b",
+                                  padding: "4px 8px",
+                                  borderRadius: "6px",
+                                  fontSize: "11px",
+                                  fontWeight: "bold",
+                                }}
+                              >
                                 {venta.origenVenta || "Local"}
                               </span>
                             </td>
@@ -3381,7 +3753,7 @@ function App() {
                       width: "100%",
                       overflowX: "auto",
                       maxHeight: "360px", // Congela la altura igual que las otras
-                      overflowY: "auto",  // Activa el scroll interno de la tabla
+                      overflowY: "auto", // Activa el scroll interno de la tabla
                     }}
                   >
                     <table
@@ -3394,20 +3766,27 @@ function App() {
                     >
                       <thead>
                         <tr>
-                          {["Producto", "Cantidad", "Stock antes", "Stock después", "Proveedor", "Fecha"].map((titulo) => (
-                            <th 
-                              key={titulo} 
-                              style={{ 
-                                padding: "10px 8px", 
-                                textAlign: "center", 
-                                position: "sticky", 
-                                top: 0, 
-                                backgroundColor: "#f1f3f5", 
-                                zIndex: 1, 
-                                fontSize: "13px", 
-                                fontWeight: "700", 
+                          {[
+                            "Producto",
+                            "Cantidad",
+                            "Stock antes",
+                            "Stock después",
+                            "Proveedor",
+                            "Fecha",
+                          ].map((titulo) => (
+                            <th
+                              key={titulo}
+                              style={{
+                                padding: "10px 8px",
+                                textAlign: "center",
+                                position: "sticky",
+                                top: 0,
+                                backgroundColor: "#f1f3f5",
+                                zIndex: 1,
+                                fontSize: "13px",
+                                fontWeight: "700",
                                 color: "#333",
-                                borderBottom: "1px solid #e5e7eb"
+                                borderBottom: "1px solid #e5e7eb",
                               }}
                             >
                               {titulo}
@@ -3446,7 +3825,6 @@ function App() {
               </>
             )}
           </div>
-
           <div
             style={{
               display: seccionActiva === "registrar" ? "block" : "none",
@@ -3487,80 +3865,416 @@ function App() {
 
             {(editandoId || modoRegistro === "nuevo") && (
               <form onSubmit={guardarProducto} style={{}}>
-              
-              {/* 1. CAMPOS OBLIGATORIOS (SIEMPRE VISIBLES) */}
-              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Nombre del producto</p>
-              <input type="text" placeholder="Nombre del producto" value={nombre} onChange={(e) => setNombre(e.target.value)} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
-              <div style={{ height: "14px" }} />
+                {/* 1. CAMPOS OBLIGATORIOS (SIEMPRE VISIBLES) */}
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Nombre del producto
+                </p>
+                <input
+                  type="text"
+                  placeholder="Nombre del producto"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  style={{
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #ccc",
+                    fontSize: "12.5px",
+                  }}
+                />
+                <div style={{ height: "14px" }} />
 
-              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Descripción del producto <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
-              <textarea placeholder="Ejemplo: Audífonos Bluetooth, marca X, color negro" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", minHeight: "60px", resize: "vertical" }} />
-              <div style={{ height: "14px" }} />
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Descripción del producto{" "}
+                  <span
+                    style={{
+                      color: "#666",
+                      fontWeight: "normal",
+                      fontSize: "11px",
+                    }}
+                  >
+                    (Opcional)
+                  </span>
+                </p>
+                <textarea
+                  placeholder="Ejemplo: Audífonos Bluetooth, marca X, color negro"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  style={{
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #ccc",
+                    fontSize: "12.5px",
+                    minHeight: "60px",
+                    resize: "vertical",
+                  }}
+                />
+                <div style={{ height: "14px" }} />
 
-              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Precio de venta</p>
-              <input type="number" placeholder="Precio al que lo venderás" value={precioVenta} min="0" onChange={(e) => setPrecioVenta(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
-              <div style={{ height: "14px" }} />
+                {/* --- SELECTOR DE CATEGORÍAS --- */}
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Categoría
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    width: "350px",
+                    maxWidth: "100%",
+                    marginBottom: "15px",
+                  }}
+                >
+                  <select
+                    value={creandoCategoria ? "nueva" : categoriaId}
+                    onChange={(e) => {
+                      if (e.target.value === "nueva") {
+                        setCreandoCategoria(true);
+                        setCategoriaId("");
+                      } else {
+                        setCreandoCategoria(false);
+                        setCategoriaId(e.target.value);
+                      }
+                    }}
+                    style={{
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc",
+                      fontSize: "12.5px",
+                    }}
+                  >
+                    <option value="">Selecciona una categoría...</option>
+                    {categorias.map((cat) => (
+                      <option key={cat._id} value={cat._id}>
+                        {cat.nombre}
+                      </option>
+                    ))}
+                    <option value="nueva">➕ Añadir nueva categoría...</option>
+                  </select>
 
-              <p style={{ marginBottom: "6px", fontWeight: "600" }}>Costo del producto <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
-                  <input type="number" placeholder="¿Cuánto te costó?" value={precio} min="0" onChange={(e) => setPrecio(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
-                  <div style={{ height: "14px" }} />
-
-              {!editandoId && (
-                <>
-                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Stock inicial</p>
-                  <input type="number" required placeholder="¿Cuántos tienes ahora?" value={stock} min="0" onChange={(e) => setStock(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
-                  <div style={{ height: "14px" }} />
-                </>
-              )}
-
-              {/* 2. BOTÓN DEL ACORDEÓN */}
-              <div
-                onClick={() => setMostrarOpcionesProducto(!mostrarOpcionesProducto)}
-                style={{ cursor: "pointer", color: "#0d6efd", fontWeight: "600", marginBottom: "15px", display: "flex", alignItems: "center", gap: "5px", fontSize: "13px" }}
-              >
-                {mostrarOpcionesProducto ? "▲ Ocultar opciones avanzadas" : "▼ Mostrar opciones avanzadas (Costo, Proveedor, etc.)"}
-              </div>
-
-              {/* 3. CAMPOS OPCIONALES (DENTRO DEL ACORDEÓN) */}
-              {mostrarOpcionesProducto && (
-                <div style={{ paddingLeft: "10px", borderLeft: "2px solid #0d6efd", marginBottom: "15px" }}>
-
-                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Costo de envío/manejo por unidad <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
-                  <input type="number" placeholder="Costo de envio" value={costoEnvio} min="0" onChange={(e) => setCostoEnvio(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
-                  <div style={{ height: "14px" }} />
-
-                  {/* Cuadro de utilidad, solo se muestra si metió precios */}
-                  {precio !== "" && precioVenta !== "" && (
-                    <div style={{ backgroundColor: Number(precioVenta) < Number(precio) + Number(costoEnvio || 0) ? "#f8d7da" : "#e7f1ff", color: Number(precioVenta) < Number(precio) + Number(costoEnvio || 0) ? "#842029" : "#084298", padding: "12px", borderRadius: "10px", marginBottom: "15px", fontWeight: "600", width: "316px", maxWidth: "100%" }}>
-                      <p style={{ margin: "0 0 6px" }}>Costo total unitario: ${(Number(precio || 0) + Number(costoEnvio || 0)).toFixed(2)}</p>
-                      <p style={{ margin: 0 }}>Utilidad estimada por unidad: ${(Number(precioVenta || 0) - (Number(precio || 0) + Number(costoEnvio || 0))).toFixed(2)}</p>
-                    </div>
+                  {creandoCategoria && (
+                    <input
+                      type="text"
+                      placeholder="Escribe el nombre de la nueva categoría"
+                      value={nombreNuevaCategoria}
+                      onChange={(e) => setNombreNuevaCategoria(e.target.value)}
+                      style={{
+                        padding: "8px",
+                        borderRadius: "8px",
+                        border: "1px solid #0d6efd",
+                        fontSize: "12.5px",
+                        backgroundColor: "#f8f9fa",
+                        boxSizing: "border-box",
+                      }}
+                    />
                   )}
-
-                  {!editandoId && (
-                    <>
-                      <p style={{ marginBottom: "6px", fontWeight: "600" }}>Proveedor inicial <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
-                      <input type="text" placeholder="Nombre del proveedor" value={proveedorProductoNuevo} onChange={(e) => setProveedorProductoNuevo(e.target.value)} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "15px", boxSizing: "border-box" }} />
-                    </>
-                  )}
-
-                  <p style={{ marginBottom: "6px", fontWeight: "600" }}>Stock mínimo recomendado <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span></p>
-                  <input type="number" placeholder="Asume 1 por defecto" value={stockMinimo} min="0" onChange={(e) => setStockMinimo(e.target.value)} onWheel={(e) => e.target.blur()} style={{ width: "340px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px" }} />
-                  <div style={{ height: "14px" }} />
-
                 </div>
-              )}
 
-              {/* 4. BOTONES DE ACCIÓN */}
-              <div style={{ display: "flex", gap: "10px", marginTop: "5px", flexWrap: "wrap" }}>
-                <button type="submit" style={{ display: "block", backgroundColor: editandoId ? "#0d6efd" : "#7c3aed", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
-                  {editandoId ? "Actualizar producto" : "Guardar producto"}
-                </button>
-                <button type="button" onClick={() => { setNombre(""); setDescripcion(""); setPrecio(""); setCostoEnvio(""); setPrecioVenta(""); setStock(""); setStockMinimo(""); setProductoReposicionId(""); setCantidadReposicion(""); setEditandoId(null); setModoRegistro("nuevo"); setSeccionActiva("inventario"); setMostrarOpcionesProducto(false); }} style={{ backgroundColor: "#dc3545", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Precio de venta
+                </p>
+                <input
+                  type="number"
+                  placeholder="Precio al que lo venderás"
+                  value={precioVenta}
+                  min="0"
+                  onChange={(e) => setPrecioVenta(e.target.value)}
+                  onWheel={(e) => e.target.blur()}
+                  style={{
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #ccc",
+                    fontSize: "12.5px",
+                  }}
+                />
+                <div style={{ height: "14px" }} />
+
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Costo del producto{" "}
+                  <span
+                    style={{
+                      color: "#666",
+                      fontWeight: "normal",
+                      fontSize: "11px",
+                    }}
+                  >
+                    (Opcional)
+                  </span>
+                </p>
+                <input
+                  type="number"
+                  placeholder="¿Cuánto te costó?"
+                  value={precio}
+                  min="0"
+                  onChange={(e) => setPrecio(e.target.value)}
+                  onWheel={(e) => e.target.blur()}
+                  style={{
+                    width: "340px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #ccc",
+                    fontSize: "12.5px",
+                  }}
+                />
+                <div style={{ height: "14px" }} />
+
+                {!editandoId && (
+                  <>
+                    <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                      Stock inicial
+                    </p>
+                    <input
+                      type="number"
+                      required
+                      placeholder="¿Cuántos tienes ahora?"
+                      value={stock}
+                      min="0"
+                      onChange={(e) => setStock(e.target.value)}
+                      onWheel={(e) => e.target.blur()}
+                      style={{
+                        width: "350px",
+                        maxWidth: "100%",
+                        padding: "8px",
+                        borderRadius: "8px",
+                        border: "1px solid #ccc",
+                        fontSize: "12.5px",
+                      }}
+                    />
+                    <div style={{ height: "14px" }} />
+                  </>
+                )}
+
+                {/* 2. BOTÓN DEL ACORDEÓN */}
+                <div
+                  onClick={() =>
+                    setMostrarOpcionesProducto(!mostrarOpcionesProducto)
+                  }
+                  style={{
+                    cursor: "pointer",
+                    color: "#0d6efd",
+                    fontWeight: "600",
+                    marginBottom: "15px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    fontSize: "13px",
+                  }}
+                >
+                  {mostrarOpcionesProducto
+                    ? "▲ Ocultar opciones avanzadas"
+                    : "▼ Mostrar opciones avanzadas (Costo, Proveedor, etc.)"}
+                </div>
+
+                {/* 3. CAMPOS OPCIONALES (DENTRO DEL ACORDEÓN) */}
+                {mostrarOpcionesProducto && (
+                  <div
+                    style={{
+                      paddingLeft: "10px",
+                      borderLeft: "2px solid #0d6efd",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                      Costo de envío/manejo por unidad{" "}
+                      <span
+                        style={{
+                          color: "#666",
+                          fontWeight: "normal",
+                          fontSize: "11px",
+                        }}
+                      >
+                        (Opcional)
+                      </span>
+                    </p>
+                    <input
+                      type="number"
+                      placeholder="Costo de envio"
+                      value={costoEnvio}
+                      min="0"
+                      onChange={(e) => setCostoEnvio(e.target.value)}
+                      onWheel={(e) => e.target.blur()}
+                      style={{
+                        width: "340px",
+                        maxWidth: "100%",
+                        padding: "8px",
+                        borderRadius: "8px",
+                        border: "1px solid #ccc",
+                        fontSize: "12.5px",
+                      }}
+                    />
+                    <div style={{ height: "14px" }} />
+
+                    {/* Cuadro de utilidad, solo se muestra si metió precios */}
+                    {precio !== "" && precioVenta !== "" && (
+                      <div
+                        style={{
+                          backgroundColor:
+                            Number(precioVenta) <
+                            Number(precio) + Number(costoEnvio || 0)
+                              ? "#f8d7da"
+                              : "#e7f1ff",
+                          color:
+                            Number(precioVenta) <
+                            Number(precio) + Number(costoEnvio || 0)
+                              ? "#842029"
+                              : "#084298",
+                          padding: "12px",
+                          borderRadius: "10px",
+                          marginBottom: "15px",
+                          fontWeight: "600",
+                          width: "316px",
+                          maxWidth: "100%",
+                        }}
+                      >
+                        <p style={{ margin: "0 0 6px" }}>
+                          Costo total unitario: $
+                          {(
+                            Number(precio || 0) + Number(costoEnvio || 0)
+                          ).toFixed(2)}
+                        </p>
+                        <p style={{ margin: 0 }}>
+                          Utilidad estimada por unidad: $
+                          {(
+                            Number(precioVenta || 0) -
+                            (Number(precio || 0) + Number(costoEnvio || 0))
+                          ).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+
+                    {!editandoId && (
+                      <>
+                        <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                          Proveedor inicial{" "}
+                          <span
+                            style={{
+                              color: "#666",
+                              fontWeight: "normal",
+                              fontSize: "11px",
+                            }}
+                          >
+                            (Opcional)
+                          </span>
+                        </p>
+                        <input
+                          type="text"
+                          placeholder="Nombre del proveedor"
+                          value={proveedorProductoNuevo}
+                          onChange={(e) =>
+                            setProveedorProductoNuevo(e.target.value)
+                          }
+                          style={{
+                            width: "340px",
+                            maxWidth: "100%",
+                            padding: "8px",
+                            borderRadius: "8px",
+                            border: "1px solid #ccc",
+                            fontSize: "12.5px",
+                            marginBottom: "15px",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </>
+                    )}
+
+                    <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                      Stock mínimo recomendado{" "}
+                      <span
+                        style={{
+                          color: "#666",
+                          fontWeight: "normal",
+                          fontSize: "11px",
+                        }}
+                      >
+                        (Opcional)
+                      </span>
+                    </p>
+                    <input
+                      type="number"
+                      placeholder="Asume 1 por defecto"
+                      value={stockMinimo}
+                      min="0"
+                      onChange={(e) => setStockMinimo(e.target.value)}
+                      onWheel={(e) => e.target.blur()}
+                      style={{
+                        width: "340px",
+                        maxWidth: "100%",
+                        padding: "8px",
+                        borderRadius: "8px",
+                        border: "1px solid #ccc",
+                        fontSize: "12.5px",
+                      }}
+                    />
+                    <div style={{ height: "14px" }} />
+                  </div>
+                )}
+
+                {/* 4. BOTONES DE ACCIÓN */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    marginTop: "5px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    type="submit"
+                    style={{
+                      display: "block",
+                      backgroundColor: editandoId ? "#0d6efd" : "#7c3aed",
+                      color: "white",
+                      border: "none",
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {editandoId ? "Actualizar producto" : "Guardar producto"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNombre("");
+                      setDescripcion("");
+                      setPrecio("");
+                      setCostoEnvio("");
+                      setPrecioVenta("");
+                      setStock("");
+                      setStockMinimo("");
+                      setProductoReposicionId("");
+                      setCantidadReposicion("");
+                      setCategoriaId("");
+                      setCreandoCategoria(false);
+                      setNombreNuevaCategoria("");
+                      setEditandoId(null);
+                      setModoRegistro("nuevo");
+                      setSeccionActiva("inventario");
+                      setMostrarOpcionesProducto(false);
+                    }}
+                    style={{
+                      backgroundColor: "#dc3545",
+                      color: "white",
+                      border: "none",
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
             )}
 
             {/* ----------------------
@@ -3690,12 +4404,24 @@ function App() {
             ---------------------- */}
             {!editandoId && modoRegistro === "reposicionMasiva" && (
               <form onSubmit={guardarReposicionMasiva}>
-                <p style={{ color: "#666", marginBottom: "15px", marginTop: 0 }}>
-                  Agrega unidades a varios productos al mismo tiempo. Deja en blanco los que no vas a reponer hoy.
+                <p
+                  style={{ color: "#666", marginBottom: "15px", marginTop: 0 }}
+                >
+                  Agrega unidades a varios productos al mismo tiempo. Deja en
+                  blanco los que no vas a reponer hoy.
                 </p>
 
                 <p style={{ marginBottom: "6px", fontWeight: "600" }}>
-                  Proveedor global <span style={{color: "#666", fontWeight: "normal", fontSize: "11px"}}>(Opcional)</span>
+                  Proveedor global{" "}
+                  <span
+                    style={{
+                      color: "#666",
+                      fontWeight: "normal",
+                      fontSize: "11px",
+                    }}
+                  >
+                    (Opcional)
+                  </span>
                 </p>
                 <input
                   type="text"
@@ -3703,48 +4429,133 @@ function App() {
                   value={proveedorReposicion}
                   onChange={(e) => setProveedorReposicion(e.target.value)}
                   style={{
-                    width: "350px", maxWidth: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "12.5px", marginBottom: "15px", boxSizing: "border-box"
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #ccc",
+                    fontSize: "12.5px",
+                    marginBottom: "15px",
+                    boxSizing: "border-box",
                   }}
                 />
 
                 {/* Lista de todos los productos */}
-                <div style={{ maxHeight: "400px", overflowY: "auto", border: "1px solid #eee", borderRadius: "8px", padding: "10px", marginBottom: "15px", backgroundColor: "#f8f9fa" }}>
+                <div
+                  style={{
+                    maxHeight: "400px",
+                    overflowY: "auto",
+                    border: "1px solid #eee",
+                    borderRadius: "8px",
+                    padding: "10px",
+                    marginBottom: "15px",
+                    backgroundColor: "#f8f9fa",
+                  }}
+                >
                   {productos.map((producto) => (
-                    <div key={producto._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #e5e7eb" }}>
+                    <div
+                      key={producto._id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "8px 0",
+                        borderBottom: "1px solid #e5e7eb",
+                      }}
+                    >
                       <div style={{ flex: 1, paddingRight: "10px" }}>
-                        <p style={{ margin: 0, fontWeight: "600", fontSize: "13px", color: "#333" }}>{producto.nombre}</p>
-                        <p style={{ margin: 0, fontSize: "11px", color: Number(producto.stock) === 0 ? "#dc3545" : "#666", fontWeight: "500" }}>Stock actual: {producto.stock}</p>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontWeight: "600",
+                            fontSize: "13px",
+                            color: "#333",
+                          }}
+                        >
+                          {producto.nombre}
+                        </p>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "11px",
+                            color:
+                              Number(producto.stock) === 0 ? "#dc3545" : "#666",
+                            fontWeight: "500",
+                          }}
+                        >
+                          Stock actual: {producto.stock}
+                        </p>
                       </div>
                       <input
                         type="number"
                         min="0"
                         placeholder="+0"
                         value={cantidadesMasivas[producto._id] || ""}
-                        onChange={(e) => setCantidadesMasivas(prev => ({...prev, [producto._id]: e.target.value}))}
+                        onChange={(e) =>
+                          setCantidadesMasivas((prev) => ({
+                            ...prev,
+                            [producto._id]: e.target.value,
+                          }))
+                        }
                         onWheel={(e) => e.target.blur()}
-                        style={{ width: "65px", padding: "6px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px", textAlign: "center" }}
+                        style={{
+                          width: "65px",
+                          padding: "6px",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          fontSize: "13px",
+                          textAlign: "center",
+                        }}
                       />
                     </div>
                   ))}
                 </div>
 
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  <button type="submit" style={{ backgroundColor: "#198754", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12.5px", fontWeight: "600" }}>
+                  <button
+                    type="submit"
+                    style={{
+                      backgroundColor: "#198754",
+                      color: "white",
+                      border: "none",
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "12.5px",
+                      fontWeight: "600",
+                    }}
+                  >
                     Guardar reposición masiva
                   </button>
-                  <button type="button" onClick={() => { setCantidadesMasivas({}); setProveedorReposicion(""); setModoRegistro("nuevo"); setSeccionActiva("inventario"); }} style={{ backgroundColor: "#dc3545", color: "white", border: "none", padding: "9px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "12.5px", fontWeight: "600" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCantidadesMasivas({});
+                      setProveedorReposicion("");
+                      setModoRegistro("nuevo");
+                      setSeccionActiva("inventario");
+                    }}
+                    style={{
+                      backgroundColor: "#dc3545",
+                      color: "white",
+                      border: "none",
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "12.5px",
+                      fontWeight: "600",
+                    }}
+                  >
                     Cancelar
                   </button>
                 </div>
               </form>
             )}
           </div>
-
           {/* ======================================================
     MÓDULO DE INVENTARIO
     Listado, filtros y gestión de productos
     ====================================================== */}
-
           <div
             id="zonaInventario"
             style={{
@@ -3756,35 +4567,69 @@ function App() {
               marginTop: "0",
               marginBottom: "25px",
               position: inventarioExpandido ? "fixed" : "static",
-              top: 0, left: 0, width: "100%", height: "100%", zIndex: 9999,
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 9999,
               overflowY: "auto",
-              boxSizing: "border-box"
+              boxSizing: "border-box",
             }}
           >
             {/* BOTONES DE CONTROL DE VISTA EXPANDIDA */}
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "15px",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setInventarioExpandido(!inventarioExpandido)}
-                style={{ backgroundColor: "#0d6efd", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                style={{
+                  backgroundColor: "#0d6efd",
+                  color: "white",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "none",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
               >
-                {inventarioExpandido ? "↙️ Volver a vista normal" : "↗️ Expandir (Modo Celular)"}
+                {inventarioExpandido
+                  ? "↙️ Volver a vista normal"
+                  : "↗️ Expandir (Modo Celular)"}
               </button>
-              
+
               {inventarioExpandido && (
                 <button
                   type="button"
                   onClick={() => {
-                    const texto = productosFiltrados.map(p => `▪️ ${p.nombre} - ${p.descripcion || 'Sin descripción'}`).join('\n');
-                    navigator.clipboard.writeText(texto).then(() => alert("¡Lista copiada al portapapeles!"));
+                    const texto = productosFiltrados
+                      .map(
+                        (p) =>
+                          `▪️ ${p.nombre} - ${p.descripcion || "Sin descripción"}`,
+                      )
+                      .join("\n");
+                    navigator.clipboard
+                      .writeText(texto)
+                      .then(() => alert("¡Lista copiada al portapapeles!"));
                   }}
-                  style={{ backgroundColor: "#198754", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                  style={{
+                    backgroundColor: "#198754",
+                    color: "white",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: "none",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
                 >
                   📋 Copiar Todo
                 </button>
               )}
             </div>
-
             {/* ENVOLVEMOS TODO LO DE ARRIBA (BOTONES Y BUSCADORES) EN UN CONTENEDOR QUE SE OCULTA CON CSS */}
             <div style={{ display: inventarioExpandido ? "none" : "block" }}>
               <div
@@ -3799,156 +4644,195 @@ function App() {
                   marginBottom: "16px",
                 }}
               >
-              <button
-                type="button"
-                onClick={() => {
-                  cancelarEdicion();
-                  setModoRegistro("nuevo");
-                  setSeccionActiva("registrar");
-                }}
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelarEdicion();
+                    setModoRegistro("nuevo");
+                    setSeccionActiva("registrar");
+                  }}
+                  style={{
+                    backgroundColor: "#7c3aed",
+                    color: "white",
+                    border: "none",
+                    padding: "9px 13px",
+                    borderRadius: "9px",
+                    cursor: "pointer",
+                    fontSize: "12.5px",
+                    fontWeight: "700",
+                    boxShadow: "0 6px 14px rgba(124, 58, 237, 0.22)",
+                  }}
+                >
+                  + Agregar producto
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelarEdicion();
+                    setCantidadesMasivas({});
+                    setProveedorReposicion("");
+                    setModoRegistro("reposicionMasiva");
+                    setSeccionActiva("registrar");
+                  }}
+                  style={{
+                    backgroundColor: "#198754", // Verde oscuro
+                    color: "white",
+                    border: "none",
+                    padding: "9px 13px",
+                    borderRadius: "9px",
+                    cursor: "pointer",
+                    fontSize: "12.5px",
+                    fontWeight: "700",
+                    boxShadow: "0 6px 14px rgba(25, 135, 84, 0.22)",
+                  }}
+                >
+                  📥 Reponer todo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={abrirGeneradorPedido}
+                  style={{
+                    backgroundColor: "#2563eb", // Azul llamativo para acción
+                    color: "white",
+                    border: "none",
+                    padding: "9px 13px",
+                    borderRadius: "9px",
+                    cursor: "pointer",
+                    fontSize: "12.5px",
+                    fontWeight: "700",
+                    boxShadow: "0 6px 14px rgba(37, 99, 235, 0.22)",
+                  }}
+                >
+                  📱 Generar Pedido
+                </button>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Buscar producto por nombre..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
                 style={{
-                  backgroundColor: "#7c3aed",
-                  color: "white",
-                  border: "none",
-                  padding: "9px 13px",
-                  borderRadius: "9px",
-                  cursor: "pointer",
+                  width: "350px",
+                  maxWidth: "100%",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
                   fontSize: "12.5px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 14px rgba(124, 58, 237, 0.22)",
+                  marginBottom: "20px",
+                }}
+              />
+
+              <select
+                value={orden}
+                onChange={(e) => setOrden(e.target.value)}
+                style={{
+                  width: "220px",
+                  maxWidth: "100%",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                  fontSize: "12.5px",
+                  marginBottom: "20px",
+                  marginLeft: "10px",
                 }}
               >
-                + Agregar producto
-              </button>
+                <option value="">Ordenar por...</option>
+                <option value="nombre">Nombre A-Z</option>
+                <option value="stockMayor">Mayor stock</option>
+                <option value="stockMenor">Menor stock</option>
+                <option value="precioMayor">Mayor precio</option>
+                <option value="precioMenor">Menor precio</option>
+                <option value="margenMayor">Mayor porcentaje utilidad</option>
+                <option value="margenMenor">Menor porcentaje utilidad</option>
+              </select>
 
-              <button
-                type="button"
-                onClick={() => {
-                  cancelarEdicion();
-                  setCantidadesMasivas({});
-                  setProveedorReposicion("");
-                  setModoRegistro("reposicionMasiva");
-                  setSeccionActiva("registrar");
-                }}
+              <select
+                value={filtroStock}
+                onChange={(e) => setFiltroStock(e.target.value)}
                 style={{
-                  backgroundColor: "#198754", // Verde oscuro
-                  color: "white",
-                  border: "none",
-                  padding: "9px 13px",
-                  borderRadius: "9px",
-                  cursor: "pointer",
+                  width: "220px",
+                  maxWidth: "100%",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
                   fontSize: "12.5px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 14px rgba(25, 135, 84, 0.22)",
+                  marginBottom: "20px",
+                  marginLeft: "10px",
                 }}
               >
-                📥 Reponer todo
-              </button>
+                <option value="todos">Ver todos</option>
+                <option value="bajo">Solo stock bajo</option>
+                <option value="agotado">Solo agotados</option>
+              </select>
 
-              <button
-                type="button"
-                onClick={abrirGeneradorPedido}
+              <p
                 style={{
-                  backgroundColor: "#2563eb", // Azul llamativo para acción
-                  color: "white",
-                  border: "none",
-                  padding: "9px 13px",
-                  borderRadius: "9px",
-                  cursor: "pointer",
-                  fontSize: "12.5px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 14px rgba(37, 99, 235, 0.22)",
+                  marginTop: "-5px",
+                  marginBottom: "15px",
+                  color: "#666",
+                  fontSize: "13px",
                 }}
               >
-                📱 Generar Pedido
-              </button>
-            </div>
-
-            <input
-              type="text"
-              placeholder="Buscar producto por nombre..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              style={{
-                width: "350px",
-                maxWidth: "100%",
-                padding: "8px",
-                borderRadius: "8px",
-                border: "1px solid #ccc",
-                fontSize: "12.5px",
-                marginBottom: "20px",
-              }}
-            />
-
-            <select
-              value={orden}
-              onChange={(e) => setOrden(e.target.value)}
-              style={{
-                width: "220px",
-                maxWidth: "100%",
-                padding: "8px",
-                borderRadius: "8px",
-                border: "1px solid #ccc",
-                fontSize: "12.5px",
-                marginBottom: "20px",
-                marginLeft: "10px",
-              }}
-            >
-              <option value="">Ordenar por...</option>
-              <option value="nombre">Nombre A-Z</option>
-              <option value="stockMayor">Mayor stock</option>
-              <option value="stockMenor">Menor stock</option>
-              <option value="precioMayor">Mayor precio</option>
-              <option value="precioMenor">Menor precio</option>
-              <option value="margenMayor">Mayor porcentaje utilidad</option>
-              <option value="margenMenor">Menor porcentaje utilidad</option>
-            </select>
-
-            <select
-              value={filtroStock}
-              onChange={(e) => setFiltroStock(e.target.value)}
-              style={{
-                width: "220px",
-                maxWidth: "100%",
-                padding: "8px",
-                borderRadius: "8px",
-                border: "1px solid #ccc",
-                fontSize: "12.5px",
-                marginBottom: "20px",
-                marginLeft: "10px",
-              }}
-            >
-              <option value="todos">Ver todos</option>
-              <option value="bajo">Solo stock bajo</option>
-              <option value="agotado">Solo agotados</option>
-            </select>
-
-            <p
-              style={{
-                marginTop: "-5px",
-                marginBottom: "15px",
-                color: "#666",
-                fontSize: "13px",
-              }}
-            >
-              Mostrando {productosFiltrados.length} de {productos.length}{" "}
-              productos
-            </p>
-            </div> {/* <-- AQUÍ CERRAMOS EL DIV QUE OCULTA LOS FILTROS */}
-
+                Mostrando {productosFiltrados.length} de {productos.length}{" "}
+                productos
+              </p>
+            </div>{" "}
+            {/* <-- AQUÍ CERRAMOS EL DIV QUE OCULTA LOS FILTROS */}
             {seccionActiva === "inventario" ? (
               inventarioExpandido ? (
                 // --- VISTA MÓVIL SIMPLIFICADA ---
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingBottom: "20px" }}>
-                  {productosFiltrados.map(producto => (
-                    <div key={producto._id} style={{ border: "1px solid #ccc", padding: "12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    paddingBottom: "20px",
+                  }}
+                >
+                  {productosFiltrados.map((producto) => (
+                    <div
+                      key={producto._id}
+                      style={{
+                        border: "1px solid #ccc",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
                       <div style={{ paddingRight: "10px" }}>
-                        <p style={{ margin: 0, fontWeight: "bold", fontSize: "16px", color: "#222" }}>{producto.nombre}</p>
-                        <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>{producto.descripcion || "Sin descripción"}</p>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontWeight: "bold",
+                            fontSize: "16px",
+                            color: "#222",
+                          }}
+                        >
+                          {producto.nombre}
+                        </p>
+                        <p
+                          style={{ margin: 0, color: "#666", fontSize: "12px" }}
+                        >
+                          {producto.descripcion || "Sin descripción"}
+                        </p>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setProductoDetalle(producto)}
-                        style={{ backgroundColor: "#eef6ff", color: "#0d6efd", border: "none", padding: "8px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", whiteSpace: "nowrap" }}
+                        style={{
+                          backgroundColor: "#eef6ff",
+                          color: "#0d6efd",
+                          border: "none",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         Detalles
                       </button>
@@ -3968,7 +4852,7 @@ function App() {
                     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                   }}
                 >
-                  <div style={{ minWidth: "800px" }}>
+                  <div style={{ width: "100%" }}>
                     {/* ----------------------
             TABLA DE INVENTARIO
             Listado general de productos
@@ -3984,20 +4868,31 @@ function App() {
                     >
                       <thead>
                         <tr>
-                          {["Nombre", "Descripción", "Costo total", "Precio venta", "Utilidad", "Margen %", "Stock", "Recomendación", "Acciones"].map((titulo) => (
-                            <th 
-                              key={titulo} 
-                              style={{ 
-                                padding: "10px 8px", 
-                                textAlign: "center", 
-                                position: "sticky", 
-                                top: 0, 
-                                backgroundColor: "#f1f3f5", 
-                                zIndex: 1, 
-                                fontSize: "13px", 
-                                fontWeight: "700", 
+                          {[
+                            "Nombre",
+                            "Categoría",
+                            "Descripción",
+                            "Costo total",
+                            "Precio venta",
+                            "Utilidad",
+                            "Margen %",
+                            "Stock",
+                            "Recomendación",
+                            "Acciones",
+                          ].map((titulo) => (
+                            <th
+                              key={titulo}
+                              style={{
+                                padding: "10px 8px",
+                                textAlign: "center",
+                                position: "sticky",
+                                top: 0,
+                                backgroundColor: "#f1f3f5",
+                                zIndex: 1,
+                                fontSize: "13px",
+                                fontWeight: "700",
                                 color: "#333",
-                                boxShadow: "0 1px 0 0 #e5e7eb" // Usamos sombra en vez de borde para que no se descuadre
+                                boxShadow: "0 1px 0 0 #e5e7eb", // Usamos sombra en vez de borde para que no se descuadre
                               }}
                             >
                               {titulo}
@@ -4026,7 +4921,7 @@ function App() {
                           {productosFiltrados.length === 0 ? (
                             <tr>
                               <td
-                                colSpan="8"
+                                colSpan="10"
                                 style={{
                                   padding: "12px",
                                   textAlign: "center",
@@ -4049,14 +4944,31 @@ function App() {
                                   {producto.nombre}
                                 </td>
 
+                                {/* 2. CATEGORÍA (Texto limpio y alineado) */}
+                                <td
+                                  style={{
+                                    padding: "8px",
+                                    textAlign: "center",
+                                    fontSize: "13px",
+                                    color: "#555",
+                                  }}
+                                >
+                                  {typeof producto.categoria === "object"
+                                    ? producto.categoria?.nombre
+                                    : categorias.find(
+                                        (c) => c._id === producto.categoria,
+                                      )?.nombre || "—"}
+                                </td>
+
+                                {/* 3. DESCRIPCIÓN (Con espacio extra) */}
                                 <td
                                   style={{
                                     padding: "8px",
                                     textAlign: "left",
-                                    maxWidth: "120px",
+                                    maxWidth: "150px",
                                     wordBreak: "break-word",
-                                    color: "#555",
-                                    fontSize: "13px",
+                                    color: "#666",
+                                    fontSize: "12px",
                                   }}
                                 >
                                   {producto.descripcion || "—"}
@@ -4227,6 +5139,14 @@ function App() {
                                         setStockMinimo(
                                           producto.stockMinimo || "",
                                         );
+
+                                        // NUEVO: Cargar la categoría al editar
+                                        const catId =
+                                          typeof producto.categoria === "object"
+                                            ? producto.categoria?._id
+                                            : producto.categoria || "";
+                                        setCategoriaId(catId);
+
                                         setEditandoId(producto._id);
                                         setSeccionActiva("registrar");
 
@@ -4313,136 +5233,497 @@ function App() {
                 </div>
               )
             ) : null}
-            
             {/* ======================================================
               MODAL DE DETALLES DEL PRODUCTO (VISTA EXPANDIDA)
               ====================================================== */}
             {productoDetalle && (
-              <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center", padding: "20px", boxSizing: "border-box" }}>
-                <div style={{ backgroundColor: "white", padding: "20px", borderRadius: "12px", width: "100%", maxWidth: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
-                  <h3 style={{ margin: "0 0 15px 0", color: "#222" }}>{productoDetalle.nombre}</h3>
-                  <div style={{ display: "grid", gap: "10px", fontSize: "14px", color: "#333", marginBottom: "20px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
-                      <strong>Descripción:</strong> <span style={{textAlign: "right", maxWidth: "60%"}}>{productoDetalle.descripcion || "—"}</span>
+              <div
+                onClick={() => setProductoDetalle(null)} // <-- 1. Cierra al dar clic en el fondo oscuro
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: "rgba(0,0,0,0.6)",
+                  zIndex: 10000,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  padding: "20px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()} // <-- 2. Frena el clic aquí para que la caja blanca no se cierre
+                  style={{
+                    backgroundColor: "white",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    width: "100%",
+                    maxWidth: "400px",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <h3 style={{ margin: "0 0 15px 0", color: "#222" }}>
+                    {productoDetalle.nombre}
+                  </h3>
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: "10px",
+                      fontSize: "14px",
+                      color: "#333",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #eee",
+                        paddingBottom: "5px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <strong>Categoría:</strong>
+                      <span
+                        style={{
+                          padding: "4px 8px",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                        }}
+                      >
+                        {categorias.find(
+                          (c) => c._id === productoDetalle.categoria,
+                        )?.nombre || "Sin categoría"}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
-                      <strong>Precio Venta:</strong> <span style={{ color: "#198754", fontWeight: "bold" }}>${Number(productoDetalle.precioVenta || 0).toFixed(2)}</span>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #eee",
+                        paddingBottom: "5px",
+                      }}
+                    >
+                      <strong>Descripción:</strong>{" "}
+                      <span style={{ textAlign: "right", maxWidth: "60%" }}>
+                        {productoDetalle.descripcion || "—"}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
-                      <strong>Costo Total:</strong> <span>${(Number(productoDetalle.precio || 0) + Number(productoDetalle.costoEnvio || 0)).toFixed(2)}</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #eee",
+                        paddingBottom: "5px",
+                      }}
+                    >
+                      <strong>Precio Venta:</strong>{" "}
+                      <span style={{ color: "#198754", fontWeight: "bold" }}>
+                        ${Number(productoDetalle.precioVenta || 0).toFixed(2)}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
-                      <strong>Stock Actual:</strong> <span style={{ fontWeight: "bold" }}>{productoDetalle.stock}</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #eee",
+                        paddingBottom: "5px",
+                      }}
+                    >
+                      <strong>Costo Total:</strong>{" "}
+                      <span>
+                        $
+                        {(
+                          Number(productoDetalle.precio || 0) +
+                          Number(productoDetalle.costoEnvio || 0)
+                        ).toFixed(2)}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #eee",
+                        paddingBottom: "5px",
+                      }}
+                    >
+                      <strong>Stock Actual:</strong>{" "}
+                      <span style={{ fontWeight: "bold" }}>
+                        {productoDetalle.stock}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #eee",
+                        paddingBottom: "5px",
+                      }}
+                    >
                       <strong>Estado:</strong>
-                      <span style={{ color: Number(productoDetalle.stock) === 0 ? "#dc3545" : Number(productoDetalle.stock) <= Number(productoDetalle.stockMinimo || 5) ? "#fd7e14" : "#198754", fontWeight: "bold" }}>
-                        {Number(productoDetalle.stock) === 0 ? "Agotado" : Number(productoDetalle.stock) <= Number(productoDetalle.stockMinimo || 5) ? "Bajo" : "Suficiente"}
+                      <span
+                        style={{
+                          color:
+                            Number(productoDetalle.stock) === 0
+                              ? "#dc3545"
+                              : Number(productoDetalle.stock) <=
+                                  Number(productoDetalle.stockMinimo || 5)
+                                ? "#fd7e14"
+                                : "#198754",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {Number(productoDetalle.stock) === 0
+                          ? "Agotado"
+                          : Number(productoDetalle.stock) <=
+                              Number(productoDetalle.stockMinimo || 5)
+                            ? "Bajo"
+                            : "Suficiente"}
                       </span>
                     </div>
                   </div>
-                  <button 
+
+                  <button
                     onClick={() => setProductoDetalle(null)}
-                    style={{ width: "100%", backgroundColor: "#dc3545", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#dc3545",
+                      color: "white",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "none",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
                   >
                     Cerrar Detalles
                   </button>
                 </div>
               </div>
             )}
-
             {/* ======================================================
               MODAL GENERADOR DE PEDIDOS (WHATSAPP)
               ====================================================== */}
             {modalPedidoAbierto && (
-              <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: "20px", boxSizing: "border-box" }}>
-                <div style={{ backgroundColor: "white", borderRadius: "12px", width: "100%", maxWidth: "500px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
-                  
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                  zIndex: 100,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  padding: "20px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    width: "100%",
+                    maxWidth: "500px",
+                    maxHeight: "90vh",
+                    display: "flex",
+                    flexDirection: "column",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                  }}
+                >
                   {/* Cabecera del Modal */}
-                  <div style={{ padding: "16px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ margin: 0, fontSize: "16px", color: "#222" }}>📋 Generar Pedido a Proveedor</h3>
-                    <button onClick={() => setModalPedidoAbierto(false)} style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "#666" }}>✖</button>
+                  <div
+                    style={{
+                      padding: "16px",
+                      borderBottom: "1px solid #eee",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <h3 style={{ margin: 0, fontSize: "16px", color: "#222" }}>
+                      📋 Generar Pedido a Proveedor
+                    </h3>
+                    <button
+                      onClick={() => setModalPedidoAbierto(false)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "18px",
+                        cursor: "pointer",
+                        color: "#666",
+                      }}
+                    >
+                      ✖
+                    </button>
                   </div>
 
                   {/* Cuerpo del Modal (Scrollable) */}
                   <div style={{ padding: "16px", overflowY: "auto", flex: 1 }}>
-                    <p style={{ margin: "0 0 15px", fontSize: "13px", color: "#666" }}>Estos productos tienen stock bajo o están agotados. Ingresa cuántos quieres pedir.</p>
+                    <p
+                      style={{
+                        margin: "0 0 15px",
+                        fontSize: "13px",
+                        color: "#666",
+                      }}
+                    >
+                      Estos productos tienen stock bajo o están agotados.
+                      Ingresa cuántos quieres pedir.
+                    </p>
 
                     {/* Lista de Items */}
                     {itemsPedido.map((item) => (
-                      <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", marginBottom: "8px", border: "1px solid #eee" }}>
+                      <div
+                        key={item.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          backgroundColor: "#f8f9fa",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          marginBottom: "8px",
+                          border: "1px solid #eee",
+                        }}
+                      >
                         <div style={{ flex: 1, paddingRight: "10px" }}>
-                          <p style={{ margin: 0, fontWeight: "600", fontSize: "13px", color: "#333" }}>{item.nombre}</p>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontWeight: "600",
+                              fontSize: "13px",
+                              color: "#333",
+                            }}
+                          >
+                            {item.nombre}
+                          </p>
                           {/* === NUEVO: Muestra la descripción === */}
                           {item.descripcion && (
-                            <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#777", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }}>
+                            <p
+                              style={{
+                                margin: "2px 0 0",
+                                fontSize: "11px",
+                                color: "#777",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                maxWidth: "200px",
+                              }}
+                            >
                               {item.descripcion}
                             </p>
                           )}
-                          <p style={{ margin: 0, fontSize: "11px", color: Number(item.stockActual) === 0 ? "#dc3545" : "#fd7e14", fontWeight: "600" }}>Stock actual: {item.stockActual}</p>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "11px",
+                              color:
+                                Number(item.stockActual) === 0
+                                  ? "#dc3545"
+                                  : "#fd7e14",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Stock actual: {item.stockActual}
+                          </p>
                         </div>
-                        
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <input 
-                            type="number" 
-                            min="1" 
-                            placeholder="Cant." 
-                            value={item.cantidad} 
-                            onChange={(e) => actualizarCantidadPedido(item.id, e.target.value)} 
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Cant."
+                            value={item.cantidad}
+                            onChange={(e) =>
+                              actualizarCantidadPedido(item.id, e.target.value)
+                            }
                             onWheel={(e) => e.target.blur()}
-                            style={{ width: "60px", padding: "6px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px", textAlign: "center" }}
+                            style={{
+                              width: "60px",
+                              padding: "6px",
+                              borderRadius: "6px",
+                              border: "1px solid #ccc",
+                              fontSize: "13px",
+                              textAlign: "center",
+                            }}
                           />
-                          <button onClick={() => eliminarItemPedido(item.id)} style={{ background: "none", border: "none", color: "#dc3545", cursor: "pointer", padding: "4px" }}>🗑️</button>
+                          <button
+                            onClick={() => eliminarItemPedido(item.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#dc3545",
+                              cursor: "pointer",
+                              padding: "4px",
+                            }}
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
                     ))}
 
                     {/* Buscador para agregar productos extra */}
-                    <div style={{ marginTop: "20px", borderTop: "1px dashed #ccc", paddingTop: "15px" }}>
-                      <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: "600" }}>¿Quieres pedir algo más?</p>
-                      <input 
-                        type="text" 
-                        placeholder="Buscar otro producto para agregar..." 
+                    <div
+                      style={{
+                        marginTop: "20px",
+                        borderTop: "1px dashed #ccc",
+                        paddingTop: "15px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: "0 0 8px",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        ¿Quieres pedir algo más?
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="Buscar otro producto para agregar..."
                         value={busquedaExtra}
                         onChange={(e) => setBusquedaExtra(e.target.value)}
-                        style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "13px", boxSizing: "border-box" }}
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          borderRadius: "8px",
+                          border: "1px solid #ccc",
+                          fontSize: "13px",
+                          boxSizing: "border-box",
+                        }}
                       />
-                      
+
                       {/* === LISTA PERMANENTE DE PRODUCTOS (Filtrable y ordenada por stock) === */}
-                      <div style={{ marginTop: "10px", border: "1px solid #eee", borderRadius: "8px", maxHeight: "160px", overflowY: "auto", backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+                      <div
+                        style={{
+                          marginTop: "10px",
+                          border: "1px solid #eee",
+                          borderRadius: "8px",
+                          maxHeight: "160px",
+                          overflowY: "auto",
+                          backgroundColor: "white",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                        }}
+                      >
                         {productos
-                          .filter(p => !itemsPedido.find(i => i.id === p._id)) // Oculta los que ya están en la lista de arriba
-                          .filter(p => p.nombre.toLowerCase().includes(busquedaExtra.toLowerCase())) // Aplica el buscador si escribe algo
+                          .filter(
+                            (p) => !itemsPedido.find((i) => i.id === p._id),
+                          ) // Oculta los que ya están en la lista de arriba
+                          .filter((p) =>
+                            p.nombre
+                              .toLowerCase()
+                              .includes(busquedaExtra.toLowerCase()),
+                          ) // Aplica el buscador si escribe algo
                           .sort((a, b) => Number(a.stock) - Number(b.stock)) // Ordena del que tiene menos stock al que tiene más
-                          .map(p => (
-                          <div 
-                            key={p._id} 
-                            onClick={() => agregarProductoExtraAlPedido(p)}
-                            style={{ padding: "10px", borderBottom: "1px solid #eee", fontSize: "13px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                          >
-                            <div style={{ flex: 1, paddingRight: "10px", minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-                                <span style={{ fontWeight: "600", color: "#333" }}>{p.nombre}</span>
-                                <span style={{ fontSize: "11px", color: Number(p.stock) === 0 ? "#dc3545" : "#666", marginLeft: "8px", fontWeight: "500" }}>
-                                  (Stock: {p.stock})
-                                </span>
-                              </div>
-                              {/* === NUEVO: Muestra la descripción === */}
-                              {p.descripcion && (
-                                <div style={{ fontSize: "11px", color: "#888", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {p.descripcion}
+                          .map((p) => (
+                            <div
+                              key={p._id}
+                              onClick={() => agregarProductoExtraAlPedido(p)}
+                              style={{
+                                padding: "10px",
+                                borderBottom: "1px solid #eee",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  flex: 1,
+                                  paddingRight: "10px",
+                                  minWidth: 0,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <span
+                                    style={{ fontWeight: "600", color: "#333" }}
+                                  >
+                                    {p.nombre}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: "11px",
+                                      color:
+                                        Number(p.stock) === 0
+                                          ? "#dc3545"
+                                          : "#666",
+                                      marginLeft: "8px",
+                                      fontWeight: "500",
+                                    }}
+                                  >
+                                    (Stock: {p.stock})
+                                  </span>
                                 </div>
-                              )}
+                                {/* === NUEVO: Muestra la descripción === */}
+                                {p.descripcion && (
+                                  <div
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#888",
+                                      marginTop: "2px",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {p.descripcion}
+                                  </div>
+                                )}
+                              </div>
+                              <span
+                                style={{
+                                  color: "#0d6efd",
+                                  fontWeight: "700",
+                                  fontSize: "12px",
+                                  backgroundColor: "#eef6ff",
+                                  padding: "4px 8px",
+                                  borderRadius: "6px",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                + Agregar
+                              </span>
                             </div>
-                            <span style={{ color: "#0d6efd", fontWeight: "700", fontSize: "12px", backgroundColor: "#eef6ff", padding: "4px 8px", borderRadius: "6px", whiteSpace: "nowrap" }}>
-                              + Agregar
-                            </span>
-                          </div>
-                      ))}
-                        
+                          ))}
+
                         {/* Mensaje por si la búsqueda no arroja resultados */}
-                        {productos.filter(p => !itemsPedido.find(i => i.id === p._id) && p.nombre.toLowerCase().includes(busquedaExtra.toLowerCase())).length === 0 && (
-                          <div style={{ padding: "12px", textAlign: "center", color: "#999", fontSize: "12px" }}>
+                        {productos.filter(
+                          (p) =>
+                            !itemsPedido.find((i) => i.id === p._id) &&
+                            p.nombre
+                              .toLowerCase()
+                              .includes(busquedaExtra.toLowerCase()),
+                        ).length === 0 && (
+                          <div
+                            style={{
+                              padding: "12px",
+                              textAlign: "center",
+                              color: "#999",
+                              fontSize: "12px",
+                            }}
+                          >
                             No hay más productos para agregar.
                           </div>
                         )}
@@ -4451,30 +5732,122 @@ function App() {
                   </div>
 
                   {/* Pie del Modal (Botón Copiar) */}
-                  <div style={{ padding: "16px", borderTop: "1px solid #eee", backgroundColor: "#f9fafb", borderRadius: "0 0 12px 12px" }}>
-                    <button onClick={copiarPedidoWhatsapp} style={{ width: "100%", backgroundColor: "#198754", color: "white", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "14px", display: "flex", justifyContent: "center", gap: "8px", alignItems: "center" }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                  <div
+                    style={{
+                      padding: "16px",
+                      borderTop: "1px solid #eee",
+                      backgroundColor: "#f9fafb",
+                      borderRadius: "0 0 12px 12px",
+                    }}
+                  >
+                    <button
+                      onClick={copiarPedidoWhatsapp}
+                      style={{
+                        width: "100%",
+                        backgroundColor: "#198754",
+                        color: "white",
+                        border: "none",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: "8px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                        <rect
+                          x="8"
+                          y="2"
+                          width="8"
+                          height="4"
+                          rx="1"
+                          ry="1"
+                        ></rect>
+                      </svg>
                       Copiar Pedido para WhatsApp
                     </button>
                   </div>
                 </div>
               </div>
             )}
-          </div> {/* <-- Aquí cierra la zonaInventario */}
-
+          </div>{" "}
+          {/* <-- Aquí cierra la zonaInventario */}
           {/* ======================================================
             MODAL DEL TICKET DE VENTA (CONFIRMACIÓN Y COMPROBANTE)
             ====================================================== */}
           {ticketAbierto && datosTicket && (
-            <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center", padding: "20px", boxSizing: "border-box" }}>
-              <div style={{ backgroundColor: "white", padding: "20px", borderRadius: "12px", width: "100%", maxWidth: "350px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
-                
-                <div id="ticket-imprimible" style={{ padding: "15px", border: "1px dashed #ccc", marginBottom: "15px", textAlign: "left" }}>
-                  <h3 style={{ textAlign: "center", margin: "0 0 10px 0", color: "#222" }}>📄 Ticket de Compra</h3>
-                  <p style={{ margin: "2px 0", fontSize: "14px" }}><strong>Fecha:</strong> {datosTicket.fecha}</p>
-                  
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                backgroundColor: "rgba(0,0,0,0.6)",
+                zIndex: 10000,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: "20px",
+                boxSizing: "border-box",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "white",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  width: "100%",
+                  maxWidth: "350px",
+                  textAlign: "center",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                }}
+              >
+                <div
+                  id="ticket-imprimible"
+                  style={{
+                    padding: "15px",
+                    border: "1px dashed #ccc",
+                    marginBottom: "15px",
+                    textAlign: "left",
+                  }}
+                >
+                  <h3
+                    style={{
+                      textAlign: "center",
+                      margin: "0 0 10px 0",
+                      color: "#222",
+                    }}
+                  >
+                    📄 Ticket de Compra
+                  </h3>
+                  <p style={{ margin: "2px 0", fontSize: "14px" }}>
+                    <strong>Fecha:</strong> {datosTicket.fecha}
+                  </p>
+
                   {/* CAMPO DE CLIENTE AHORA DENTRO DEL TICKET */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "8px 0" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      margin: "8px 0",
+                    }}
+                  >
                     <strong style={{ fontSize: "14px" }}>Cliente:</strong>
                     <input
                       type="text"
@@ -4482,44 +5855,107 @@ function App() {
                       value={clienteVenta}
                       onChange={(e) => setClienteVenta(e.target.value)}
                       disabled={ventaConfirmada} // Se bloquea si ya se confirmó la venta
-                      style={{ flex: 1, padding: "4px 8px", borderRadius: "4px", border: "1px solid #ccc", fontSize: "13px", backgroundColor: ventaConfirmada ? "#f1f3f5" : "white" }}
+                      style={{
+                        flex: 1,
+                        padding: "4px 8px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "13px",
+                        backgroundColor: ventaConfirmada ? "#f1f3f5" : "white",
+                      }}
                     />
                   </div>
-                  
-                  <hr style={{ borderTop: "1px dashed #eee", margin: "10px 0" }} />
-                  <p style={{ margin: "5px 0", fontSize: "14px" }}>{datosTicket.cantidad}x {datosTicket.producto}</p>
-                  <p style={{ margin: "10px 0", fontSize: "20px", fontWeight: "900", color: "#198754" }}>Total: ${datosTicket.monto.toFixed(2)}</p>
-                  <p style={{ margin: "2px 0", fontSize: "14px" }}><strong>Pago en:</strong> Efectivo</p>
-                  <hr style={{ borderTop: "1px dashed #eee", margin: "10px 0" }} />
-                  
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-                    <label style={{ fontSize: "14px", fontWeight: "bold" }}>Garantía (días):</label>
-                    <input 
-                      type="number" 
-                      value={diasGarantia} 
-                      onChange={(e) => setDiasGarantia(e.target.value)} 
+
+                  <hr
+                    style={{ borderTop: "1px dashed #eee", margin: "10px 0" }}
+                  />
+                  <p style={{ margin: "5px 0", fontSize: "14px" }}>
+                    {datosTicket.cantidad}x {datosTicket.producto}
+                  </p>
+                  <p
+                    style={{
+                      margin: "10px 0",
+                      fontSize: "20px",
+                      fontWeight: "900",
+                      color: "#198754",
+                    }}
+                  >
+                    Total: ${datosTicket.monto.toFixed(2)}
+                  </p>
+                  <p style={{ margin: "2px 0", fontSize: "14px" }}>
+                    <strong>Pago en:</strong> Efectivo
+                  </p>
+                  <hr
+                    style={{ borderTop: "1px dashed #eee", margin: "10px 0" }}
+                  />
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      marginTop: "10px",
+                    }}
+                  >
+                    <label style={{ fontSize: "14px", fontWeight: "bold" }}>
+                      Garantía (días):
+                    </label>
+                    <input
+                      type="number"
+                      value={diasGarantia}
+                      onChange={(e) => setDiasGarantia(e.target.value)}
                       disabled={ventaConfirmada}
-                      style={{ width: "60px", padding: "4px", borderRadius: "4px", border: "1px solid #ccc", textAlign: "center", backgroundColor: ventaConfirmada ? "#f1f3f5" : "white" }}
+                      style={{
+                        width: "60px",
+                        padding: "4px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        textAlign: "center",
+                        backgroundColor: ventaConfirmada ? "#f1f3f5" : "white",
+                      }}
                     />
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
                   {!ventaConfirmada ? (
                     // --- BOTONES DE PRE-VENTA (AÚN NO SE DESCUENTA STOCK) ---
                     <>
-                      <button 
+                      <button
                         onClick={confirmarVentaFinal}
-                        style={{ backgroundColor: "#198754", color: "white", padding: "12px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", fontSize: "15px" }}
+                        style={{
+                          backgroundColor: "#198754",
+                          color: "white",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          border: "none",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          fontSize: "15px",
+                        }}
                       >
                         ✅ Confirmar y Descontar Stock
                       </button>
-                      <button 
+                      <button
                         onClick={() => {
                           setTicketAbierto(false);
                           setClienteVenta(""); // Reseteamos por si acaso
                         }}
-                        style={{ backgroundColor: "#dc3545", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                        style={{
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "none",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
                       >
                         ❌ Cancelar Venta
                       </button>
@@ -4527,27 +5963,57 @@ function App() {
                   ) : (
                     // --- BOTONES POST-VENTA (YA SE CONFIRMÓ, SOLO IMPRIMIR/COPIAR) ---
                     <>
-                      <button 
+                      <button
                         onClick={() => {
-                          const textoTicket = `📄 *TICKET DE COMPRA*\nFecha: ${datosTicket.fecha}\nCliente: ${clienteVenta || 'Público en general'}\n\n▪️ ${datosTicket.cantidad}x ${datosTicket.producto}\n*Total pagado: $${datosTicket.monto.toFixed(2)} (Efectivo)*\n\n🛡️ Garantía válida por ${diasGarantia} días.\n¡Gracias por su compra!`;
-                          navigator.clipboard.writeText(textoTicket).then(() => alert("¡Ticket copiado para enviar por WhatsApp!"));
+                          const textoTicket = `📄 *TICKET DE COMPRA*\nFecha: ${datosTicket.fecha}\nCliente: ${clienteVenta || "Público en general"}\n\n▪️ ${datosTicket.cantidad}x ${datosTicket.producto}\n*Total pagado: $${datosTicket.monto.toFixed(2)} (Efectivo)*\n\n🛡️ Garantía válida por ${diasGarantia} días.\n¡Gracias por su compra!`;
+                          navigator.clipboard
+                            .writeText(textoTicket)
+                            .then(() =>
+                              alert(
+                                "¡Ticket copiado para enviar por WhatsApp!",
+                              ),
+                            );
                         }}
-                        style={{ backgroundColor: "#2563eb", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                        style={{
+                          backgroundColor: "#2563eb",
+                          color: "white",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "none",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
                       >
                         📋 Copiar Texto a WhatsApp
                       </button>
-                      <button 
+                      <button
                         onClick={() => window.print()}
-                        style={{ backgroundColor: "#198754", color: "white", padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                        style={{
+                          backgroundColor: "#198754",
+                          color: "white",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "none",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
                       >
                         🖨️ Imprimir / Guardar PDF
                       </button>
-                      <button 
+                      <button
                         onClick={() => {
                           setTicketAbierto(false);
                           setClienteVenta(""); // Limpiamos para la próxima venta
                         }}
-                        style={{ backgroundColor: "transparent", color: "#666", padding: "10px", borderRadius: "8px", border: "1px solid #ccc", fontWeight: "bold", cursor: "pointer" }}
+                        style={{
+                          backgroundColor: "transparent",
+                          color: "#666",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #ccc",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
                       >
                         Cerrar Ticket
                       </button>
@@ -4557,7 +6023,6 @@ function App() {
               </div>
             </div>
           )}
-
         </section>
       </main>
     </div>

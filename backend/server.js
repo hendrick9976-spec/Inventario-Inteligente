@@ -8,6 +8,10 @@ const authMiddleware = require("./middleware/authMiddleware");
 const Product = require("./models/Product");
 const Venta = require("./models/Venta");
 const Reposicion = require("./models/Reposicion");
+
+const Categoria = require("./models/Categoria");
+const { upload } = require("./config/cloudinary");
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -30,6 +34,47 @@ app.get("/perfil", authMiddleware, (req, res) => {
   });
 });
 
+// ==========================================
+// CATEGORÍAS
+// ==========================================
+
+// Obtener todas las categorías del usuario
+app.get("/categorias", authMiddleware, async (req, res) => {
+  try {
+    const categorias = await Categoria.find({
+      user: req.user.userId,
+      estado: true,
+    });
+    res.json(categorias);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener categorías" });
+  }
+});
+
+// Crear una nueva categoría
+app.post("/categorias", authMiddleware, async (req, res) => {
+  try {
+    const { nombre, descripcion } = req.body;
+
+    if (!nombre || !nombre.trim()) {
+      return res
+        .status(400)
+        .json({ error: "El nombre de la categoría es obligatorio" });
+    }
+
+    const nuevaCategoria = new Categoria({
+      nombre: nombre.trim(),
+      descripcion: descripcion ? descripcion.trim() : "",
+      user: req.user.userId, // Vinculamos la categoría al usuario actual
+    });
+
+    await nuevaCategoria.save();
+    res.status(201).json(nuevaCategoria);
+  } catch (error) {
+    res.status(500).json({ error: "Error al crear la categoría" });
+  }
+});
+
 // Obtener todos los productos
 app.get("/productos", authMiddleware, async (req, res) => {
   try {
@@ -42,66 +87,112 @@ app.get("/productos", authMiddleware, async (req, res) => {
   }
 });
 
-// Crear producto
-app.post("/productos", authMiddleware, async (req, res) => {
-  try {
-    const {
-      nombre,
-      descripcion,
-      precio,
-      costoEnvio,
-      precioVenta,
-      stock,
-      stockMinimo,
-      proveedorInicial,
-    } = req.body;
+// Crear producto (ACTUALIZADO CON FOTOS Y CATEGORÍA)
+app.post(
+  "/productos",
+  authMiddleware,
+  upload.single("foto"),
+  async (req, res) => {
+    try {
+      const {
+        nombre,
+        descripcion,
+        precio,
+        costoEnvio,
+        precioVenta,
+        stock,
+        stockMinimo,
+        proveedorInicial,
+        categoria, // NUEVO CAMPO
+      } = req.body;
 
-    if (
-      !nombre ||
-      !nombre.trim() ||
-      precio === undefined ||
-      precioVenta === undefined ||
-      stock === undefined ||
-      Number(precio) < 0 ||
-      Number(precioVenta) < 0 ||
-      Number(stock) < 0
-    ) {
-      return res.status(400).json({ error: "Datos inválidos" });
-    }
+      if (
+        !nombre ||
+        !nombre.trim() ||
+        precio === undefined ||
+        precioVenta === undefined ||
+        stock === undefined ||
+        Number(precio) < 0 ||
+        Number(precioVenta) < 0 ||
+        Number(stock) < 0 ||
+        !categoria // Validación de la categoría
+      ) {
+        return res.status(400).json({ error: "Datos inválidos o faltantes" });
+      }
 
-    const nuevoProducto = new Product({
-      nombre: nombre.trim(),
-      descripcion: descripcion ? descripcion.trim() : "",
-      precio: Number(precio),
-      costoEnvio: Number(costoEnvio || 0),
-      precioVenta: Number(precioVenta),
-      stock: Number(stock),
-      stockMinimo: Number(stockMinimo || 5),
-      user: req.user.userId,
-    });
-
-    await nuevoProducto.save();
-
-    if (Number(stock) > 0) {
-      const nuevaReposicion = new Reposicion({
-        productoId: nuevoProducto._id,
-        nombreProducto: nuevoProducto.nombre,
-        cantidad: Number(stock),
-        stockAntes: 0,
-        stockDespues: Number(stock),
-        proveedor: proveedorInicial || "",
+      const nuevoProducto = new Product({
+        nombre: nombre.trim(),
+        descripcion: descripcion ? descripcion.trim() : "",
+        precio: Number(precio),
+        costoEnvio: Number(costoEnvio || 0),
+        precioVenta: Number(precioVenta),
+        stock: Number(stock),
+        stockMinimo: Number(stockMinimo || 5),
+        categoria: categoria, // Guardamos el ID de la categoría
         user: req.user.userId,
       });
 
-      await nuevaReposicion.save();
-    }
+      // NUEVO: Si Cloudinary procesó una imagen, guardamos la URL
+      if (req.file) {
+        nuevoProducto.fotos = [req.file.path];
+      }
 
-    res.status(201).json(nuevoProducto);
-  } catch (error) {
-    res.status(500).json({ error: "Error al crear producto" });
-  }
-  
-});
+      await nuevoProducto.save();
+
+      if (Number(stock) > 0) {
+        const nuevaReposicion = new Reposicion({
+          productoId: nuevoProducto._id,
+          nombreProducto: nuevoProducto.nombre,
+          cantidad: Number(stock),
+          stockAntes: 0,
+          stockDespues: Number(stock),
+          proveedor: proveedorInicial || "",
+          user: req.user.userId,
+        });
+
+        await nuevaReposicion.save();
+      }
+
+      res.status(201).json(nuevoProducto);
+    } catch (error) {
+      console.error("Error al crear producto:", error);
+      res.status(500).json({ error: "Error al crear producto" });
+    }
+  },
+);
+
+// ==========================================
+// RUTA TEMPORAL PARA PRUEBA DE FOTOS
+// ==========================================
+app.post(
+  "/productos/:id/foto",
+  authMiddleware,
+  upload.single("foto"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se detectó ninguna imagen" });
+      }
+
+      // Usamos findOneAndUpdate para actualizar solo la foto y evitar
+      // el error de validación por la falta de 'categoria' en productos antiguos
+      const producto = await Product.findOneAndUpdate(
+        { _id: req.params.id, user: req.user.userId },
+        { $set: { fotos: [req.file.path] } },
+        { returnDocument: "after" }, // Esto nos devuelve el producto ya actualizado
+      );
+
+      if (!producto) {
+        return res.status(404).json({ error: "Producto no encontrado" });
+      }
+
+      res.json({ mensaje: "Foto guardada con éxito", producto });
+    } catch (error) {
+      console.error("Error al subir foto:", error);
+      res.status(500).json({ error: "Error al procesar la imagen" });
+    }
+  },
+);
 
 // Eliminar producto
 app.delete("/productos/:id", authMiddleware, async (req, res) => {
@@ -132,6 +223,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
       costoEnvio,
       precioVenta,
       stockMinimo,
+      categoria,
     } = req.body;
 
     if (
@@ -157,6 +249,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
         costoEnvio: Number(costoEnvio || 0),
         precioVenta: Number(precioVenta),
         stockMinimo: Number(stockMinimo || 5),
+        categoria: categoria,
       },
       { returnDocument: "after" },
     );
@@ -328,7 +421,7 @@ app.post("/ventas", authMiddleware, async (req, res) => {
       ventaConPerdida: utilidad < 0,
       user: req.user.userId,
       origenVenta: "Fisica",
-      estado: "Completado"
+      estado: "Completado",
     });
 
     await nuevaVenta.save();
@@ -356,15 +449,19 @@ app.get("/ventas/dashboard/origen", authMiddleware, async (req, res) => {
 
     const consolidado = ventasUsuario.reduce((acc, venta) => {
       // Unificamos: Todo lo que NO sea 'Web' se convierte en 'Local'
-      let categoria = venta.origenVenta === 'Web' ? 'Web' : 'Local';
-      
+      let categoria = venta.origenVenta === "Web" ? "Web" : "Local";
+
       if (!acc[categoria]) {
-        acc[categoria] = { _id: categoria, totalIngresos: 0, cantidadVentas: 0 };
+        acc[categoria] = {
+          _id: categoria,
+          totalIngresos: 0,
+          cantidadVentas: 0,
+        };
       }
-      
+
       acc[categoria].totalIngresos += Number(venta.ingresoTotal);
       acc[categoria].cantidadVentas += 1;
-      
+
       return acc;
     }, {});
 
@@ -455,15 +552,17 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
 app.get("/api/tienda/:usuarioId/productos", async (req, res) => {
   try {
     const { usuarioId } = req.params;
-    
+
     // Se extrae el catálogo exclusivamente del usuario especificado en la URL
     const productos = await Product.find({ user: usuarioId }).sort({
       nombre: 1,
     });
-    
+
     res.json(productos);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener los productos de la tienda" });
+    res
+      .status(500)
+      .json({ error: "Error al obtener los productos de la tienda" });
   }
 });
 
@@ -482,24 +581,33 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
       {
         _id: productoId,
         user: usuarioId, // Validación extra de seguridad
-        stock: { $gte: Number(cantidad) }
+        stock: { $gte: Number(cantidad) },
       },
       {
-        $inc: { stock: -Number(cantidad) }
+        $inc: { stock: -Number(cantidad) },
       },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
     if (!producto) {
-      const existeProducto = await Product.findOne({ _id: productoId, user: usuarioId });
+      const existeProducto = await Product.findOne({
+        _id: productoId,
+        user: usuarioId,
+      });
       if (!existeProducto) {
-        return res.status(404).json({ error: "El producto ya no existe en esta tienda" });
+        return res
+          .status(404)
+          .json({ error: "El producto ya no existe en esta tienda" });
       }
-      return res.status(400).json({ error: "Lo sentimos, no hay suficiente stock disponible" });
+      return res
+        .status(400)
+        .json({ error: "Lo sentimos, no hay suficiente stock disponible" });
     }
 
     const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
-    const costoTotal = (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) * Number(cantidad);
+    const costoTotal =
+      (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) *
+      Number(cantidad);
     const utilidad = ingresoTotal - costoTotal;
 
     const nuevaVenta = new Venta({
@@ -516,7 +624,7 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
       ventaConPerdida: utilidad < 0,
       user: producto.user,
       origenVenta: "Web",
-      estado: "Completado"
+      estado: "Completado",
     });
 
     await nuevaVenta.save();
@@ -524,9 +632,8 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
     res.status(201).json({
       mensaje: "¡Compra simulada con éxito! El stock ha sido actualizado.",
       venta: nuevaVenta,
-      productoUpdated: producto 
+      productoUpdated: producto,
     });
-
   } catch (error) {
     console.error("Error en la compra simulada:", error);
     res.status(500).json({ error: "Error al procesar la compra simulada" });
