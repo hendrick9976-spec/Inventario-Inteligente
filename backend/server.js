@@ -8,6 +8,7 @@ const authMiddleware = require("./middleware/authMiddleware");
 const Product = require("./models/Product");
 const Venta = require("./models/Venta");
 const Reposicion = require("./models/Reposicion");
+const ConfigTienda = require("./models/ConfigTienda");
 
 const Categoria = require("./models/Categoria");
 const { upload } = require("./config/cloudinary");
@@ -541,6 +542,71 @@ app.get("/ventas/resumen", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("Error al obtener resumen financiero:", error);
     res.status(500).json({ error: "Error al obtener resumen financiero" });
+  }
+});
+
+// ==========================================
+// CONFIGURACIÓN DE LA TIENDA VIRTUAL (CMS)
+// ==========================================
+
+// 1. Obtener la configuración actual (Privado - Para el dueño en el CMS)
+app.get("/api/tienda/config", authMiddleware, async (req, res) => {
+  try {
+    let config = await ConfigTienda.findOne({ user: req.user.userId });
+
+    // Si el dueño es nuevo y no tiene configuración, creamos una por defecto
+    if (!config) {
+      config = new ConfigTienda({ user: req.user.userId });
+      await config.save();
+    }
+
+    res.json(config);
+  } catch (error) {
+    console.error("Error al obtener configuración:", error);
+    res.status(500).json({ error: "Error al obtener configuración" });
+  }
+});
+
+// 2. Guardar/Actualizar la configuración (Privado - Para el dueño en el CMS)
+app.put("/api/tienda/config", authMiddleware, async (req, res) => {
+  try {
+    const { nombreTienda, mensajeBanner, descripcionBanner } = req.body;
+
+    // Usamos findOneAndUpdate con 'upsert: true' para actualizar o crear si no existe
+    const configActualizada = await ConfigTienda.findOneAndUpdate(
+      { user: req.user.userId },
+      { nombreTienda, mensajeBanner, descripcionBanner },
+      { returnDocument: "after", upsert: true },
+    );
+
+    res.json(configActualizada);
+  } catch (error) {
+    console.error("Error al actualizar configuración:", error);
+    res.status(500).json({ error: "Error al actualizar configuración" });
+  }
+});
+
+// ==========================================
+// RUTA PÚBLICA PARA EL FRONTEND DE LA TIENDA
+// ==========================================
+// 3. El e-commerce consulta los datos de su dueño (Público)
+app.get("/api/tienda/:usuarioId/config", async (req, res) => {
+  try {
+    const { usuarioId } = req.params;
+    const config = await ConfigTienda.findOne({ user: usuarioId });
+
+    if (!config) {
+      return res.json({
+        nombreTienda: "TechStore",
+        mensajeBanner: "Bienvenido a nuestra tienda",
+        descripcionBanner: "Explora nuestro catálogo de productos.",
+      });
+    }
+
+    res.json(config);
+  } catch (error) {
+    console.error("Error al obtener config pública:", error);
+    res.status(500).json({ error: "Error al cargar la tienda" });
   }
 });
 

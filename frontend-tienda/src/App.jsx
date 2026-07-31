@@ -28,6 +28,12 @@ function App() {
   const [nombreCliente, setNombreCliente] = useState("");
   const [apellidoCliente, setApellidoCliente] = useState("");
 
+  const [configTienda, setConfigTienda] = useState({
+    nombreTienda: "Cargando Tienda...",
+    mensajeBanner: "Preparando ofertas...",
+    descripcionBanner: "Por favor espera un momento...",
+  });
+
   // ESTADOS DEL CARRITO Y BASE DE DATOS
   const [carrito, setCarrito] = useState([]);
   const [procesando, setProcesando] = useState(false);
@@ -48,23 +54,39 @@ function App() {
   };
 
   // =========================================
-  // 1. OBTENER PRODUCTOS DE MONGODB
+  // 1. OBTENER PRODUCTOS Y CONFIGURACIÓN
   // =========================================
-  const fetchProductos = async () => {
+  const fetchTiendaData = async () => {
     try {
-      // Extraemos el ID de la URL. Si la URL es localhost:5173/ID_USUARIO, tomará el último fragmento
       const pathParts = window.location.pathname.split("/");
       const usuarioId = pathParts[pathParts.length - 1];
 
-      // Validamos que exista un ID en la URL
       if (!usuarioId) throw new Error("ID de tienda no encontrado en la URL");
 
-      const res = await fetch(
+      // A) Traer los productos
+      const resProd = await fetch(
         `http://localhost:5000/api/tienda/${usuarioId}/productos`,
       );
-      if (!res.ok) throw new Error("Error al cargar el catálogo");
-      const data = await res.json();
-      setProductos(data);
+      if (resProd.ok) {
+        const dataProd = await resProd.json();
+        setProductos(dataProd);
+      }
+
+      // B) Traer la configuración de la tienda (Nuevo)
+      const resConfig = await fetch(
+        `http://localhost:5000/api/tienda/${usuarioId}/config`,
+      );
+      if (resConfig.ok) {
+        const dataConfig = await resConfig.json();
+        setConfigTienda({
+          nombreTienda: dataConfig.nombreTienda || "TechStore",
+          mensajeBanner:
+            dataConfig.mensajeBanner || "HASTA 30% OFF EN TODA LA TIENDA",
+          descripcionBanner:
+            dataConfig.descripcionBanner ||
+            "Lleva los mejores accesorios al mejor precio.",
+        });
+      }
     } catch (error) {
       console.error("Error conectando con la base de datos:", error);
     } finally {
@@ -73,7 +95,7 @@ function App() {
   };
 
   useEffect(() => {
-    fetchProductos();
+    fetchTiendaData();
   }, []);
 
   // Generar ofertas dinámicas tomando los primeros 3 productos de la BD
@@ -187,7 +209,7 @@ function App() {
       setCarrito([]);
       setEnCheckout(false);
 
-      await fetchProductos();
+      await fetchTiendaData();
     } catch (error) {
       alert("Hubo un error al procesar la compra: " + error.message);
       console.error(error);
@@ -290,7 +312,7 @@ function App() {
                 color: theme.text,
               }}
             >
-              Tech<span style={{ color: theme.primary }}>Store</span>
+              {configTienda.nombreTienda}
             </h2>
           </div>
           <button
@@ -605,7 +627,7 @@ function App() {
                 color: theme.text,
               }}
             >
-              Tech<span style={{ color: theme.primary }}>Store</span>
+              {configTienda.nombreTienda}
             </h2>
           </div>
         </header>
@@ -748,7 +770,7 @@ function App() {
               color: theme.text,
             }}
           >
-            Tech<span style={{ color: theme.primary }}>Store</span>
+            {configTienda.nombreTienda}
           </h2>
         </div>
 
@@ -872,15 +894,7 @@ function App() {
                 lineHeight: "1.1",
               }}
             >
-              HASTA 30% OFF <br />{" "}
-              <span
-                style={{
-                  color: theme.primary,
-                  fontSize: "clamp(24px, 4vw, 32px)",
-                }}
-              >
-                EN TODA LA TIENDA
-              </span>
+              {configTienda.mensajeBanner}
             </h1>
             <p
               style={{
@@ -891,8 +905,7 @@ function App() {
                 lineHeight: "1.5",
               }}
             >
-              Lleva los mejores accesorios tecnológicos al mejor precio con
-              liquidaciones de inventario por tiempo limitado.
+              {configTienda.descripcionBanner}
             </p>
             <div>
               <button

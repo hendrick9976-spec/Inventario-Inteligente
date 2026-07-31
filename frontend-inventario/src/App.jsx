@@ -47,6 +47,16 @@ function App() {
   const [perfilConfirmarPassword, setPerfilConfirmarPassword] = useState("");
 
   // ----------------------
+  // CONFIGURACIÓN DE TIENDA WEB
+  // ----------------------
+  const [configTienda, setConfigTienda] = useState({
+    nombreTienda: "Mi Tienda",
+    mensajeBanner: "¡Especial de Verano!",
+    descripcionBanner:
+      "Lleva los mejores artículos al mejor precio por tiempo limitado.",
+  });
+
+  // ----------------------
   // AUTENTICACIÓN
   // Registro e inicio de sesión
   // ----------------------
@@ -74,6 +84,7 @@ function App() {
   const [productos, setProductos] = useState([]);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [foto, setFoto] = useState(null);
   const [precio, setPrecio] = useState("");
   const [costoEnvio, setCostoEnvio] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
@@ -503,13 +514,13 @@ function App() {
       return;
     }
     // ==========================================================
-
     if (editandoId) {
       const confirmado = window.confirm(
         "¿Seguro que quieres actualizar este producto?",
       );
       if (!confirmado) return;
 
+      // 1. Actualizamos los datos de texto (JSON)
       const res = await fetch(`${API_URL}/productos/${editandoId}`, {
         method: "PUT",
         headers: {
@@ -522,43 +533,59 @@ function App() {
           precio: Number(precio || 0),
           costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
-          stockMinimo: stockMinimoCalculado, // Aplicamos el default de 1
+          stockMinimo: stockMinimoCalculado,
           categoria: idCategoriaFinal,
         }),
       });
 
-      const data = await res.json();
-      console.log("Respuesta al editar:", data);
+      // 2. Si el dueño seleccionó una nueva foto, disparamos la ruta de imagen
+      if (res.ok && foto) {
+        const formDataFoto = new FormData();
+        formDataFoto.append("foto", foto);
+
+        await fetch(`${API_URL}/productos/${editandoId}/foto`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`, // FormData va sin Content-Type
+          },
+          body: formDataFoto,
+        });
+      }
 
       setEditandoId(null);
       setSeccionActiva("inventario");
     } else {
+      // Para producto NUEVO, empaquetamos todo en FormData
+      const formDataNuevo = new FormData();
+      formDataNuevo.append("nombre", nombre.trim());
+      formDataNuevo.append(
+        "descripcion",
+        descripcion ? descripcion.trim() : "",
+      );
+      formDataNuevo.append("precio", Number(precio || 0));
+      formDataNuevo.append("costoEnvio", Number(costoEnvio || 0));
+      formDataNuevo.append("precioVenta", Number(precioVenta));
+      formDataNuevo.append("stock", Number(stock || 0));
+      formDataNuevo.append("stockMinimo", stockMinimoCalculado);
+      formDataNuevo.append("proveedorInicial", proveedorProductoNuevo || "");
+      formDataNuevo.append("categoria", idCategoriaFinal);
+      if (foto) {
+        formDataNuevo.append("foto", foto);
+      }
+
       const res = await fetch(`${API_URL}/productos`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // FormData va sin Content-Type
         },
-        body: JSON.stringify({
-          nombre,
-          descripcion,
-          precio: Number(precio || 0),
-          costoEnvio: Number(costoEnvio || 0),
-          precioVenta: Number(precioVenta),
-          stock: Number(stock || 0),
-          stockMinimo: stockMinimoCalculado, // Aplicamos el default de 1
-          proveedorInicial: proveedorProductoNuevo,
-          categoria: idCategoriaFinal,
-        }),
+        body: formDataNuevo,
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         alert(data.error || "Error al crear producto");
         return;
       }
-
       alert("Producto agregado correctamente");
     }
 
@@ -572,6 +599,7 @@ function App() {
     setStockMinimo("");
     setProveedorProductoNuevo("");
     setCategoriaId("");
+    setFoto(null);
     setCreandoCategoria(false);
     setNombreNuevaCategoria("");
 
@@ -615,6 +643,7 @@ function App() {
     setCategoriaId(""); // <--- AÑADIR
     setCreandoCategoria(false); // <--- AÑADIR
     setNombreNuevaCategoria(""); // <--- AÑADIR
+    setFoto(null);
     setEditandoId(null);
     setSeccionActiva("inventario");
   };
@@ -1018,6 +1047,26 @@ function App() {
       obtenerCategorias();
     }
   }, [token]);
+
+  useEffect(() => {
+    if (token && seccionActiva === "tienda") {
+      // Cargar la configuración actual desde el backend
+      fetch(`${API_URL}/api/tienda/config`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.error) {
+            setConfigTienda({
+              nombreTienda: data.nombreTienda,
+              mensajeBanner: data.mensajeBanner,
+              descripcionBanner: data.descripcionBanner,
+            });
+          }
+        })
+        .catch((err) => console.error("Error cargando config:", err));
+    }
+  }, [token, seccionActiva]);
 
   // ======================================================
   // PANTALLA DE AUTENTICACIÓN
@@ -1813,32 +1862,36 @@ function App() {
   const tituloSeccion =
     seccionActiva === "perfil"
       ? "Mi Perfil"
-      : seccionActiva === "inicio"
-        ? "🏠 Inicio"
-        : seccionActiva === "inventario"
-          ? "📦 Inventario"
-          : seccionActiva === "ventas"
-            ? "🛒 Ventas"
-            : seccionActiva === "historial"
-              ? "📊 Historial"
-              : editandoId
-                ? "Editar Producto"
-                : "Agregar Producto";
+      : seccionActiva === "tienda"
+        ? "🌐 Mi Tienda en Línea"
+        : seccionActiva === "inicio"
+          ? "🏠 Inicio"
+          : seccionActiva === "inventario"
+            ? "📦 Inventario"
+            : seccionActiva === "ventas"
+              ? "🛒 Ventas"
+              : seccionActiva === "historial"
+                ? "📊 Historial"
+                : editandoId
+                  ? "Editar Producto"
+                  : "Agregar Producto";
 
   const subtituloSeccion =
     seccionActiva === "perfil"
       ? "Configuración de usuario y seguridad"
-      : seccionActiva === "inicio"
-        ? "Resumen general del negocio"
-        : seccionActiva === "inventario"
-          ? "Gestiona tus productos y controla tu stock"
-          : seccionActiva === "ventas"
-            ? "Registra ventas normales o al mayoreo"
-            : seccionActiva === "historial"
-              ? "Consulta ventas, reposiciones y rendimiento"
-              : editandoId
-                ? "Actualiza la información del producto seleccionado"
-                : "Formulario de productos dentro del módulo de inventario";
+      : seccionActiva === "tienda"
+        ? "Personaliza el aspecto de tu escaparate digital y obtén tu enlace" // <-- NUEVO
+        : seccionActiva === "inicio"
+          ? "Resumen general del negocio"
+          : seccionActiva === "inventario"
+            ? "Gestiona tus productos y controla tu stock"
+            : seccionActiva === "ventas"
+              ? "Registra ventas normales o al mayoreo"
+              : seccionActiva === "historial"
+                ? "Consulta ventas, reposiciones y rendimiento"
+                : editandoId
+                  ? "Actualiza la información del producto seleccionado"
+                  : "Formulario de productos dentro del módulo de inventario";
 
   // ======================================================
   // RENDER PRINCIPAL DE LA APLICACIÓN
@@ -1915,6 +1968,7 @@ function App() {
 
           <nav style={layoutStyles.sidebarNav}>
             {opcionMenu("inicio", "Inicio", "🏠")}
+            {/*{opcionMenu("tienda", "Mi Tienda Web", "🌐")} */}
             {opcionMenu("inventario", "Inventario", "📦")}
             {opcionMenu("ventas", "Ventas", "🛒")}
             {opcionMenu("historial", "Historial", "📊")}
@@ -2218,6 +2272,237 @@ function App() {
             </form>
           )}
           {/* ======================================================
+          MÓDULO DE MI TIENDA EN LÍNEA (CMS)
+          ====================================================== */}
+          {false && seccionActiva === "tienda" && (
+            <div style={{ maxWidth: "800px" }}>
+              {/* Tarjeta del Enlace */}
+              <div
+                style={{
+                  backgroundColor: "#7c3aed",
+                  color: "white",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  marginBottom: "20px",
+                  boxShadow: "0 4px 15px rgba(124, 58, 237, 0.25)",
+                }}
+              >
+                <h3 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
+                  🔗 Enlace de tu E-commerce
+                </h3>
+                <p
+                  style={{
+                    margin: "0 0 15px 0",
+                    fontSize: "13px",
+                    opacity: 0.9,
+                  }}
+                >
+                  Comparte este enlace con tus clientes por WhatsApp o redes
+                  sociales para que puedan comprar tus productos directamente.
+                </p>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`http://localhost:5174/${usuario?.id}`}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "none",
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                      fontSize: "14px",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `http://localhost:5174/${usuario?.id}`,
+                      );
+                      alert("¡Enlace copiado al portapapeles!");
+                    }}
+                    style={{
+                      backgroundColor: "white",
+                      color: "#7c3aed",
+                      border: "none",
+                      padding: "10px 15px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Copiar
+                  </button>
+                  <button
+                    onClick={() =>
+                      window.open(
+                        `http://localhost:5174/${usuario?.id}`,
+                        "_blank",
+                      )
+                    }
+                    style={{
+                      backgroundColor: "#10b981",
+                      color: "white",
+                      border: "none",
+                      padding: "10px 15px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Visitar Tienda ➔
+                  </button>
+                </div>
+              </div>
+
+              {/* Tarjeta de Configuración de Diseño */}
+              <div
+                style={{
+                  backgroundColor: "white",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                }}
+              >
+                <h3 style={{ margin: "0 0 15px 0", color: "#111827" }}>
+                  🎨 Personalizar Diseño
+                </h3>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const res = await fetch(`${API_URL}/api/tienda/config`, {
+                        method: "PUT",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify(configTienda),
+                      });
+
+                      if (res.ok) {
+                        alert("¡Configuración guardada correctamente! 💾");
+                      } else {
+                        alert("Hubo un error al guardar los cambios.");
+                      }
+                    } catch (error) {
+                      console.error(error);
+                      alert("Error de red al guardar.");
+                    }
+                  }}
+                >
+                  <div style={{ marginBottom: "15px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 6px",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Nombre de tu Tienda (Logo)
+                    </p>
+                    <input
+                      type="text"
+                      value={configTienda.nombreTienda}
+                      onChange={(e) =>
+                        setConfigTienda({
+                          ...configTienda,
+                          nombreTienda: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: "15px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 6px",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Mensaje Principal (Banner destacado)
+                    </p>
+                    <input
+                      type="text"
+                      value={configTienda.mensajeBanner}
+                      onChange={(e) =>
+                        setConfigTienda({
+                          ...configTienda,
+                          mensajeBanner: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        boxSizing: "border-box",
+                      }}
+                      placeholder="Ej. ¡Llegaron las rebajas!"
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: "20px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 6px",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Subtítulo del Banner
+                    </p>
+                    <textarea
+                      value={configTienda.descripcionBanner}
+                      onChange={(e) =>
+                        setConfigTienda({
+                          ...configTienda,
+                          descripcionBanner: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        boxSizing: "border-box",
+                        minHeight: "60px",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    style={{
+                      backgroundColor: "#0d6efd",
+                      color: "white",
+                      border: "none",
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
+                    jajaja
+                  >
+                    💾 Guardar Cambios
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+          {/* ======================================================
       DASHBOARD PRINCIPAL
       Resumen general del negocio
       ====================================================== */}
@@ -2314,55 +2599,6 @@ function App() {
               })
             )}
           </div>
-          {/* ======================================================
-              ACCESO RÁPIDO A LA TIENDA EN LÍNEA *oculto temporalmente
-              ====================================================== */}
-          {/*{seccionActiva === "inicio" && (
-            <div style={{
-              backgroundColor: "#7c3aed",
-              color: "white",
-              padding: "18px 20px",
-              borderRadius: "10px",
-              marginBottom: "20px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              boxShadow: "0 4px 15px rgba(124, 58, 237, 0.25)",
-              flexWrap: "wrap",
-              gap: "15px"
-            }}>
-              <div>
-                <h3 style={{ margin: "0 0 5px 0", fontSize: "17px", fontWeight: "800" }}>
-                  🛍️ Tu Tienda en Línea
-                </h3>
-                <p style={{ margin: 0, fontSize: "13px", opacity: 0.9 }}>
-                  Comparte tu enlace exclusivo para que tus clientes compren de forma directa.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  // Se corrigió a usuario?.id para evitar el "undefined"
-                  const urlTienda = `http://localhost:5174/${usuario?.id}`;
-                  // Esto abre la pestaña nueva automáticamente
-                  window.open(urlTienda, '_blank');
-                }}
-                style={{
-                  backgroundColor: "white",
-                  color: "#7c3aed",
-                  border: "none",
-                  padding: "10px 18px",
-                  borderRadius: "8px",
-                  fontWeight: "800",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
-                }}
-              >
-                Ir a mi Tienda ➔
-              </button>
-            </div>
-          )}   */}
           {/* ======================================================
               CIERRE DE CAJA (RESUMEN DEL DÍA)
               ====================================================== */}
@@ -3866,6 +4102,7 @@ function App() {
             {(editandoId || modoRegistro === "nuevo") && (
               <form onSubmit={guardarProducto} style={{}}>
                 {/* 1. CAMPOS OBLIGATORIOS (SIEMPRE VISIBLES) */}
+
                 <p style={{ marginBottom: "6px", fontWeight: "600" }}>
                   Nombre del producto
                 </p>
@@ -3913,6 +4150,36 @@ function App() {
                   }}
                 />
                 <div style={{ height: "14px" }} />
+
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Foto del producto{" "}
+                  <span
+                    style={{
+                      color: "#666",
+                      fontWeight: "normal",
+                      fontSize: "11px",
+                    }}
+                  >
+                    (Opcional)
+                  </span>
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFoto(e.target.files[0])}
+                  style={{
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px dashed #ccc",
+                    fontSize: "12.5px",
+                    marginBottom: "15px",
+                    backgroundColor: "#f8f9fa",
+                    cursor: "pointer",
+                    boxSizing: "border-box",
+                  }}
+                />
 
                 {/* --- SELECTOR DE CATEGORÍAS --- */}
                 <p style={{ marginBottom: "6px", fontWeight: "600" }}>
@@ -4573,6 +4840,7 @@ function App() {
               height: "100%",
               zIndex: 9999,
               overflowY: "auto",
+              overflowX: "hidden",
               boxSizing: "border-box",
             }}
           >
@@ -4845,391 +5113,372 @@ function App() {
                 <div
                   style={{
                     width: "100%",
-                    overflowX: "auto",
+                    maxWidth: "100%", // <--- 2. PONER ESTO AQUÍ (Frena que la tabla desborde la tarjeta)
+                    maxHeight: "65vh",
+                    overflowX: "auto", // <--- Aquí se queda el scroll horizontal limpio
+                    overflowY: "auto", // <--- Aquí se queda el scroll vertical con los títulos fijos
                     borderRadius: "12px",
                     border: "1px solid #eee",
                     backgroundColor: "white",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                   }}
                 >
-                  <div style={{ width: "100%" }}>
-                    {/* ----------------------
-            TABLA DE INVENTARIO
-            Listado general de productos
-            ---------------------- */}
-
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "separate",
-                        borderSpacing: 0,
-                        backgroundColor: "white",
-                      }}
-                    >
-                      <thead>
+                  <table
+                    style={{
+                      width: "100%",
+                      minWidth: "1100px",
+                      borderCollapse: "separate",
+                      borderSpacing: 0,
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        {[
+                          "Nombre",
+                          "Categoría",
+                          "Descripción",
+                          "Costo total",
+                          "Precio venta",
+                          "Utilidad",
+                          "Margen %",
+                          "Stock",
+                          "Recomendación",
+                          "Acciones",
+                        ].map((titulo) => (
+                          <th
+                            key={titulo}
+                            style={{
+                              padding: "10px 8px",
+                              textAlign: "center",
+                              position: "sticky",
+                              top: 0,
+                              backgroundColor: "#f1f3f5",
+                              zIndex: 10,
+                              fontSize: "13px",
+                              fontWeight: "700",
+                              color: "#333",
+                              boxShadow: "0 1px 0 0 #e5e7eb",
+                            }}
+                          >
+                            {titulo}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productosFiltrados.length === 0 ? (
                         <tr>
-                          {[
-                            "Nombre",
-                            "Categoría",
-                            "Descripción",
-                            "Costo total",
-                            "Precio venta",
-                            "Utilidad",
-                            "Margen %",
-                            "Stock",
-                            "Recomendación",
-                            "Acciones",
-                          ].map((titulo) => (
-                            <th
-                              key={titulo}
+                          <td
+                            colSpan="10"
+                            style={{
+                              padding: "12px",
+                              textAlign: "center",
+                              color: "#666",
+                            }}
+                          >
+                            No se encontraron productos.
+                          </td>
+                        </tr>
+                      ) : (
+                        productosFiltrados.map((producto) => (
+                          <tr key={producto._id}>
+                            <td
                               style={{
-                                padding: "10px 8px",
+                                padding: "8px",
                                 textAlign: "center",
-                                position: "sticky",
-                                top: 0,
-                                backgroundColor: "#f1f3f5",
-                                zIndex: 1,
                                 fontSize: "13px",
-                                fontWeight: "700",
-                                color: "#333",
-                                boxShadow: "0 1px 0 0 #e5e7eb", // Usamos sombra en vez de borde para que no se descuadre
                               }}
                             >
-                              {titulo}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                    </table>
-
-                    <div
-                      style={{
-                        maxHeight: "360px",
-                        overflowY: "auto",
-                      }}
-                    >
-                      <table
-                        style={{
-                          width: "100%",
-                          tableLayout: "fixed",
-                          borderCollapse: "separate",
-                          borderSpacing: 0,
-                          backgroundColor: "white",
-                        }}
-                      >
-                        <tbody>
-                          {productosFiltrados.length === 0 ? (
-                            <tr>
-                              <td
-                                colSpan="10"
+                              <div
                                 style={{
-                                  padding: "12px",
-                                  textAlign: "center",
-                                  color: "#666",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: "6px",
                                 }}
                               >
-                                No se encontraron productos.
-                              </td>
-                            </tr>
-                          ) : (
-                            productosFiltrados.map((producto) => (
-                              <tr key={producto._id}>
-                                <td
+                                {producto.fotos && producto.fotos.length > 0 ? (
+                                  <img
+                                    src={producto.fotos[0]}
+                                    alt={producto.nombre}
+                                    style={{
+                                      width: "36px",
+                                      height: "36px",
+                                      borderRadius: "6px",
+                                      objectFit: "cover",
+                                      border: "1px solid #eee",
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      width: "36px",
+                                      height: "36px",
+                                      borderRadius: "6px",
+                                      backgroundColor: "#f1f3f5",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "16px",
+                                    }}
+                                  >
+                                    📸
+                                  </div>
+                                )}
+                                <span
                                   style={{
-                                    padding: "8px",
-                                    textAlign: "left",
-                                    fontSize: "13px",
+                                    fontWeight: "600",
+                                    color: "#111827",
+                                    textAlign: "center",
+                                    wordBreak: "break-word",
                                   }}
                                 >
                                   {producto.nombre}
-                                </td>
-
-                                {/* 2. CATEGORÍA (Texto limpio y alineado) */}
-                                <td
-                                  style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    fontSize: "13px",
-                                    color: "#555",
-                                  }}
-                                >
-                                  {typeof producto.categoria === "object"
-                                    ? producto.categoria?.nombre
-                                    : categorias.find(
-                                        (c) => c._id === producto.categoria,
-                                      )?.nombre || "—"}
-                                </td>
-
-                                {/* 3. DESCRIPCIÓN (Con espacio extra) */}
-                                <td
-                                  style={{
-                                    padding: "8px",
-                                    textAlign: "left",
-                                    maxWidth: "150px",
-                                    wordBreak: "break-word",
-                                    color: "#666",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  {producto.descripcion || "—"}
-                                </td>
-
-                                <td
-                                  style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    fontSize: "13px",
-                                  }}
-                                >
-                                  $
-                                  {(
-                                    Number(producto.precio || 0) +
-                                    Number(producto.costoEnvio || 0)
-                                  ).toFixed(2)}
-                                  <div
-                                    style={{
-                                      color: "#777",
-                                      fontSize: "11px",
-                                      marginTop: "4px",
-                                    }}
-                                  >
-                                    Compra: $
-                                    {Number(producto.precio || 0).toFixed(2)} ·
-                                    Envío: $
-                                    {Number(producto.costoEnvio || 0).toFixed(
-                                      2,
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td
-                                  style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    fontSize: "13px",
-                                  }}
-                                >
-                                  $
-                                  {Number(producto.precioVenta || 0).toFixed(2)}
-                                </td>
-
-                                <td
-                                  style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    color: "#198754",
-                                    fontWeight: "700",
-                                    fontSize: "13px",
-                                  }}
-                                >
-                                  $
-                                  {(
-                                    Number(producto.precioVenta || 0) -
+                                </span>
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                fontSize: "13px",
+                                color: "#555",
+                              }}
+                            >
+                              {typeof producto.categoria === "object"
+                                ? producto.categoria?.nombre
+                                : categorias.find(
+                                    (c) => c._id === producto.categoria,
+                                  )?.nombre || "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "left",
+                                maxWidth: "150px",
+                                wordBreak: "break-word",
+                                color: "#666",
+                                fontSize: "12px",
+                              }}
+                            >
+                              {producto.descripcion || "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                fontSize: "13px",
+                              }}
+                            >
+                              $
+                              {(
+                                Number(producto.precio || 0) +
+                                Number(producto.costoEnvio || 0)
+                              ).toFixed(2)}
+                              <div
+                                style={{
+                                  color: "#777",
+                                  fontSize: "11px",
+                                  marginTop: "4px",
+                                }}
+                              >
+                                Compra: $
+                                {Number(producto.precio || 0).toFixed(2)} ·
+                                Envío: $
+                                {Number(producto.costoEnvio || 0).toFixed(2)}
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                fontSize: "13px",
+                              }}
+                            >
+                              ${Number(producto.precioVenta || 0).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                color: "#198754",
+                                fontWeight: "700",
+                                fontSize: "13px",
+                              }}
+                            >
+                              $
+                              {(
+                                Number(producto.precioVenta || 0) -
+                                (Number(producto.precio || 0) +
+                                  Number(producto.costoEnvio || 0))
+                              ).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                color:
+                                  Number(producto.precioVenta || 0) > 0 &&
+                                  ((Number(producto.precioVenta || 0) -
                                     (Number(producto.precio || 0) +
-                                      Number(producto.costoEnvio || 0))
-                                  ).toFixed(2)}
-                                </td>
-
-                                <td
-                                  style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    color:
-                                      Number(producto.precioVenta || 0) > 0 &&
-                                      ((Number(producto.precioVenta || 0) -
-                                        (Number(producto.precio || 0) +
-                                          Number(producto.costoEnvio || 0))) /
-                                        Number(producto.precioVenta || 0)) *
-                                        100 <
-                                        0
-                                        ? "#dc3545"
-                                        : ((Number(producto.precioVenta || 0) -
-                                              (Number(producto.precio || 0) +
-                                                Number(
-                                                  producto.costoEnvio || 0,
-                                                ))) /
-                                              Number(
-                                                producto.precioVenta || 0,
-                                              )) *
-                                              100 <
-                                            10
-                                          ? "#fd7e14"
-                                          : "#198754",
-                                    fontWeight: "700",
-                                    fontSize: "13px",
-                                  }}
-                                >
-                                  {Number(producto.precioVenta || 0) > 0
-                                    ? `${(
-                                        ((Number(producto.precioVenta || 0) -
+                                      Number(producto.costoEnvio || 0))) /
+                                    Number(producto.precioVenta || 0)) *
+                                    100 <
+                                    0
+                                    ? "#dc3545"
+                                    : ((Number(producto.precioVenta || 0) -
                                           (Number(producto.precio || 0) +
                                             Number(producto.costoEnvio || 0))) /
                                           Number(producto.precioVenta || 0)) *
-                                        100
-                                      ).toFixed(2)}%`
-                                    : "0.00%"}
-                                </td>
-
-                                <td
+                                          100 <
+                                        10
+                                      ? "#fd7e14"
+                                      : "#198754",
+                                fontWeight: "700",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {Number(producto.precioVenta || 0) > 0
+                                ? `${(
+                                    ((Number(producto.precioVenta || 0) -
+                                      (Number(producto.precio || 0) +
+                                        Number(producto.costoEnvio || 0))) /
+                                      Number(producto.precioVenta || 0)) *
+                                    100
+                                  ).toFixed(2)}%`
+                                : "0.00%"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                color:
+                                  Number(producto.stock) <=
+                                  Number(producto.stockMinimo || 5)
+                                    ? "#dc3545"
+                                    : "#198754",
+                                fontWeight: "700",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {producto.stock}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                                fontWeight: "600",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {Number(producto.stock) === 0
+                                ? "🚫 Reponer"
+                                : Number(producto.stock) <=
+                                    Number(producto.stockMinimo || 5)
+                                  ? "⚠️ Bajo"
+                                  : "✅ Suficiente"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px",
+                                textAlign: "center",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "6px",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  onClick={() => {
+                                    setNombre(producto.nombre);
+                                    setDescripcion(producto.descripcion || "");
+                                    setPrecio(producto.precio);
+                                    setCostoEnvio(producto.costoEnvio || "");
+                                    setPrecioVenta(producto.precioVenta || "");
+                                    setStock(producto.stock);
+                                    setStockMinimo(producto.stockMinimo || "");
+                                    const catId =
+                                      typeof producto.categoria === "object"
+                                        ? producto.categoria?._id
+                                        : producto.categoria || "";
+                                    setCategoriaId(catId);
+                                    setEditandoId(producto._id);
+                                    setSeccionActiva("registrar");
+                                    setTimeout(() => {
+                                      document
+                                        .getElementById("formularioProducto")
+                                        ?.scrollIntoView({
+                                          behavior: "smooth",
+                                          block: "start",
+                                        });
+                                    }, 100);
+                                  }}
                                   style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    color:
-                                      Number(producto.stock) <=
-                                      Number(producto.stockMinimo || 5)
-                                        ? "#dc3545"
-                                        : "#198754",
-                                    fontWeight: "700",
-                                    fontSize: "13px",
+                                    backgroundColor: "#0d6efd",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "5px 7px",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    fontSize: "10px",
                                   }}
                                 >
-                                  {producto.stock}
-                                </td>
-
-                                <td
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => eliminarProducto(producto._id)}
                                   style={{
-                                    padding: "8px",
-                                    textAlign: "center",
-                                    fontWeight: "600",
-                                    fontSize: "13px",
+                                    backgroundColor: "#dc3545",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "5px 7px",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    fontSize: "10px",
                                   }}
                                 >
-                                  {Number(producto.stock) === 0
-                                    ? "🚫 Reponer"
-                                    : Number(producto.stock) <=
-                                        Number(producto.stockMinimo || 5)
-                                      ? "⚠️ Bajo"
-                                      : "✅ Suficiente"}
-                                </td>
-
-                                {/* ----------------------
-                        ACCIONES DE PRODUCTO
-                        Editar, eliminar y reponer inventario
-                        ---------------------- */}
-
-                                <td
+                                  Eliminar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setModoRegistro("reposicion");
+                                    setProductoReposicionId(producto._id);
+                                    setCantidadReposicion("");
+                                    setSeccionActiva("registrar");
+                                    setTimeout(() => {
+                                      document
+                                        .getElementById("formularioProducto")
+                                        ?.scrollIntoView({
+                                          behavior: "smooth",
+                                          block: "start",
+                                        });
+                                    }, 100);
+                                  }}
                                   style={{
-                                    padding: "8px",
-                                    textAlign: "center",
+                                    backgroundColor: "#198754",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "5px 7px",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    fontSize: "10px",
                                   }}
                                 >
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      gap: "6px",
-                                      justifyContent: "center",
-                                      alignItems: "center",
-                                      flexWrap: "wrap",
-                                    }}
-                                  >
-                                    <button
-                                      onClick={() => {
-                                        setNombre(producto.nombre);
-                                        setDescripcion(
-                                          producto.descripcion || "",
-                                        );
-                                        setPrecio(producto.precio);
-                                        setCostoEnvio(
-                                          producto.costoEnvio || "",
-                                        );
-                                        setPrecioVenta(
-                                          producto.precioVenta || "",
-                                        );
-                                        setStock(producto.stock);
-                                        setStockMinimo(
-                                          producto.stockMinimo || "",
-                                        );
-
-                                        // NUEVO: Cargar la categoría al editar
-                                        const catId =
-                                          typeof producto.categoria === "object"
-                                            ? producto.categoria?._id
-                                            : producto.categoria || "";
-                                        setCategoriaId(catId);
-
-                                        setEditandoId(producto._id);
-                                        setSeccionActiva("registrar");
-
-                                        setTimeout(() => {
-                                          document
-                                            .getElementById(
-                                              "formularioProducto",
-                                            )
-                                            ?.scrollIntoView({
-                                              behavior: "smooth",
-                                              block: "start",
-                                            });
-                                        }, 100);
-                                      }}
-                                      style={{
-                                        backgroundColor: "#0d6efd",
-                                        color: "white",
-                                        border: "none",
-                                        padding: "5px 7px",
-                                        borderRadius: "6px",
-                                        cursor: "pointer",
-                                        fontSize: "10px",
-                                      }}
-                                    >
-                                      Editar
-                                    </button>
-
-                                    <button
-                                      onClick={() =>
-                                        eliminarProducto(producto._id)
-                                      }
-                                      style={{
-                                        backgroundColor: "#dc3545",
-                                        color: "white",
-                                        border: "none",
-                                        padding: "5px 7px",
-                                        borderRadius: "6px",
-                                        cursor: "pointer",
-                                        fontSize: "10px",
-                                      }}
-                                    >
-                                      Eliminar
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        setModoRegistro("reposicion");
-                                        setProductoReposicionId(producto._id);
-                                        setCantidadReposicion("");
-                                        setSeccionActiva("registrar");
-
-                                        setTimeout(() => {
-                                          document
-                                            .getElementById(
-                                              "formularioProducto",
-                                            )
-                                            ?.scrollIntoView({
-                                              behavior: "smooth",
-                                              block: "start",
-                                            });
-                                        }, 100);
-                                      }}
-                                      style={{
-                                        backgroundColor: "#198754",
-                                        color: "white",
-                                        border: "none",
-                                        padding: "5px 7px",
-                                        borderRadius: "6px",
-                                        cursor: "pointer",
-                                        fontSize: "10px",
-                                      }}
-                                    >
-                                      Reponer
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                                  Reponer
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               )
             ) : null}
