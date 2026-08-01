@@ -104,7 +104,8 @@ app.post(
         stock,
         stockMinimo,
         proveedorInicial,
-        categoria, // NUEVO CAMPO
+        categoria,
+        precioOferta, // NUEVO CAMPO
       } = req.body;
 
       if (
@@ -127,6 +128,7 @@ app.post(
         precio: Number(precio),
         costoEnvio: Number(costoEnvio || 0),
         precioVenta: Number(precioVenta),
+        precioOferta: Number(precioOferta || 0), // <-- NUEVO: Lo guardamos (0 si no hay oferta)
         stock: Number(stock),
         stockMinimo: Number(stockMinimo || 5),
         categoria: categoria, // Guardamos el ID de la categoría
@@ -225,6 +227,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
       precioVenta,
       stockMinimo,
       categoria,
+      precioOferta, // <-- NUEVO
     } = req.body;
 
     if (
@@ -249,6 +252,7 @@ app.put("/productos/:id", authMiddleware, async (req, res) => {
         precio: Number(precio),
         costoEnvio: Number(costoEnvio || 0),
         precioVenta: Number(precioVenta),
+        precioOferta: Number(precioOferta || 0), // <-- NUEVO
         stockMinimo: Number(stockMinimo || 5),
         categoria: categoria,
       },
@@ -427,8 +431,10 @@ app.post("/ventas", authMiddleware, async (req, res) => {
 
     await nuevaVenta.save();
 
-    producto.stock = Number(producto.stock) - Number(cantidad);
-    await producto.save();
+    await Product.updateOne(
+      { _id: producto._id },
+      { $inc: { stock: -Number(cantidad) } },
+    );
 
     res.status(201).json({
       mensaje: "Venta registrada correctamente",
@@ -568,21 +574,120 @@ app.get("/api/tienda/config", authMiddleware, async (req, res) => {
 });
 
 // 2. Guardar/Actualizar la configuración (Privado - Para el dueño en el CMS)
+// Actualizar la ruta PUT /api/tienda/config
 app.put("/api/tienda/config", authMiddleware, async (req, res) => {
   try {
-    const { nombreTienda, mensajeBanner, descripcionBanner } = req.body;
+    const {
+      nombreTienda,
+      mensajeBanner,
+      descripcionBanner,
+      correoTienda,
+      whatsappTienda,
+      politicaReembolso, // <-- NUEVO
+      terminosServicio, // <-- NUEVO
+    } = req.body;
 
-    // Usamos findOneAndUpdate con 'upsert: true' para actualizar o crear si no existe
     const configActualizada = await ConfigTienda.findOneAndUpdate(
       { user: req.user.userId },
-      { nombreTienda, mensajeBanner, descripcionBanner },
+      {
+        nombreTienda,
+        mensajeBanner,
+        descripcionBanner,
+        correoTienda,
+        whatsappTienda,
+        politicaReembolso, // <-- NUEVO
+        terminosServicio, // <-- NUEVO
+      },
       { returnDocument: "after", upsert: true },
     );
-
     res.json(configActualizada);
   } catch (error) {
     console.error("Error al actualizar configuración:", error);
     res.status(500).json({ error: "Error al actualizar configuración" });
+  }
+});
+
+// ==========================================
+// GESTOR DE OFERTAS (MARKETING)
+// ==========================================
+
+// 1. Aplicar descuento masivo (por producto o categoría)
+app.post("/api/tienda/ofertas/aplicar", authMiddleware, async (req, res) => {
+  try {
+    const { tipo, objetivoId, porcentaje } = req.body;
+
+    if (!porcentaje || Number(porcentaje) <= 0 || Number(porcentaje) >= 100) {
+      return res
+        .status(400)
+        .json({ error: "El porcentaje debe estar entre 1 y 99" });
+    }
+
+    const descuento = Number(porcentaje) / 100;
+    let filtro = { user: req.user.userId }; // Solo modificamos los del usuario actual
+
+    if (tipo === "categoria") {
+      filtro.categoria = objetivoId;
+    } else if (tipo === "producto") {
+      filtro._id = objetivoId;
+    } else {
+      return res
+        .status(400)
+        .json({ error: "Debes especificar si es a un producto o categoría" });
+    }
+
+    // Buscamos los productos afectados
+    const productosAfectados = await Product.find(filtro);
+
+    // Si no hay productos, avisamos
+    if (productosAfectados.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No se encontraron productos para aplicar la oferta" });
+    }
+
+    // Calculamos el nuevo precio para cada uno y lo guardamos
+    const promesas = productosAfectados.map((prod) => {
+      const nuevoPrecioOferta = Number(prod.precioVenta) * (1 - descuento);
+      prod.precioOferta = nuevoPrecioOferta;
+      return prod.save();
+    });
+
+    await Promise.all(promesas);
+    res.json({
+      mensaje: `¡Oferta del ${porcentaje}% aplicada a ${productosAfectados.length} producto(s)!`,
+    });
+  } catch (error) {
+    console.error("Error al aplicar oferta:", error);
+    res.status(500).json({ error: "Error al aplicar el descuento" });
+  }
+});
+
+// 2. Retirar descuentos (por producto, categoría o limpiar todo)
+app.post("/api/tienda/ofertas/quitar", authMiddleware, async (req, res) => {
+  try {
+    const { tipo, objetivoId } = req.body;
+    let filtro = { user: req.user.userId };
+
+    if (tipo === "categoria") {
+      filtro.categoria = objetivoId;
+    } else if (tipo === "producto") {
+      filtro._id = objetivoId;
+    } else if (tipo === "todas") {
+      // Busca todos los que tengan una oferta aplicada
+      filtro.precioOferta = { $gt: 0 };
+    }
+
+    // updateMany actualiza todo de un solo golpe (más rápido que un map)
+    const resultado = await Product.updateMany(filtro, {
+      $set: { precioOferta: 0 },
+    });
+
+    res.json({
+      mensaje: `Se han retirado las ofertas de ${resultado.modifiedCount} producto(s).`,
+    });
+  } catch (error) {
+    console.error("Error al retirar oferta:", error);
+    res.status(500).json({ error: "Error al retirar las ofertas" });
   }
 });
 
@@ -670,7 +775,13 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
         .json({ error: "Lo sentimos, no hay suficiente stock disponible" });
     }
 
-    const ingresoTotal = Number(producto.precioVenta) * Number(cantidad);
+    // NUEVO: Verificamos cuál es el precio real que debemos cobrar
+    const precioRealVenta =
+      producto.precioOferta && producto.precioOferta > 0
+        ? Number(producto.precioOferta)
+        : Number(producto.precioVenta);
+
+    const ingresoTotal = precioRealVenta * Number(cantidad);
     const costoTotal =
       (Number(producto.precio || 0) + Number(producto.costoEnvio || 0)) *
       Number(cantidad);
@@ -681,7 +792,7 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
       nombreProducto: producto.nombre,
       cantidad: Number(cantidad),
       costoUnitario: Number(producto.precio),
-      precioVentaUnitario: Number(producto.precioVenta),
+      precioVentaUnitario: precioRealVenta, // <-- Usamos el precio final detectado
       ingresoTotal,
       costoTotal,
       utilidad,
@@ -703,6 +814,19 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
   } catch (error) {
     console.error("Error en la compra simulada:", error);
     res.status(500).json({ error: "Error al procesar la compra simulada" });
+  }
+});
+
+// 3. Obtener categorías de forma pública para la tienda
+app.get("/api/tienda/:usuarioId/categorias", async (req, res) => {
+  try {
+    const { usuarioId } = req.params;
+    const categorias = await Categoria.find({ user: usuarioId });
+    res.json(categorias);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Error al obtener las categorías de la tienda" });
   }
 });
 

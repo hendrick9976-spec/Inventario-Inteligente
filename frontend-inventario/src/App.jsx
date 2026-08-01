@@ -54,6 +54,10 @@ function App() {
     mensajeBanner: "¡Especial de Verano!",
     descripcionBanner:
       "Lleva los mejores artículos al mejor precio por tiempo limitado.",
+    correoTienda: "",
+    whatsappTienda: "",
+    politicaReembolso: "",
+    terminosServicio: "",
   });
 
   // ----------------------
@@ -88,6 +92,7 @@ function App() {
   const [precio, setPrecio] = useState("");
   const [costoEnvio, setCostoEnvio] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
+  const [precioOferta, setPrecioOferta] = useState("");
   const [stock, setStock] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
   const [mostrarOpcionesProducto, setMostrarOpcionesProducto] = useState(false);
@@ -167,6 +172,14 @@ function App() {
   const [tipoHistorial, setTipoHistorial] = useState("ventas");
   const [topHistorialActivo, setTopHistorialActivo] = useState("ventas");
   const [filtroFechaReposicion, setFiltroFechaReposicion] = useState("");
+
+  // ----------------------
+  // GESTOR DE OFERTAS
+  // ----------------------
+  const [tipoOferta, setTipoOferta] = useState("categoria"); // "categoria" o "producto"
+  const [objetivoOfertaId, setObjetivoOfertaId] = useState("");
+  const [porcentajeOferta, setPorcentajeOferta] = useState("");
+  const [subSeccionTienda, setSubSeccionTienda] = useState("diseno"); // "diseno" o "ofertas"
 
   // ======================================================
   // FUNCIONES DE AUTENTICACIÓN
@@ -533,6 +546,7 @@ function App() {
           precio: Number(precio || 0),
           costoEnvio: Number(costoEnvio || 0),
           precioVenta: Number(precioVenta),
+          precioOferta: Number(precioOferta || 0),
           stockMinimo: stockMinimoCalculado,
           categoria: idCategoriaFinal,
         }),
@@ -559,12 +573,13 @@ function App() {
       const formDataNuevo = new FormData();
       formDataNuevo.append("nombre", nombre.trim());
       formDataNuevo.append(
-        "descripcion",
+        "descripción",
         descripcion ? descripcion.trim() : "",
       );
       formDataNuevo.append("precio", Number(precio || 0));
       formDataNuevo.append("costoEnvio", Number(costoEnvio || 0));
       formDataNuevo.append("precioVenta", Number(precioVenta));
+      formDataNuevo.append("precioOferta", Number(precioOferta || 0));
       formDataNuevo.append("stock", Number(stock || 0));
       formDataNuevo.append("stockMinimo", stockMinimoCalculado);
       formDataNuevo.append("proveedorInicial", proveedorProductoNuevo || "");
@@ -595,6 +610,7 @@ function App() {
     setPrecio("");
     setCostoEnvio("");
     setPrecioVenta("");
+    setPrecioOferta("");
     setStock("");
     setStockMinimo("");
     setProveedorProductoNuevo("");
@@ -646,6 +662,71 @@ function App() {
     setFoto(null);
     setEditandoId(null);
     setSeccionActiva("inventario");
+  };
+
+  // ======================================================
+  // FUNCIONES DEL GESTOR DE OFERTAS
+  // ======================================================
+  const aplicarOferta = async (e) => {
+    e.preventDefault();
+    if (!objetivoOfertaId || !porcentajeOferta) {
+      alert("Por favor selecciona un objetivo y un porcentaje válido.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/tienda/ofertas/aplicar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tipo: tipoOferta,
+          objetivoId: objetivoOfertaId,
+          porcentaje: porcentajeOferta,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.mensaje);
+        setPorcentajeOferta("");
+        setObjetivoOfertaId("");
+        obtenerProductos(); // Recargamos para ver los nuevos precios
+      } else {
+        alert(data.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error de conexión al aplicar la oferta.");
+    }
+  };
+
+  const quitarOferta = async (tipo, objetivoId = null) => {
+    const confirmar = window.confirm(
+      "¿Seguro que deseas retirar la(s) oferta(s)? Los precios volverán a la normalidad.",
+    );
+    if (!confirmar) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/tienda/ofertas/quitar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ tipo, objetivoId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.mensaje);
+        obtenerProductos(); // Recargamos para ver los precios restaurados
+      } else {
+        alert(data.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error de conexión al retirar la oferta.");
+    }
   };
 
   // ======================================================
@@ -742,13 +823,12 @@ function App() {
       alert("Selecciona un producto");
       return;
     }
-
     if (cantidadMovimiento === "" || Number(cantidadMovimiento) <= 0) {
       alert("La cantidad debe ser mayor a 0");
       return;
     }
 
-    // --- NUEVA VALIDACIÓN DE STOCK ---
+    // --- VALIDACIÓN DE STOCK ---
     const prodVerificar = productos.find((p) => p._id === productoMovimientoId);
     if (
       prodVerificar &&
@@ -757,65 +837,23 @@ function App() {
       alert(
         `⚠️ Stock insuficiente: Solo tienes ${prodVerificar.stock} unidades de ${prodVerificar.nombre}.`,
       );
-      return; // Esto detiene la venta
-    }
-    // ---------------------------------
-
-    if (tipoVentaSeleccionado === "mayoreo") {
-      const sinPrecioGlobal = precioGlobalMayoreo === "";
-
-      const sinDescuento = porcentajeDescuento === "";
-
-      if (sinPrecioGlobal && sinDescuento) {
-        alert("Ingresa un precio global o un porcentaje de descuento");
-        return;
-      }
-
-      if (precioGlobalMayoreo !== "" && Number(precioGlobalMayoreo) < 0) {
-        alert("El precio global no puede ser negativo");
-        return;
-      }
-
-      if (
-        porcentajeDescuento !== "" &&
-        (Number(porcentajeDescuento) < 0 || Number(porcentajeDescuento) > 100)
-      ) {
-        alert("El descuento debe estar entre 0 y 100");
-        return;
-      }
+      return;
     }
 
-    if (
-      tipoVentaSeleccionado === "detalle" &&
-      precioUnitarioNegociado !== "" &&
-      Number(precioUnitarioNegociado) < 0
-    ) {
+    if (precioUnitarioNegociado !== "" && Number(precioUnitarioNegociado) < 0) {
       alert("El precio unitario negociado no puede ser negativo");
       return;
     }
 
     if (tipoMovimiento === "venta") {
-      // Calculamos la utilidad real antes de registrar
-      const prodSelect = productos.find((p) => p._id === productoMovimientoId);
-      let ingresoEstimado = 0;
-
-      if (tipoVentaSeleccionado === "mayoreo") {
-        ingresoEstimado =
-          precioGlobalMayoreo !== ""
-            ? Number(precioGlobalMayoreo)
-            : Number(prodSelect.precioVenta) *
-              Number(cantidadMovimiento) *
-              (1 - Number(porcentajeDescuento || 0) / 100);
-      } else {
-        // AHORA TOMA EL PRECIO NEGOCIADO COMO EL TOTAL GLOBAL
-        ingresoEstimado =
-          precioUnitarioNegociado !== ""
-            ? Number(precioUnitarioNegociado)
-            : Number(prodSelect.precioVenta) * Number(cantidadMovimiento);
-      }
+      // Calculamos el ingreso total: Si puso un precio negociado, usamos ese; si no, multiplicamos.
+      const ingresoEstimado =
+        precioUnitarioNegociado !== ""
+          ? Number(precioUnitarioNegociado)
+          : Number(prodVerificar.precioVenta) * Number(cantidadMovimiento);
 
       const costoTotal =
-        (Number(prodSelect.precio) + Number(prodSelect.costoEnvio || 0)) *
+        (Number(prodVerificar.precio) + Number(prodVerificar.costoEnvio || 0)) *
         Number(cantidadMovimiento);
 
       if (ingresoEstimado - costoTotal < 0) {
@@ -824,19 +862,17 @@ function App() {
         );
         if (!confirmado) return;
       }
-    }
 
-    if (tipoMovimiento === "venta") {
-      // --- PRE-VENTA: SOLO ABRIR TICKET, NO DESCONTAR STOCK AÚN ---
+      // --- PRE-VENTA: SOLO ABRIR TICKET ---
       setDatosTicket({
-        producto: productoMovimientoSeleccionado.nombre,
+        producto: prodVerificar.nombre,
         cantidad: cantidadMovimiento,
-        monto: ingresoEstimadoMovimiento,
+        monto: ingresoEstimado,
         fecha: new Date().toLocaleString(),
       });
-      setVentaConfirmada(false); // Reiniciamos la confirmación
-      setTicketAbierto(true); // Abrimos el modal
-      return; // 🛑 DETENEMOS AQUÍ LA FUNCIÓN
+      setVentaConfirmada(false);
+      setTicketAbierto(true);
+      return;
     }
 
     // --- FLUJO ORIGINAL PARA REPOSICIÓN (tipoMovimiento !== "venta") ---
@@ -886,21 +922,12 @@ function App() {
         body: JSON.stringify({
           productoId: productoMovimientoId,
           cantidad: Number(cantidadMovimiento),
-          tipoVenta: tipoVentaSeleccionado,
+          tipoVenta: "detalle", // Ya todo es venta normal/detalle
           precioUnitarioNegociado:
-            tipoVentaSeleccionado === "detalle" &&
             precioUnitarioNegociado !== ""
               ? Number(precioUnitarioNegociado) / Number(cantidadMovimiento)
               : null,
-          precioGlobalMayoreo:
-            tipoVentaSeleccionado === "mayoreo" && precioGlobalMayoreo !== ""
-              ? Number(precioGlobalMayoreo)
-              : null,
-          porcentajeDescuento:
-            tipoVentaSeleccionado === "mayoreo" && porcentajeDescuento !== ""
-              ? Number(porcentajeDescuento)
-              : 0,
-          cliente: clienteVenta, // Ahora el cliente se extrae de lo que escriban en el ticket
+          cliente: clienteVenta,
         }),
       });
       const data = await res.json();
@@ -1050,7 +1077,6 @@ function App() {
 
   useEffect(() => {
     if (token && seccionActiva === "tienda") {
-      // Cargar la configuración actual desde el backend
       fetch(`${API_URL}/api/tienda/config`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -1058,9 +1084,13 @@ function App() {
         .then((data) => {
           if (!data.error) {
             setConfigTienda({
-              nombreTienda: data.nombreTienda,
-              mensajeBanner: data.mensajeBanner,
-              descripcionBanner: data.descripcionBanner,
+              nombreTienda: data.nombreTienda || "",
+              mensajeBanner: data.mensajeBanner || "",
+              descripcionBanner: data.descripcionBanner || "",
+              correoTienda: data.correoTienda || "", // <-- NUEVO
+              whatsappTienda: data.whatsappTienda || "",
+              politicaReembolso: data.politicaReembolso || "",
+              terminosServicio: data.terminosServicio || "", // <-- NUEVO
             });
           }
         })
@@ -1372,16 +1402,10 @@ function App() {
       : 0;
 
   const ingresoEstimadoMovimiento = ventaListaParaCalcular
-    ? tipoVentaSeleccionado === "mayoreo"
-      ? precioGlobalMayoreo !== ""
-        ? Number(precioGlobalMayoreo)
-        : Number(productoMovimientoSeleccionado?.precioVenta || 0) *
-          Number(cantidadMovimiento || 0) *
-          (1 - Number(porcentajeDescuento || 0) / 100)
-      : precioUnitarioNegociado !== ""
-        ? Number(precioUnitarioNegociado) // Si hay precio negociado, ES EL TOTAL.
-        : Number(productoMovimientoSeleccionado?.precioVenta || 0) *
-          Number(cantidadMovimiento || 0)
+    ? precioUnitarioNegociado !== ""
+      ? Number(precioUnitarioNegociado)
+      : Number(productoMovimientoSeleccionado?.precioVenta || 0) *
+        Number(cantidadMovimiento || 0)
     : 0;
 
   const costoEstimadoMovimiento =
@@ -1968,7 +1992,7 @@ function App() {
 
           <nav style={layoutStyles.sidebarNav}>
             {opcionMenu("inicio", "Inicio", "🏠")}
-            {/*{opcionMenu("tienda", "Mi Tienda Web", "🌐")} */}
+            {/*{opcionMenu("tienda", "Mi Tienda Web", "🌐")}*/}
             {opcionMenu("inventario", "Inventario", "📦")}
             {opcionMenu("ventas", "Ventas", "🛒")}
             {opcionMenu("historial", "Historial", "📊")}
@@ -2276,6 +2300,49 @@ function App() {
           ====================================================== */}
           {false && seccionActiva === "tienda" && (
             <div style={{ maxWidth: "800px" }}>
+              {/* Botones superiores (Pestañas de la Tienda) */}
+              <div
+                style={{ display: "flex", gap: "10px", marginBottom: "20px" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSubSeccionTienda("diseno")}
+                  style={{
+                    backgroundColor:
+                      subSeccionTienda === "diseno"
+                        ? "#0d6efd"
+                        : "white" /* Azul */,
+                    color: subSeccionTienda === "diseno" ? "white" : "#374151",
+                    border: "1px solid #d1d5db",
+                    padding: "9px 16px",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                  }}
+                >
+                  🎨 Personalizar Diseño
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubSeccionTienda("ofertas")}
+                  style={{
+                    backgroundColor:
+                      subSeccionTienda === "ofertas"
+                        ? "#fd7e14"
+                        : "white" /* Naranja */,
+                    color: subSeccionTienda === "ofertas" ? "white" : "#374151",
+                    border: "1px solid #d1d5db",
+                    padding: "9px 16px",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                  }}
+                >
+                  🎁 Gestor de Ofertas
+                </button>
+              </div>
               {/* Tarjeta del Enlace */}
               <div
                 style={{
@@ -2358,148 +2425,530 @@ function App() {
               </div>
 
               {/* Tarjeta de Configuración de Diseño */}
-              <div
-                style={{
-                  backgroundColor: "white",
-                  padding: "20px",
-                  borderRadius: "12px",
-                  border: "1px solid #e5e7eb",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                }}
-              >
-                <h3 style={{ margin: "0 0 15px 0", color: "#111827" }}>
-                  🎨 Personalizar Diseño
-                </h3>
-
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    try {
-                      const res = await fetch(`${API_URL}/api/tienda/config`, {
-                        method: "PUT",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify(configTienda),
-                      });
-
-                      if (res.ok) {
-                        alert("¡Configuración guardada correctamente! 💾");
-                      } else {
-                        alert("Hubo un error al guardar los cambios.");
-                      }
-                    } catch (error) {
-                      console.error(error);
-                      alert("Error de red al guardar.");
-                    }
+              {subSeccionTienda === "diseno" && (
+                <div
+                  style={{
+                    backgroundColor: "white",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
                   }}
                 >
-                  <div style={{ marginBottom: "15px" }}>
-                    <p
-                      style={{
-                        margin: "0 0 6px",
-                        fontWeight: "600",
-                        fontSize: "13px",
-                      }}
-                    >
-                      Nombre de tu Tienda (Logo)
-                    </p>
-                    <input
-                      type="text"
-                      value={configTienda.nombreTienda}
-                      onChange={(e) =>
-                        setConfigTienda({
-                          ...configTienda,
-                          nombreTienda: e.target.value,
-                        })
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: "8px",
-                        border: "1px solid #d1d5db",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
+                  <h3 style={{ margin: "0 0 15px 0", color: "#111827" }}>
+                    🎨 Personalizar Diseño
+                  </h3>
 
-                  <div style={{ marginBottom: "15px" }}>
-                    <p
-                      style={{
-                        margin: "0 0 6px",
-                        fontWeight: "600",
-                        fontSize: "13px",
-                      }}
-                    >
-                      Mensaje Principal (Banner destacado)
-                    </p>
-                    <input
-                      type="text"
-                      value={configTienda.mensajeBanner}
-                      onChange={(e) =>
-                        setConfigTienda({
-                          ...configTienda,
-                          mensajeBanner: e.target.value,
-                        })
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: "8px",
-                        border: "1px solid #d1d5db",
-                        boxSizing: "border-box",
-                      }}
-                      placeholder="Ej. ¡Llegaron las rebajas!"
-                    />
-                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      try {
+                        const res = await fetch(
+                          `${API_URL}/api/tienda/config`,
+                          {
+                            method: "PUT",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify(configTienda),
+                          },
+                        );
 
-                  <div style={{ marginBottom: "20px" }}>
-                    <p
-                      style={{
-                        margin: "0 0 6px",
-                        fontWeight: "600",
-                        fontSize: "13px",
-                      }}
-                    >
-                      Subtítulo del Banner
-                    </p>
-                    <textarea
-                      value={configTienda.descripcionBanner}
-                      onChange={(e) =>
-                        setConfigTienda({
-                          ...configTienda,
-                          descripcionBanner: e.target.value,
-                        })
+                        if (res.ok) {
+                          alert("¡Configuración guardada correctamente! 💾");
+                        } else {
+                          alert("Hubo un error al guardar los cambios.");
+                        }
+                      } catch (error) {
+                        console.error(error);
+                        alert("Error de red al guardar.");
                       }
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        borderRadius: "8px",
-                        border: "1px solid #d1d5db",
-                        boxSizing: "border-box",
-                        minHeight: "60px",
-                      }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    style={{
-                      backgroundColor: "#0d6efd",
-                      color: "white",
-                      border: "none",
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
                     }}
-                    jajaja
                   >
-                    💾 Guardar Cambios
-                  </button>
-                </form>
-              </div>
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Nombre de tu Tienda (Logo)
+                      </p>
+                      <input
+                        type="text"
+                        value={configTienda.nombreTienda}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            nombreTienda: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Mensaje Principal (Banner destacado)
+                      </p>
+                      <input
+                        type="text"
+                        value={configTienda.mensajeBanner}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            mensajeBanner: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                        placeholder="Ej. ¡Llegaron las rebajas!"
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "20px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Subtítulo del Banner
+                      </p>
+                      <textarea
+                        value={configTienda.descripcionBanner}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            descripcionBanner: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                          minHeight: "60px",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Correo de Contacto de la Tienda
+                      </p>
+                      <input
+                        type="email"
+                        value={configTienda.correoTienda}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            correoTienda: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                        placeholder="ventas@mitienda.com"
+                      />
+                    </div>
+                    <div style={{ marginBottom: "20px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Número de WhatsApp
+                      </p>
+                      <input
+                        type="text"
+                        value={configTienda.whatsappTienda}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            whatsappTienda: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                        placeholder="Ej. +52 55 1234 5678"
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Política de Reembolso y Devoluciones
+                      </p>
+                      <textarea
+                        value={configTienda.politicaReembolso}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            politicaReembolso: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                          minHeight: "100px",
+                        }}
+                        placeholder="Ej. Tienes 30 días para solicitar un reembolso si el producto está sellado..."
+                      />
+                    </div>
+                    <div style={{ marginBottom: "20px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Términos de Servicio
+                      </p>
+                      <textarea
+                        value={configTienda.terminosServicio}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            terminosServicio: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                          minHeight: "100px",
+                        }}
+                        placeholder="Ej. Al comprar en esta tienda aceptas que los tiempos de envío pueden variar..."
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      style={{
+                        backgroundColor: "#0d6efd",
+                        color: "white",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                      }}
+                    >
+                      💾 Guardar Cambios
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {subSeccionTienda === "ofertas" && (
+                <div
+                  style={{
+                    backgroundColor: "white",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                    marginTop: "20px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    <h3 style={{ margin: 0, color: "#111827" }}>
+                      🎁 Gestor de Ofertas y Promociones
+                    </h3>
+                    <button
+                      onClick={() => quitarOferta("todas")}
+                      style={{
+                        backgroundColor: "#dc3545",
+                        color: "white",
+                        border: "none",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
+                    >
+                      🧹 Limpiar Todas las Ofertas
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={aplicarOferta}
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "15px",
+                      alignItems: "flex-end",
+                      paddingBottom: "20px",
+                      borderBottom: "1px solid #eee",
+                    }}
+                  >
+                    <div style={{ flex: "1 1 200px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Aplicar oferta a:
+                      </p>
+                      <select
+                        value={tipoOferta}
+                        onChange={(e) => {
+                          setTipoOferta(e.target.value);
+                          setObjetivoOfertaId(""); // Limpiar objetivo al cambiar de tipo
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <option value="categoria">Toda una Categoría</option>
+                        <option value="producto">Un Producto Específico</option>
+                      </select>
+                    </div>
+
+                    <div style={{ flex: "2 1 300px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Selecciona el objetivo:
+                      </p>
+                      <select
+                        value={objetivoOfertaId}
+                        onChange={(e) => setObjetivoOfertaId(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <option value="">Selecciona...</option>
+                        {tipoOferta === "categoria"
+                          ? categorias.map((cat) => (
+                              <option key={cat._id} value={cat._id}>
+                                {cat.nombre}
+                              </option>
+                            ))
+                          : productos.map((prod) => (
+                              <option key={prod._id} value={prod._id}>
+                                {prod.nombre} (Normal: ${prod.precioVenta})
+                              </option>
+                            ))}
+                      </select>
+                    </div>
+
+                    <div style={{ flex: "1 1 150px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Descuento (%):
+                      </p>
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={porcentajeOferta}
+                        onChange={(e) => setPorcentajeOferta(e.target.value)}
+                        placeholder="Ej. 20"
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      style={{
+                        backgroundColor: "#198754",
+                        color: "white",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        height: "40px",
+                      }}
+                    >
+                      Aplicar Descuento
+                    </button>
+                  </form>
+
+                  {/* Lista de Ofertas Activas */}
+                  <div style={{ marginTop: "20px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 10px",
+                        fontWeight: "600",
+                        fontSize: "14px",
+                        color: "#4b5563",
+                      }}
+                    >
+                      Productos con oferta activa actualmente:
+                    </p>
+                    <div
+                      style={{
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        border: "1px solid #eee",
+                        borderRadius: "8px",
+                      }}
+                    >
+                      {productos.filter(
+                        (p) => p.precioOferta && p.precioOferta > 0,
+                      ).length === 0 ? (
+                        <p
+                          style={{
+                            padding: "15px",
+                            margin: 0,
+                            textAlign: "center",
+                            color: "#9ca3af",
+                            fontSize: "13px",
+                          }}
+                        >
+                          No hay ofertas activas en este momento.
+                        </p>
+                      ) : (
+                        productos
+                          .filter((p) => p.precioOferta && p.precioOferta > 0)
+                          .map((prod) => (
+                            <div
+                              key={prod._id}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "10px 15px",
+                                borderBottom: "1px solid #eee",
+                                fontSize: "13px",
+                              }}
+                            >
+                              <div>
+                                <span
+                                  style={{
+                                    fontWeight: "600",
+                                    color: "#111827",
+                                  }}
+                                >
+                                  {prod.nombre}
+                                </span>
+                                <span
+                                  style={{
+                                    marginLeft: "10px",
+                                    textDecoration: "line-through",
+                                    color: "#9ca3af",
+                                  }}
+                                >
+                                  ${prod.precioVenta}
+                                </span>
+                                <span
+                                  style={{
+                                    marginLeft: "10px",
+                                    color: "#198754",
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  🔥 ${Number(prod.precioOferta).toFixed(2)}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  quitarOferta("producto", prod._id)
+                                }
+                                style={{
+                                  background: "none",
+                                  border: "1px solid #dc3545",
+                                  color: "#dc3545",
+                                  padding: "4px 8px",
+                                  borderRadius: "4px",
+                                  cursor: "pointer",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {/* ======================================================
@@ -2859,54 +3308,15 @@ function App() {
             }}
           >
             <form onSubmit={guardarMovimiento}>
-              <div style={{ marginBottom: "20px" }}>
-                <button
-                  type="button"
-                  onClick={() => setTipoVentaSeleccionado("detalle")}
-                  style={{
-                    backgroundColor:
-                      tipoVentaSeleccionado === "detalle" ? "#0d6efd" : "white",
-                    color:
-                      tipoVentaSeleccionado === "detalle" ? "white" : "#222",
-                    border: "1px solid #ddd",
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    marginRight: "10px",
-                    fontWeight: "600",
-                  }}
-                >
-                  🛒 Venta normal
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTipoVentaSeleccionado("mayoreo")}
-                  style={{
-                    backgroundColor:
-                      tipoVentaSeleccionado === "mayoreo" ? "#fd7e14" : "white",
-                    color:
-                      tipoVentaSeleccionado === "mayoreo" ? "white" : "#222",
-                    border: "1px solid #ddd",
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    fontWeight: "600",
-                  }}
-                >
-                  📦 Venta al mayoreo
-                </button>
-              </div>
-
               <p
                 style={{ color: "#666", marginTop: "0", marginBottom: "18px" }}
               >
-                {tipoVentaSeleccionado === "detalle"
-                  ? "Registra ventas unitarias o por cantidad usando el precio de venta establecido. También puedes indicar un precio negociado si aplica."
-                  : "Registra ventas al por mayor usando un precio global negociado para toda la operación."}
+                Registra ventas unitarias o por cantidad usando el precio de
+                venta establecido. Si acordaste un precio final distinto con el
+                cliente, puedes colocarlo abajo.
               </p>
 
               <p style={{ marginBottom: "6px", fontWeight: "600" }}>Producto</p>
-
               <select
                 value={productoMovimientoId}
                 onChange={(e) => setProductoMovimientoId(e.target.value)}
@@ -2921,7 +3331,6 @@ function App() {
                 }}
               >
                 <option value="">Selecciona un producto...</option>
-
                 {productos.map((producto) => (
                   <option key={producto._id} value={producto._id}>
                     {producto.nombre} — Stock: {producto.stock}
@@ -2932,7 +3341,6 @@ function App() {
               <p style={{ marginBottom: "6px", fontWeight: "600" }}>
                 Cantidad vendida
               </p>
-
               <input
                 type="number"
                 min="1"
@@ -2945,26 +3353,20 @@ function App() {
                 value={cantidadMovimiento}
                 onChange={(e) => {
                   const nuevaCantidad = e.target.value;
-
-                  // Si hay un producto seleccionado y se está escribiendo un número
                   if (productoMovimientoSeleccionado && nuevaCantidad !== "") {
-                    // Si lo que teclea es mayor al stock disponible
                     if (
                       Number(nuevaCantidad) >
                       Number(productoMovimientoSeleccionado.stock)
                     ) {
                       alert(
-                        `⚠️ Stock insuficiente: Solo tienes ${productoMovimientoSeleccionado.stock} unidades de ${productoMovimientoSeleccionado.nombre}.`,
+                        `⚠️ Stock insuficiente: Solo tienes ${productoMovimientoSeleccionado.stock} unidades.`,
                       );
-                      // Forzamos a que el valor se quede en el máximo stock disponible
                       setCantidadMovimiento(
                         productoMovimientoSeleccionado.stock,
                       );
-                      return; // Detenemos la ejecución
+                      return;
                     }
                   }
-
-                  // Si no supera el límite, permitimos que se escriba normal
                   setCantidadMovimiento(nuevaCantidad);
                 }}
                 onWheel={(e) => e.target.blur()}
@@ -2980,139 +3382,46 @@ function App() {
                 }}
               />
 
-              {/* === PRECIO NEGOCIADO SIEMPRE VISIBLE (Solo en venta al detalle) === */}
-              {tipoVentaSeleccionado === "detalle" &&
-                productoMovimientoSeleccionado && (
-                  <>
-                    <p
+              {productoMovimientoSeleccionado && (
+                <>
+                  <p
+                    style={{
+                      marginBottom: "6px",
+                      marginTop: "0",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Precio final negociado{" "}
+                    <span
                       style={{
-                        marginBottom: "6px",
-                        marginTop: "0",
-                        fontWeight: "600",
+                        color: "#666",
+                        fontWeight: "normal",
+                        fontSize: "11px",
                       }}
                     >
-                      Precio negociado{" "}
-                      <span
-                        style={{
-                          color: "#666",
-                          fontWeight: "normal",
-                          fontSize: "11px",
-                        }}
-                      >
-                        (Opcional)
-                      </span>
-                    </p>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Si le diste precio especial, ponlo aquí"
-                      value={precioUnitarioNegociado}
-                      onChange={(e) =>
-                        setPrecioUnitarioNegociado(e.target.value)
-                      }
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: "350px",
-                        maxWidth: "100%",
-                        padding: "8px",
-                        borderRadius: "8px",
-                        border: "1px solid #ccc",
-                        fontSize: "12.5px",
-                        marginBottom: "15px",
-                        display: "block",
-                      }}
-                    />
-                  </>
-                )}
-
-              {/* NUEVO: CAMPOS OBLIGATORIOS PARA MAYOREO (FUERA DEL ACORDEÓN) */}
-              {tipoVentaSeleccionado === "mayoreo" &&
-                productoMovimientoSeleccionado && (
-                  <div
+                      (Opcional)
+                    </span>
+                  </p>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Total a cobrar por esta venta"
+                    value={precioUnitarioNegociado}
+                    onChange={(e) => setPrecioUnitarioNegociado(e.target.value)}
+                    onWheel={(e) => e.target.blur()}
                     style={{
                       width: "350px",
                       maxWidth: "100%",
-                      padding: "12px",
-                      backgroundColor: "#fff8f1",
-                      borderLeft: "4px solid #fd7e14",
-                      borderRadius: "0 8px 8px 0",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #ccc",
+                      fontSize: "12.5px",
                       marginBottom: "15px",
-                      boxSizing: "border-box",
+                      display: "block",
                     }}
-                  >
-                    <p
-                      style={{
-                        margin: "0 0 10px",
-                        fontWeight: "700",
-                        color: "#fd7e14",
-                        fontSize: "13px",
-                      }}
-                    >
-                      📦 Condición de Mayoreo
-                    </p>
-
-                    <p
-                      style={{
-                        margin: "0 0 6px",
-                        fontWeight: "600",
-                        fontSize: "12px",
-                      }}
-                    >
-                      Precio global negociado
-                    </p>
-                    <input
-                      type="number"
-                      min="0"
-                      disabled={!!porcentajeDescuento}
-                      placeholder="Monto total cobrado"
-                      value={precioGlobalMayoreo}
-                      onChange={(e) => setPrecioGlobalMayoreo(e.target.value)}
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: "6px",
-                        border: "1px solid #ccc",
-                        fontSize: "12.5px",
-                        marginBottom: "10px",
-                        backgroundColor: !!porcentajeDescuento
-                          ? "#e9ecef"
-                          : "white",
-                        boxSizing: "border-box",
-                      }}
-                    />
-
-                    <p
-                      style={{
-                        margin: "0 0 6px",
-                        fontWeight: "600",
-                        fontSize: "12px",
-                      }}
-                    >
-                      O aplica un descuento %
-                    </p>
-                    <input
-                      type="number"
-                      min="0"
-                      disabled={!!precioGlobalMayoreo}
-                      placeholder="Ejemplo: 10"
-                      value={porcentajeDescuento}
-                      onChange={(e) => setPorcentajeDescuento(e.target.value)}
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: "6px",
-                        border: "1px solid #ccc",
-                        fontSize: "12.5px",
-                        backgroundColor: !!precioGlobalMayoreo
-                          ? "#e9ecef"
-                          : "white",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
-                )}
+                  />
+                </>
+              )}
 
               {/* === NUEVO: TOTAL A COBRAR (Súper visible) === */}
               {productoMovimientoSeleccionado && cantidadMovimiento !== "" && (
@@ -3793,7 +4102,6 @@ function App() {
                           {[
                             "Producto",
                             "Categoría",
-                            "Tipo",
                             "Origen",
                             "Cliente",
                             "Cantidad",
@@ -3850,12 +4158,6 @@ function App() {
                                     ?.nombre || "—"
                                 );
                               })()}
-                            </td>
-
-                            <td style={{ padding: "8px", textAlign: "center" }}>
-                              {venta.tipoVenta === "mayoreo"
-                                ? "Mayoreo"
-                                : "Normal"}
                             </td>
 
                             {/* --- NUEVA CELDA DE ORIGEN --- */}
@@ -4259,7 +4561,9 @@ function App() {
                     fontSize: "12.5px",
                   }}
                 />
+
                 <div style={{ height: "14px" }} />
+                {/* -------------------------------------- */}
 
                 <p style={{ marginBottom: "6px", fontWeight: "600" }}>
                   Costo del producto{" "}
@@ -5154,7 +5458,7 @@ function App() {
                               position: "sticky",
                               top: 0,
                               backgroundColor: "#f1f3f5",
-                              zIndex: 10,
+                              zIndex: 1,
                               fontSize: "13px",
                               fontWeight: "700",
                               color: "#333",
@@ -5401,6 +5705,9 @@ function App() {
                                     setPrecio(producto.precio);
                                     setCostoEnvio(producto.costoEnvio || "");
                                     setPrecioVenta(producto.precioVenta || "");
+                                    setPrecioOferta(
+                                      producto.precioOferta || "",
+                                    );
                                     setStock(producto.stock);
                                     setStockMinimo(producto.stockMinimo || "");
                                     const catId =

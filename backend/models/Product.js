@@ -46,6 +46,7 @@ const productSchema = new mongoose.Schema(
       ref: "Categoria",
       required: true,
     },
+
     fotos: [
       {
         type: String,
@@ -57,7 +58,13 @@ const productSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
+    precioOferta: {
+      type: Number,
+      default: 0,
+    },
   },
+
   {
     timestamps: true,
   },

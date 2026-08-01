@@ -21,6 +21,22 @@ const configTiendaSchema = new mongoose.Schema(
       default:
         "Lleva los mejores accesorios tecnológicos al mejor precio con liquidaciones de inventario por tiempo limitado.",
     },
+    correoTienda: {
+      type: String,
+      default: "",
+    },
+    whatsappTienda: {
+      type: String,
+      default: "",
+    },
+    politicaReembolso: {
+      type: String,
+      default: "",
+    },
+    terminosServicio: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true },
 );
