@@ -27,6 +27,7 @@ function App() {
   const [slideActual, setSlideActive] = useState(0);
   const [nombreCliente, setNombreCliente] = useState("");
   const [apellidoCliente, setApellidoCliente] = useState("");
+  const [telefonoCliente, setTelefonoCliente] = useState(""); // <--- NUEVO
 
   const [configTienda, setConfigTienda] = useState({
     nombreTienda: "Cargando Tienda...",
@@ -45,6 +46,21 @@ function App() {
   const [cargandoProductos, setCargandoProductos] = useState(true);
   const [categorias, setCategorias] = useState([]);
   const [categoriaActiva, setCategoriaActiva] = useState("TODAS"); // "TODAS" será la vista por defecto
+
+  // === NUEVOS ESTADOS PARA EL BUSCADOR ===
+  const [mostrarBuscador, setMostrarBuscador] = useState(false);
+  const [busquedaTienda, setBusquedaTienda] = useState("");
+  // === CERRAR BUSCADOR AL HACER CLIC AFUERA ===
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (mostrarBuscador && !event.target.closest("#contenedor-buscador")) {
+        setMostrarBuscador(false);
+        setBusquedaTienda("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [mostrarBuscador]);
 
   const theme = {
     bg: "#f8f9fa",
@@ -143,11 +159,19 @@ function App() {
     0,
   );
 
-  // LÓGICA DE CATEGORÍAS (VISTA DINÁMICA)
-  const productosAMostrar =
-    categoriaActiva === "TODAS"
-      ? productos
-      : productos.filter((p) => p.categoria === categoriaActiva);
+  // LÓGICA DE CATEGORÍAS Y BÚSQUEDA (VISTA DINÁMICA)
+  const productosAMostrar = productos
+    .filter(
+      (p) => categoriaActiva === "TODAS" || p.categoria === categoriaActiva,
+    )
+    .filter((p) => {
+      const busqueda = busquedaTienda.toLowerCase();
+      const coincideNombre = p.nombre.toLowerCase().includes(busqueda);
+      const coincideDesc = p.descripcion
+        ? p.descripcion.toLowerCase().includes(busqueda)
+        : false;
+      return coincideNombre || coincideDesc;
+    });
 
   const agregarAlCarrito = (producto) => {
     // Validación 1: Verificar el stock antes de hacer nada
@@ -221,6 +245,7 @@ function App() {
             productoId: item._id,
             cantidad: item.cantidadSeleccionada,
             cliente: `${nombreCliente} ${apellidoCliente}`.trim(),
+            telefonoCliente: telefonoCliente.trim(), // <--- ENVIAMOS EL TELÉFONO AL BACKEND
             origenVenta: "Web",
           }),
         }).then(async (res) => {
@@ -234,10 +259,16 @@ function App() {
         }),
       );
       await Promise.all(promesasCompra);
-      alert("¡Compra realizada con éxito! El inventario se ha descontado.");
+
+      // ALERTA NUEVA Y LIMPIA (Cero redirección para el cliente)
+      alert(
+        "¡Pedido completado con éxito! Nos pondremos en contacto contigo por WhatsApp para coordinar la entrega y el pago.",
+      );
+
+      // Limpiamos todo al terminar
       setCarrito([]);
       setEnCheckout(false);
-
+      setTelefonoCliente("");
       await fetchTiendaData();
     } catch (error) {
       alert("Hubo un error al procesar la compra: " + error.message);
@@ -379,9 +410,18 @@ function App() {
             >
               Contacto
             </h3>
+            <p
+              style={{
+                margin: "0 0 5px 0",
+                fontSize: "13px",
+                color: theme.textMuted,
+              }}
+            >
+              Correo electrónico (Opcional)
+            </p>
             <input
               type="email"
-              placeholder="Correo electrónico"
+              placeholder="Ej. correo@ejemplo.com"
               style={{
                 backgroundColor: "white",
                 color: theme.text,
@@ -402,8 +442,18 @@ function App() {
                 color: theme.text,
               }}
             >
-              Entrega
+              Entrega{" "}
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: theme.textMuted,
+                  fontWeight: "normal",
+                }}
+              >
+                (<span style={{ color: "red" }}>*</span> Obligatorios)
+              </span>
             </h3>
+
             <div
               style={{
                 display: "grid",
@@ -412,29 +462,84 @@ function App() {
                 marginBottom: "15px",
               }}
             >
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={nombreCliente}
-                onChange={(e) => setNombreCliente(e.target.value)}
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 5px 0",
+                    fontSize: "13px",
+                    color: theme.text,
+                    fontWeight: "600",
+                  }}
+                >
+                  Nombre <span style={{ color: "red" }}>*</span>
+                </p>
+                <input
+                  type="text"
+                  placeholder="Tu nombre"
+                  value={nombreCliente}
+                  onChange={(e) => setNombreCliente(e.target.value)}
+                  style={{
+                    backgroundColor: "white",
+                    color: theme.text,
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    border: `1px solid ${theme.border}`,
+                    fontSize: "14px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 5px 0",
+                    fontSize: "13px",
+                    color: theme.text,
+                    fontWeight: "600",
+                  }}
+                >
+                  Apellidos <span style={{ color: "red" }}>*</span>
+                </p>
+                <input
+                  type="text"
+                  placeholder="Tus apellidos"
+                  value={apellidoCliente}
+                  onChange={(e) => setApellidoCliente(e.target.value)}
+                  style={{
+                    backgroundColor: "white",
+                    color: theme.text,
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    border: `1px solid ${theme.border}`,
+                    fontSize: "14px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <p
                 style={{
-                  backgroundColor: "white",
+                  margin: "0 0 5px 0",
+                  fontSize: "13px",
                   color: theme.text,
-                  padding: "12px",
-                  borderRadius: "6px",
-                  border: `1px solid ${theme.border}`,
-                  fontSize: "14px",
-                  boxSizing: "border-box",
+                  fontWeight: "600",
                 }}
-              />
+              >
+                Número de WhatsApp <span style={{ color: "red" }}>*</span>
+              </p>
               <input
-                type="text"
-                placeholder="Apellidos"
-                value={apellidoCliente}
-                onChange={(e) => setApellidoCliente(e.target.value)}
+                type="tel"
+                placeholder="A 10 dígitos"
+                value={telefonoCliente}
+                onChange={(e) => setTelefonoCliente(e.target.value)}
                 style={{
                   backgroundColor: "white",
                   color: theme.text,
+                  width: "100%",
                   padding: "12px",
                   borderRadius: "6px",
                   border: `1px solid ${theme.border}`,
@@ -443,25 +548,16 @@ function App() {
                 }}
               />
             </div>
-            <input
-              type="text"
-              placeholder="Dirección completa"
-              style={{
-                backgroundColor: "white",
-                color: theme.text,
-                width: "100%",
-                padding: "12px",
-                borderRadius: "6px",
-                border: `1px solid ${theme.border}`,
-                marginBottom: "15px",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
 
             <button
               onClick={procesarCompra}
-              disabled={procesando || carrito.length === 0}
+              disabled={
+                procesando ||
+                carrito.length === 0 ||
+                !nombreCliente.trim() ||
+                !apellidoCliente.trim() ||
+                !telefonoCliente.trim()
+              }
               style={{
                 width: "100%",
                 padding: "16px",
@@ -471,12 +567,24 @@ function App() {
                 borderRadius: "8px",
                 fontSize: "16px",
                 fontWeight: "bold",
-                cursor: procesando ? "not-allowed" : "pointer",
-                marginTop: "20px",
-                opacity: procesando ? 0.7 : 1,
+                cursor:
+                  procesando ||
+                  !nombreCliente.trim() ||
+                  !apellidoCliente.trim() ||
+                  !telefonoCliente.trim()
+                    ? "not-allowed"
+                    : "pointer",
+                marginTop: "10px",
+                opacity:
+                  procesando ||
+                  !nombreCliente.trim() ||
+                  !apellidoCliente.trim() ||
+                  !telefonoCliente.trim()
+                    ? 0.6
+                    : 1,
               }}
             >
-              {procesando ? "Procesando pago..." : "Continuar con el pago"}
+              {procesando ? "Procesando pedido..." : "Completar pedido"}
             </button>
           </div>
 
@@ -846,8 +954,52 @@ function App() {
         </nav>
 
         <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-          <span style={{ cursor: "pointer", fontSize: "18px" }}>🔍</span>
-          <span style={{ cursor: "pointer", fontSize: "18px" }}>👤</span>
+          {/* BARRA DE BÚSQUEDA DESPLEGABLE */}
+          <div
+            id="contenedor-buscador"
+            style={{ display: "flex", gap: "10px", alignItems: "center" }}
+          >
+            {mostrarBuscador && (
+              <input
+                type="text"
+                placeholder="Buscar producto..."
+                value={busquedaTienda}
+                onChange={(e) => setBusquedaTienda(e.target.value)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "20px",
+                  border: `1px solid ${theme.border}`,
+                  outline: "none",
+                  fontSize: "13px",
+                  width: "150px",
+                }}
+                autoFocus
+              />
+            )}
+            <span
+              onClick={() => {
+                setMostrarBuscador(!mostrarBuscador);
+                if (mostrarBuscador) setBusquedaTienda(""); // Limpia al cerrar
+              }}
+              style={{ cursor: "pointer", fontSize: "18px" }}
+            >
+              🔍
+            </span>
+          </div>
+
+          {/* ICONO DE USUARIO CON AVISO */}
+          <span
+            onClick={() =>
+              alert(
+                "🛠️ El sistema de cuentas para clientes y registro de historial estará disponible en futuras actualizaciones. ¡Gracias por tu paciencia!",
+              )
+            }
+            style={{ cursor: "pointer", fontSize: "18px" }}
+            title="Mi Cuenta"
+          >
+            👤
+          </span>
+
           <button
             onClick={() => setCarritoAbierto(true)}
             style={{
@@ -884,7 +1036,7 @@ function App() {
         </div>
       </header>
 
-      {categoriaActiva === "TODAS" && (
+      {categoriaActiva === "TODAS" && busquedaTienda === "" && (
         <section
           style={{
             padding: "clamp(15px, 3vw, 30px) clamp(15px, 4vw, 40px)",
@@ -1078,9 +1230,22 @@ function App() {
                           justifyContent: "center",
                           fontSize: "60px",
                           marginBottom: "15px",
+                          overflow: "hidden", // <-- Importante para que la foto respete el borde redondo
                         }}
                       >
-                        📸
+                        {producto.fotos && producto.fotos.length > 0 ? (
+                          <img
+                            src={producto.fotos[0]}
+                            alt={producto.nombre}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          "📸"
+                        )}
                       </div>
                       <h3
                         style={{
@@ -1535,12 +1700,22 @@ function App() {
             <h4
               style={{
                 color: theme.text,
-                marginBottom: "20px",
+                marginBottom: "10px",
                 fontSize: "15px",
               }}
             >
-              Suscríbete al Club Tech
+              Mantente informado
             </h4>
+            <p
+              style={{
+                fontSize: "12px",
+                color: theme.textMuted,
+                marginBottom: "15px",
+                lineHeight: "1.4",
+              }}
+            >
+              Entérate de próximas actualizaciones o próximas ofertas.
+            </p>
             <div style={{ display: "flex", gap: "5px" }}>
               <input
                 type="email"
@@ -1585,11 +1760,19 @@ function App() {
           }}
         >
           <div>
-            © 2026 TechStore. Todos los derechos reservados. | Sistema
-            administrado por Inventario Inteligente.
-          </div>
-          <div style={{ display: "flex", gap: "10px", fontSize: "24px" }}>
-            <span>💳</span> <span>💵</span> <span>💸</span>
+            © 2026 {configTienda.nombreTienda}. Todos los derechos reservados. |
+            Sistema administrado por{" "}
+            <span
+              onClick={() => (window.location.href = "http://localhost:5173")}
+              style={{
+                color: theme.primary,
+                cursor: "pointer",
+                fontWeight: "bold",
+                textDecoration: "underline",
+              }}
+            >
+              Inventario Inteligente
+            </span>
           </div>
         </div>
       </footer>
@@ -1877,7 +2060,7 @@ function App() {
                   opacity: carrito.length === 0 ? 0.5 : 1,
                 }}
               >
-                FINALIZAR COMPRA
+                FINALIZAR PEDIDO
               </button>
             </div>
           </div>

@@ -740,7 +740,7 @@ app.get("/api/tienda/:usuarioId/productos", async (req, res) => {
 // 2. Simular una compra desde la tienda (Ruta Dinámica)
 app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
   try {
-    const { productoId, cantidad, cliente } = req.body;
+    const { productoId, cantidad, cliente, telefonoCliente } = req.body;
     const { usuarioId } = req.params;
 
     if (!productoId || cantidad === undefined || Number(cantidad) <= 0) {
@@ -798,22 +798,69 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
       utilidad,
       tipoVenta: "detalle",
       cliente: cliente || "",
+      telefonoCliente: telefonoCliente || "", // <--- NUEVO
       ventaConPerdida: utilidad < 0,
       user: producto.user,
       origenVenta: "Web",
-      estado: "Completado",
+      estado: "En proceso",
     });
 
     await nuevaVenta.save();
 
     res.status(201).json({
-      mensaje: "¡Compra simulada con éxito! El stock ha sido actualizado.",
+      mensaje: "¡Pedido registrado correctamente!",
       venta: nuevaVenta,
       productoUpdated: producto,
     });
   } catch (error) {
     console.error("Error en la compra simulada:", error);
     res.status(500).json({ error: "Error al procesar la compra simulada" });
+  }
+});
+
+// Actualizar estado de la venta
+app.put("/ventas/:id/estado", authMiddleware, async (req, res) => {
+  try {
+    const { estado } = req.body;
+    const ventaActualizada = await Venta.findOneAndUpdate(
+      { _id: req.params.id, user: req.user.userId },
+      { estado },
+      { returnDocument: "after" },
+    );
+    if (!ventaActualizada) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+    res.json(ventaActualizada);
+  } catch (error) {
+    console.error("Error al actualizar estado:", error);
+    res.status(500).json({ error: "Error al actualizar estado" });
+  }
+});
+
+// Cancelar pedido web y devolver stock
+app.delete("/api/ventas/:id/cancelar", authMiddleware, async (req, res) => {
+  try {
+    const venta = await Venta.findOne({
+      _id: req.params.id,
+      user: req.user.userId,
+    });
+    if (!venta) {
+      return res.status(404).json({ error: "Venta no encontrada" });
+    }
+
+    // 1. Devolver el stock al producto sumando la cantidad apartada
+    await Product.updateOne(
+      { _id: venta.productoId },
+      { $inc: { stock: venta.cantidad } },
+    );
+
+    // 2. Eliminar el registro de la venta para no ensuciar el historial
+    await Venta.deleteOne({ _id: venta._id });
+
+    res.json({ mensaje: "Pedido cancelado y stock restaurado" });
+  } catch (error) {
+    console.error("Error al cancelar pedido:", error);
+    res.status(500).json({ error: "Error al cancelar el pedido" });
   }
 });
 

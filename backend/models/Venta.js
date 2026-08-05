@@ -85,19 +85,24 @@ const ventaSchema = new mongoose.Schema(
       required: true,
     },
 
-      origenVenta: {
+    origenVenta: {
       type: String,
-      enum: ['Web', 'App', 'Fisica', 'Simulador Tienda'],
-      default: 'Simulador Tienda'
+      enum: ["Web", "App", "Fisica", "Simulador Tienda"],
+      default: "Simulador Tienda",
     },
 
     estado: {
       type: String,
-      enum: ['Pendiente', 'Procesando', 'Completado', 'Cancelado'],
-      default: 'Completado' // Como es venta directa, puede caer en completado directo
+      enum: ["Completado", "En proceso"],
+      default: "Completado", // Como es venta directa, puede caer en completado directo
+    },
+
+    telefonoCliente: {
+      type: String,
+      default: "",
     },
   },
-  
+
   {
     timestamps: true,
   },
