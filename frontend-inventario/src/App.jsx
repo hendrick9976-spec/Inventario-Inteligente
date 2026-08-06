@@ -4575,133 +4575,11 @@ function App() {
                   )}
                 </div>
 
-                {datosGraficaVentas.length > 0 && (
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 380, // Subí un poco la altura para dar más respiro
-                      backgroundColor: "#f8f9fa",
-                      padding: "12px",
-                      borderRadius: "12px",
-                      marginBottom: "25px",
-                      boxSizing: "border-box",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <h3 style={{ marginTop: 0, color: "#222" }}>
-                      📈 Evolución de ingresos y utilidad por día
-                    </h3>
-
-                    <div
-                      style={{
-                        marginBottom: "15px",
-                        display: "flex",
-                        gap: "15px",
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <label
-                          style={{
-                            marginRight: "8px",
-                            fontWeight: "600",
-                            fontSize: "13px",
-                          }}
-                        >
-                          Desde:
-                        </label>
-                        <input
-                          type="date"
-                          value={fechaInicioGrafica}
-                          onChange={(e) =>
-                            setFechaInicioGrafica(e.target.value)
-                          }
-                          style={{
-                            padding: "6px",
-                            borderRadius: "6px",
-                            border: "1px solid #ccc",
-                            fontSize: "12.5px",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label
-                          style={{
-                            marginRight: "8px",
-                            fontWeight: "600",
-                            fontSize: "13px",
-                          }}
-                        >
-                          Hasta:
-                        </label>
-                        <input
-                          type="date"
-                          value={fechaFinGrafica}
-                          onChange={(e) => setFechaFinGrafica(e.target.value)}
-                          style={{
-                            padding: "6px",
-                            borderRadius: "6px",
-                            border: "1px solid #ccc",
-                            fontSize: "12.5px",
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Ahora la condición está adentro: Solo se ocultan las líneas, no los controles */}
-                    {datosGraficaVentas.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="80%">
-                        <LineChart
-                          data={datosGraficaVentas}
-                          margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="fecha" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line
-                            type="monotone"
-                            dataKey="ingresos"
-                            name="Ingresos"
-                            stroke="#0d6efd"
-                            strokeWidth={3}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="utilidad"
-                            name="Utilidad"
-                            stroke="#198754"
-                            strokeWidth={3}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "center",
-                          alignItems: "center",
-                          height: "70%",
-                          color: "#999",
-                          border: "2px dashed #ddd",
-                          borderRadius: "8px",
-                        }}
-                      >
-                        <p style={{ fontWeight: "600" }}>
-                          No hay ventas en este rango de fechas.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* --- GRÁFICO INTERACTIVO: ORIGEN -> CATEGORÍAS -> PRODUCTOS --- */}
+                {/* 1. GRÁFICA DE LÍNEAS (FINANCIERA) CON CALENDARIOS */}
                 <div
                   style={{
                     width: "100%",
-                    height: 380, // Le subí un poquito la altura para que respire mejor
+                    height: 380,
                     backgroundColor: "#f8f9fa",
                     padding: "12px",
                     borderRadius: "12px",
@@ -4769,7 +4647,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* LA REGLA AHORA SOLO ENVUELVE A LA GRÁFICA, NO A LOS CALENDARIOS */}
                   {datosGraficaVentas.length > 0 ? (
                     <ResponsiveContainer width="100%" height="80%">
                       <LineChart
@@ -4815,6 +4692,150 @@ function App() {
                     </div>
                   )}
                 </div>
+
+                {/* 2. GRÁFICA CIRCULAR (PIE) INTERACTIVA */}
+                {datosGraficoPie.length > 0 && (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 320,
+                      backgroundColor: "#f8f9fa",
+                      padding: "12px",
+                      borderRadius: "12px",
+                      marginBottom: "25px",
+                      boxSizing: "border-box",
+                      position: "relative",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "10px",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          marginTop: 0,
+                          marginBottom: 0,
+                          color: "#222",
+                          fontSize: "16px",
+                        }}
+                      >
+                        {tituloGraficoPie}
+                      </h3>
+
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {categoriaSeleccionadaPie && (
+                          <button
+                            type="button"
+                            onClick={() => setCategoriaSeleccionadaPie(null)}
+                            style={{
+                              backgroundColor: "#6c757d",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            ⬅ Volver a Categorías
+                          </button>
+                        )}
+                        {origenSeleccionadoPie && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOrigenSeleccionadoPie(null);
+                              setCategoriaSeleccionadaPie(null);
+                            }}
+                            style={{
+                              backgroundColor: "#343a40",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            ⬅ Volver a Origen
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <ResponsiveContainer width="100%" height="85%">
+                      <PieChart>
+                        <Pie
+                          data={datosGraficoPie}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          onClick={(data) => {
+                            if (!data?.payload?.id) return;
+                            if (!origenSeleccionadoPie) {
+                              setOrigenSeleccionadoPie(data.payload.id);
+                            } else if (!categoriaSeleccionadaPie) {
+                              setCategoriaSeleccionadaPie(data.payload.id);
+                            }
+                          }}
+                          style={{
+                            cursor:
+                              !origenSeleccionadoPie ||
+                              !categoriaSeleccionadaPie
+                                ? "pointer"
+                                : "default",
+                          }}
+                          label={({ name, percent }) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {datosGraficoPie.map((entry, index) => {
+                            const colores = [
+                              "#0d6efd",
+                              "#7c3aed",
+                              "#198754",
+                              "#fd7e14",
+                              "#dc3545",
+                              "#0dcaf0",
+                            ];
+                            return (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={colores[index % colores.length]}
+                              />
+                            );
+                          })}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => `$${Number(value).toFixed(2)}`}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {(!origenSeleccionadoPie || !categoriaSeleccionadaPie) && (
+                      <p
+                        style={{
+                          textAlign: "center",
+                          fontSize: "11px",
+                          color: "#666",
+                          margin: "-10px 0 0 0",
+                        }}
+                      >
+                        *Haz clic en una rebanada para profundizar en los datos.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <h3 style={{ marginBottom: "10px", color: "#222" }}>
                   📄 Historial de ventas
