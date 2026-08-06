@@ -1816,6 +1816,17 @@ function App() {
   const recomendaciones = [];
   const nombresProductosBajos = [];
 
+  // === NUEVA REGLA AZUL: Pedidos Web Pendientes ===
+  const pedidosWebPendientes = ventas.filter((v) => v.estado === "En proceso");
+  if (pedidosWebPendientes.length > 0) {
+    recomendaciones.push({
+      tipo: "pedido_web",
+      icono: "🌐",
+      mensaje: `¡Tienes ${pedidosWebPendientes.length} pedido(s) web pendiente(s) por atender!`,
+      accion: "ir_a_pedidos_web",
+    });
+  }
+
   productos.forEach((producto) => {
     const stockNum = Number(producto.stock);
     const stockMin = Number(producto.stockMinimo || 5);
@@ -3180,6 +3191,12 @@ function App() {
                   icono = rec.icono || "🟢";
                 }
 
+                if (rec.tipo === "pedido_web") {
+                  colorFondo = "#e0e7ff"; // Fondo azul/púrpura suave
+                  colorTexto = "#3730a3"; // Texto azul oscuro
+                  icono = rec.icono || "🌐";
+                }
+
                 return (
                   <div
                     key={i}
@@ -3222,6 +3239,31 @@ function App() {
                         }}
                       >
                         Pedir 📋
+                      </button>
+                    )}
+
+                    {/* SHORTCUT DIRECTO AL GESTOR DE PEDIDOS WEB */}
+                    {rec.accion === "ir_a_pedidos_web" && (
+                      <button
+                        onClick={() => {
+                          setSeccionActiva("ventas");
+                          setSubSeccionVentas("web");
+                        }}
+                        style={{
+                          backgroundColor: "#4f46e5",
+                          color: "white",
+                          border: "none",
+                          padding: "5px 12px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          whiteSpace: "nowrap",
+                          marginLeft: "10px",
+                          boxShadow: "0 2px 4px rgba(79, 70, 229, 0.2)",
+                        }}
+                      >
+                        Atender Pedido 🛒
                       </button>
                     )}
                   </div>

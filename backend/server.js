@@ -702,9 +702,10 @@ app.get("/api/tienda/:usuarioId/config", async (req, res) => {
 
     if (!config) {
       return res.json({
-        nombreTienda: "TechStore",
-        mensajeBanner: "Bienvenido a nuestra tienda",
-        descripcionBanner: "Explora nuestro catálogo de productos.",
+        nombreTienda: "Mi Tienda Virtual",
+        mensajeBanner: "¡Bienvenido a nuestra Tienda en Línea!",
+        descripcionBanner:
+          "Personaliza este banner desde tu panel de administración en la sección Mi Tienda Web.",
       });
     }
 
