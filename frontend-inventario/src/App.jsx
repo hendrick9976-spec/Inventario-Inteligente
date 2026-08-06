@@ -155,7 +155,15 @@ function App() {
 
   const [ventas, setVentas] = useState([]);
   const [filtroFechaVenta, setFiltroFechaVenta] = useState("");
-  const [rangoGrafica, setRangoGrafica] = useState("10");
+  const [fechaInicioGrafica, setFechaInicioGrafica] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 9); // Hace 9 días (para mostrar 10 días contando hoy)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [fechaFinGrafica, setFechaFinGrafica] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [ordenVentas, setOrdenVentas] = useState("");
   const [reposiciones, setReposiciones] = useState([]);
   const [datosOrigenVentas, setDatosOrigenVentas] = useState([]);
@@ -1619,60 +1627,55 @@ function App() {
   // Ventas e ingresos por día
   // ----------------------
 
-  const ventasPorDia = ventas
-    .filter((venta) => venta.origenVenta !== "Web")
-    .reduce((acc, venta) => {
-      const fechaObj = new Date(venta.createdAt);
+  const ventasPorDia = ventas.reduce((acc, venta) => {
+    const fechaObj = new Date(venta.createdAt);
 
-      const fecha = `${fechaObj.getFullYear()}-${String(
-        fechaObj.getMonth() + 1,
-      ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
+    const fecha = `${fechaObj.getFullYear()}-${String(
+      fechaObj.getMonth() + 1,
+    ).padStart(2, "0")}-${String(fechaObj.getDate()).padStart(2, "0")}`;
 
-      if (!acc[fecha]) {
-        acc[fecha] = {
-          fecha,
-          ingresos: 0,
-          utilidad: 0,
-        };
-      }
+    if (!acc[fecha]) {
+      acc[fecha] = {
+        fecha,
+        ingresos: 0,
+        utilidad: 0,
+      };
+    }
 
-      acc[fecha].ingresos += Number(venta.ingresoTotal);
-      acc[fecha].utilidad += Number(venta.utilidad);
+    acc[fecha].ingresos += Number(venta.ingresoTotal);
+    acc[fecha].utilidad += Number(venta.utilidad);
 
-      return acc;
-    }, {});
+    return acc;
+  }, {});
 
   const fechasVentas = Object.keys(ventasPorDia).sort();
-
-  let datosGraficaVentas = [];
 
   const crearFechaLocalDesdeTexto = (fechaTexto) => {
     const [year, month, day] = fechaTexto.split("-").map(Number);
     return new Date(year, month - 1, day);
   };
 
-  if (fechasVentas.length > 0) {
-    const fechaInicio = crearFechaLocalDesdeTexto(fechasVentas[0]);
-    const fechaFin = crearFechaLocalDesdeTexto(
-      fechasVentas[fechasVentas.length - 1],
-    );
+  let datosGraficaVentas = [];
 
-    const fechaActual = new Date(fechaInicio);
+  if (fechaInicioGrafica && fechaFinGrafica) {
+    const fechaActual = crearFechaLocalDesdeTexto(fechaInicioGrafica);
+    const fechaFin = crearFechaLocalDesdeTexto(fechaFinGrafica);
 
-    while (fechaActual <= fechaFin) {
-      const fecha = obtenerFechaLocal(fechaActual);
+    // Seguridad: Asegurar que inicio no sea mayor que fin y limitar a 365 días máx para que no colapse
+    if (fechaActual <= fechaFin) {
+      let contadorDias = 0;
+      while (fechaActual <= fechaFin && contadorDias <= 365) {
+        const fechaFormateada = obtenerFechaLocal(fechaActual);
 
-      datosGraficaVentas.push({
-        fecha,
-        ingresos: ventasPorDia[fecha]?.ingresos || 0,
-        utilidad: ventasPorDia[fecha]?.utilidad || 0,
-      });
+        datosGraficaVentas.push({
+          fecha: fechaFormateada,
+          ingresos: ventasPorDia[fechaFormateada]?.ingresos || 0,
+          utilidad: ventasPorDia[fechaFormateada]?.utilidad || 0,
+        });
 
-      fechaActual.setDate(fechaActual.getDate() + 1);
-    }
-
-    if (rangoGrafica === "10") {
-      datosGraficaVentas = datosGraficaVentas.slice(-10);
+        fechaActual.setDate(fechaActual.getDate() + 1);
+        contadorDias++;
+      }
     }
   }
 
@@ -1757,7 +1760,6 @@ function App() {
 
   const resumenProductos = Object.values(
     ventas
-      .filter((venta) => venta.origenVenta !== "Web")
       .filter((venta) => {
         // NUEVO: Que los "Top" también respeten el filtro de categoría
         if (filtroCategoriaHistorial === "todas") return true;
@@ -4577,44 +4579,199 @@ function App() {
                   <div
                     style={{
                       width: "100%",
-                      height: 320,
+                      height: 380, // Subí un poco la altura para dar más respiro
                       backgroundColor: "#f8f9fa",
                       padding: "12px",
                       borderRadius: "12px",
                       marginBottom: "25px",
-                      boxSizing: "border-box", // <--- Esta es la magia que lo mete al cuadro
-                      overflow: "hidden", // <--- Esto evita que la gráfica se salga por los lados
+                      boxSizing: "border-box",
+                      overflow: "hidden",
                     }}
                   >
                     <h3 style={{ marginTop: 0, color: "#222" }}>
                       📈 Evolución de ingresos y utilidad por día
                     </h3>
 
-                    <div style={{ marginBottom: "15px" }}>
-                      <label style={{ marginRight: "8px", fontWeight: "600" }}>
-                        Ver período:{" "}
+                    <div
+                      style={{
+                        marginBottom: "15px",
+                        display: "flex",
+                        gap: "15px",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <label
+                          style={{
+                            marginRight: "8px",
+                            fontWeight: "600",
+                            fontSize: "13px",
+                          }}
+                        >
+                          Desde:
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaInicioGrafica}
+                          onChange={(e) =>
+                            setFechaInicioGrafica(e.target.value)
+                          }
+                          style={{
+                            padding: "6px",
+                            borderRadius: "6px",
+                            border: "1px solid #ccc",
+                            fontSize: "12.5px",
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            marginRight: "8px",
+                            fontWeight: "600",
+                            fontSize: "13px",
+                          }}
+                        >
+                          Hasta:
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaFinGrafica}
+                          onChange={(e) => setFechaFinGrafica(e.target.value)}
+                          style={{
+                            padding: "6px",
+                            borderRadius: "6px",
+                            border: "1px solid #ccc",
+                            fontSize: "12.5px",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Ahora la condición está adentro: Solo se ocultan las líneas, no los controles */}
+                    {datosGraficaVentas.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="80%">
+                        <LineChart
+                          data={datosGraficaVentas}
+                          margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="fecha" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="ingresos"
+                            name="Ingresos"
+                            stroke="#0d6efd"
+                            strokeWidth={3}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="utilidad"
+                            name="Utilidad"
+                            stroke="#198754"
+                            strokeWidth={3}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          height: "70%",
+                          color: "#999",
+                          border: "2px dashed #ddd",
+                          borderRadius: "8px",
+                        }}
+                      >
+                        <p style={{ fontWeight: "600" }}>
+                          No hay ventas en este rango de fechas.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* --- GRÁFICO INTERACTIVO: ORIGEN -> CATEGORÍAS -> PRODUCTOS --- */}
+                <div
+                  style={{
+                    width: "100%",
+                    height: 380, // Le subí un poquito la altura para que respire mejor
+                    backgroundColor: "#f8f9fa",
+                    padding: "12px",
+                    borderRadius: "12px",
+                    marginBottom: "25px",
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                  }}
+                >
+                  <h3 style={{ marginTop: 0, color: "#222" }}>
+                    📈 Evolución de ingresos y utilidad por día
+                  </h3>
+
+                  <div
+                    style={{
+                      marginBottom: "15px",
+                      display: "flex",
+                      gap: "15px",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <label
+                        style={{
+                          marginRight: "8px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Desde:
                       </label>
-                      <select
-                        value={rangoGrafica}
-                        onChange={(e) => setRangoGrafica(e.target.value)}
+                      <input
+                        type="date"
+                        value={fechaInicioGrafica}
+                        onChange={(e) => setFechaInicioGrafica(e.target.value)}
                         style={{
                           padding: "6px",
                           borderRadius: "6px",
                           border: "1px solid #ccc",
                           fontSize: "12.5px",
                         }}
-                      >
-                        <option value="10">Últimos 10 días</option>
-                        <option value="todos">Ver todo el historial</option>
-                      </select>
+                      />
                     </div>
+                    <div>
+                      <label
+                        style={{
+                          marginRight: "8px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Hasta:
+                      </label>
+                      <input
+                        type="date"
+                        value={fechaFinGrafica}
+                        onChange={(e) => setFechaFinGrafica(e.target.value)}
+                        style={{
+                          padding: "6px",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          fontSize: "12.5px",
+                        }}
+                      />
+                    </div>
+                  </div>
 
-                    {/* ----------------------
-                GRÁFICA FINANCIERA
-                Ingresos y utilidad por día
-                ---------------------- */}
-
-                    <ResponsiveContainer width="100%" height="85%">
+                  {/* LA REGLA AHORA SOLO ENVUELVE A LA GRÁFICA, NO A LOS CALENDARIOS */}
+                  {datosGraficaVentas.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="80%">
                       <LineChart
                         data={datosGraficaVentas}
                         margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
@@ -4640,155 +4797,24 @@ function App() {
                         />
                       </LineChart>
                     </ResponsiveContainer>
-                  </div>
-                )}
-
-                {/* --- GRÁFICO INTERACTIVO: ORIGEN -> CATEGORÍAS -> PRODUCTOS --- */}
-                {datosGraficoPie.length > 0 && (
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 320,
-                      backgroundColor: "#f8f9fa",
-                      padding: "12px",
-                      borderRadius: "12px",
-                      marginBottom: "25px",
-                      boxSizing: "border-box",
-                      position: "relative",
-                    }}
-                  >
+                  ) : (
                     <div
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
+                        justifyContent: "center",
                         alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: "10px",
+                        height: "70%",
+                        color: "#999",
+                        border: "2px dashed #ddd",
+                        borderRadius: "8px",
                       }}
                     >
-                      <h3
-                        style={{
-                          marginTop: 0,
-                          marginBottom: 0,
-                          color: "#222",
-                          fontSize: "16px",
-                        }}
-                      >
-                        {tituloGraficoPie}
-                      </h3>
-
-                      {/* Botones de "Migas de pan" para retroceder */}
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        {categoriaSeleccionadaPie && (
-                          <button
-                            type="button"
-                            onClick={() => setCategoriaSeleccionadaPie(null)}
-                            style={{
-                              backgroundColor: "#6c757d",
-                              color: "white",
-                              border: "none",
-                              padding: "6px 12px",
-                              borderRadius: "6px",
-                              cursor: "pointer",
-                              fontSize: "11px",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            ⬅ Volver a Categorías
-                          </button>
-                        )}
-                        {origenSeleccionadoPie && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOrigenSeleccionadoPie(null);
-                              setCategoriaSeleccionadaPie(null);
-                            }}
-                            style={{
-                              backgroundColor: "#343a40",
-                              color: "white",
-                              border: "none",
-                              padding: "6px 12px",
-                              borderRadius: "6px",
-                              cursor: "pointer",
-                              fontSize: "11px",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            ⬅ Volver a Origen
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <ResponsiveContainer width="100%" height="85%">
-                      <PieChart>
-                        <Pie
-                          data={datosGraficoPie}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          onClick={(data) => {
-                            // MAGIA DE NAVEGACIÓN AL HACER CLIC
-                            if (!data?.payload?.id) return;
-
-                            if (!origenSeleccionadoPie) {
-                              setOrigenSeleccionadoPie(data.payload.id); // Entra a Nivel 2
-                            } else if (!categoriaSeleccionadaPie) {
-                              setCategoriaSeleccionadaPie(data.payload.id); // Entra a Nivel 3
-                            }
-                          }}
-                          style={{
-                            cursor:
-                              !origenSeleccionadoPie ||
-                              !categoriaSeleccionadaPie
-                                ? "pointer"
-                                : "default",
-                          }}
-                          label={({ name, percent }) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                        >
-                          {datosGraficoPie.map((entry, index) => {
-                            const colores = [
-                              "#0d6efd",
-                              "#7c3aed",
-                              "#198754",
-                              "#fd7e14",
-                              "#dc3545",
-                              "#0dcaf0",
-                            ];
-                            return (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={colores[index % colores.length]}
-                              />
-                            );
-                          })}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => `$${Number(value).toFixed(2)}`}
-                        />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-
-                    {(!origenSeleccionadoPie || !categoriaSeleccionadaPie) && (
-                      <p
-                        style={{
-                          textAlign: "center",
-                          fontSize: "11px",
-                          color: "#666",
-                          margin: "-10px 0 0 0",
-                        }}
-                      >
-                        *Haz clic en una rebanada para profundizar en los datos.
+                      <p style={{ fontWeight: "600" }}>
+                        No hay ventas en este rango o la fecha está incompleta.
                       </p>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
 
                 <h3 style={{ marginBottom: "10px", color: "#222" }}>
                   📄 Historial de ventas
