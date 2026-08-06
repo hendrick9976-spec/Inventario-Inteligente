@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 
+// Variable dinámica: Usará el URL público en Vercel, o localhost si estás programando.
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 function App() {
   const [carritoAbierto, setCarritoAbierto] = useState(false);
   const [enCheckout, setEnCheckout] = useState(false);
@@ -87,7 +90,7 @@ function App() {
 
       // A) Traer los productos
       const resProd = await fetch(
-        `http://localhost:5000/api/tienda/${usuarioId}/productos`,
+        `${API_URL}/api/tienda/${usuarioId}/productos`,
       );
       if (resProd.ok) {
         const dataProd = await resProd.json();
@@ -105,7 +108,7 @@ function App() {
 
       // B) Traer la configuración de la tienda
       const resConfig = await fetch(
-        `http://localhost:5000/api/tienda/${usuarioId}/config`,
+        `${API_URL}/api/tienda/${usuarioId}/config`,
       );
       if (resConfig.ok) {
         const dataConfig = await resConfig.json();
@@ -121,15 +124,15 @@ function App() {
           politicaReembolso: dataConfig.politicaReembolso || "",
           terminosServicio: dataConfig.terminosServicio || "",
         });
+      }
 
-        // C) Traer las categorías (NUEVO)
-        const resCat = await fetch(
-          `http://localhost:5000/api/tienda/${usuarioId}/categorias`,
-        );
-        if (resCat.ok) {
-          const dataCat = await resCat.json();
-          setCategorias(dataCat);
-        }
+      // C) Traer las categorías
+      const resCat = await fetch(
+        `${API_URL}/api/tienda/${usuarioId}/categorias`,
+      );
+      if (resCat.ok) {
+        const dataCat = await resCat.json();
+        setCategorias(dataCat);
       }
     } catch (error) {
       console.error("Error conectando con la base de datos:", error);
@@ -238,7 +241,7 @@ function App() {
 
     try {
       const promesasCompra = carrito.map((item) =>
-        fetch(`http://localhost:5000/api/tienda/${usuarioId}/compra`, {
+        fetch(`${API_URL}/api/tienda/${usuarioId}/compra`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

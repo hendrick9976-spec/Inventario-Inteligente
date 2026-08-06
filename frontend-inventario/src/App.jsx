@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const STORE_URL = import.meta.env.VITE_STORE_URL || "http://localhost:5174";
 
 // ======================================================
 // COMPONENTE PRINCIPAL DE LA APLICACIÓN
@@ -2153,7 +2154,7 @@ function App() {
 
           <nav style={layoutStyles.sidebarNav}>
             {opcionMenu("inicio", "Inicio", "🏠")}
-            {/*{opcionMenu("tienda", "Mi Tienda Web", "🌐")}*/}
+            {opcionMenu("tienda", "Mi Tienda Web", "🌐")}
             {opcionMenu("inventario", "Inventario", "📦")}
             {opcionMenu("ventas", "Ventas", "🛒")}
             {opcionMenu("historial", "Historial", "📊")}
@@ -2507,77 +2508,96 @@ function App() {
               {/* Tarjeta del Enlace */}
               <div
                 style={{
-                  backgroundColor: "#7c3aed",
-                  color: "white",
+                  backgroundColor: "#f3f0ff", // Fondo morado muy clarito
+                  border: "2px dashed #7c3aed", // Borde punteado para darle importancia
                   padding: "20px",
                   borderRadius: "12px",
-                  marginBottom: "20px",
-                  boxShadow: "0 4px 15px rgba(124, 58, 237, 0.25)",
+                  marginBottom: "25px",
+                  boxShadow: "0 6px 16px rgba(124, 58, 237, 0.15)", // Sombra elegante
                 }}
               >
-                <h3 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
-                  🔗 Enlace de tu E-commerce
+                <h3
+                  style={{
+                    margin: "0 0 8px 0",
+                    fontSize: "18px",
+                    color: "#4c1d95",
+                  }}
+                >
+                  🔗 Tu enlace público de ventas
                 </h3>
                 <p
                   style={{
                     margin: "0 0 15px 0",
-                    fontSize: "13px",
-                    opacity: 0.9,
+                    fontSize: "14px",
+                    color: "#5b21b6",
+                    fontWeight: "500",
                   }}
                 >
-                  Comparte este enlace con tus clientes por WhatsApp o redes
-                  sociales para que puedan comprar tus productos directamente.
+                  Este es el link oficial de tu tienda. Cópialo y compártelo con
+                  tus clientes en WhatsApp o tus Redes Sociales para que vean tu
+                  catálogo y empiecen a comprar.
                 </p>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
                   <input
                     type="text"
                     readOnly
-                    value={`http://localhost:5174/${usuario?.id}`}
+                    value={`${STORE_URL}/${usuario?.id}`}
                     style={{
                       flex: 1,
-                      padding: "10px",
+                      padding: "12px",
                       borderRadius: "8px",
-                      border: "none",
-                      backgroundColor: "rgba(255,255,255,0.2)",
-                      color: "white",
-                      fontSize: "14px",
+                      border: "1px solid #d8b4fe",
+                      backgroundColor: "white",
+                      color: "#374151", // Texto oscuro y visible
+                      fontSize: "15px",
+                      fontWeight: "700",
                       outline: "none",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)", // Sombrilla interior
                     }}
                   />
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(
-                        `http://localhost:5174/${usuario?.id}`,
+                        `${STORE_URL}/${usuario?.id}`,
                       );
-                      alert("¡Enlace copiado al portapapeles!");
+                      alert(
+                        "¡Enlace copiado al portapapeles! Ya puedes pegarlo en WhatsApp.",
+                      );
                     }}
                     style={{
-                      backgroundColor: "white",
-                      color: "#7c3aed",
+                      backgroundColor: "#7c3aed",
+                      color: "white",
                       border: "none",
-                      padding: "10px 15px",
+                      padding: "12px 20px",
                       borderRadius: "8px",
                       fontWeight: "bold",
                       cursor: "pointer",
+                      boxShadow: "0 4px 6px rgba(124, 58, 237, 0.25)",
+                      transition: "0.2s",
                     }}
                   >
-                    Copiar
+                    📋 Copiar Link
                   </button>
                   <button
                     onClick={() =>
-                      window.open(
-                        `http://localhost:5174/${usuario?.id}`,
-                        "_blank",
-                      )
+                      window.open(`${STORE_URL}/${usuario?.id}`, "_blank")
                     }
                     style={{
                       backgroundColor: "#10b981",
                       color: "white",
                       border: "none",
-                      padding: "10px 15px",
+                      padding: "12px 20px",
                       borderRadius: "8px",
                       fontWeight: "bold",
                       cursor: "pointer",
+                      boxShadow: "0 4px 6px rgba(16, 185, 129, 0.25)",
                     }}
                   >
                     Visitar Tienda ➔
