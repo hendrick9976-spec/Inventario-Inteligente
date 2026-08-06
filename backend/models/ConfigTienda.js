@@ -37,6 +37,12 @@ const configTiendaSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    preguntasFrecuentes: [
+      {
+        pregunta: String,
+        respuesta: String,
+      },
+    ],
   },
   { timestamps: true },
 );

@@ -59,6 +59,7 @@ function App() {
     whatsappTienda: "",
     politicaReembolso: "",
     terminosServicio: "",
+    preguntasFrecuentes: [],
   });
 
   // ----------------------
@@ -1143,7 +1144,8 @@ function App() {
               correoTienda: data.correoTienda || "", // <-- NUEVO
               whatsappTienda: data.whatsappTienda || "",
               politicaReembolso: data.politicaReembolso || "",
-              terminosServicio: data.terminosServicio || "", // <-- NUEVO
+              terminosServicio: data.terminosServicio || "",
+              preguntasFrecuentes: data.preguntasFrecuentes || [], // <-- NUEVO
             });
           }
         })
@@ -2862,6 +2864,230 @@ function App() {
                         }}
                         placeholder="Ej. Al comprar en esta tienda aceptas que los tiempos de envío pueden variar..."
                       />
+                    </div>
+
+                    {/* === SECCIÓN DE PREGUNTAS FRECUENTES === */}
+                    <div
+                      style={{
+                        marginBottom: "25px",
+                        borderTop: "2px dashed #e5e7eb",
+                        paddingTop: "20px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "15px",
+                          flexWrap: "wrap",
+                          gap: "10px",
+                        }}
+                      >
+                        <p
+                          style={{
+                            margin: 0,
+                            fontWeight: "700",
+                            fontSize: "15px",
+                            color: "#111827",
+                          }}
+                        >
+                          ❓ Preguntas Frecuentes (FAQ)
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfigTienda({
+                              ...configTienda,
+                              preguntasFrecuentes: [
+                                ...configTienda.preguntasFrecuentes,
+                                { pregunta: "", respuesta: "" },
+                              ],
+                            });
+                          }}
+                          style={{
+                            backgroundColor: "#198754",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ➕ Añadir nueva pregunta
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sugerencias = [
+                            {
+                              pregunta: "¿Cuánto tarda en llegar mi pedido?",
+                              respuesta:
+                                "El tiempo de entrega estándar es de 3 a 5 días hábiles a todo el país tras procesar tu pago.",
+                            },
+                            {
+                              pregunta: "¿Qué formas de pago aceptan?",
+                              respuesta:
+                                "Aceptamos transferencias, tarjetas y pagos en efectivo contra entrega.",
+                            },
+                            {
+                              pregunta:
+                                "¿Puedo devolver un producto si llega dañado?",
+                              respuesta:
+                                "Sí, tienes 7 días naturales desde que recibes el paquete para reportar cualquier daño y solicitar un reemplazo.",
+                            },
+                          ];
+                          setConfigTienda({
+                            ...configTienda,
+                            preguntasFrecuentes: sugerencias,
+                          });
+                        }}
+                        style={{
+                          backgroundColor: "#eef2ff",
+                          color: "#4f46e5",
+                          border: "1px solid #c7d2fe",
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          marginBottom: "20px",
+                          display: "block",
+                          width: "100%",
+                        }}
+                      >
+                        💡 Cargar sugerencias por defecto
+                      </button>
+
+                      {configTienda.preguntasFrecuentes.map((faq, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            backgroundColor: "#f9fafb",
+                            padding: "15px",
+                            borderRadius: "10px",
+                            border: "1px solid #e5e7eb",
+                            marginBottom: "15px",
+                            position: "relative",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nuevasFaqs =
+                                configTienda.preguntasFrecuentes.filter(
+                                  (_, i) => i !== index,
+                                );
+                              setConfigTienda({
+                                ...configTienda,
+                                preguntasFrecuentes: nuevasFaqs,
+                              });
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "15px",
+                              right: "15px",
+                              background: "none",
+                              border: "none",
+                              color: "#dc3545",
+                              cursor: "pointer",
+                              fontSize: "16px",
+                            }}
+                            title="Eliminar pregunta"
+                          >
+                            🗑️
+                          </button>
+                          <p
+                            style={{
+                              margin: "0 0 6px 0",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              color: "#4b5563",
+                            }}
+                          >
+                            Pregunta:
+                          </p>
+                          <input
+                            type="text"
+                            placeholder="Ej. ¿Tienen envíos gratis?"
+                            value={faq.pregunta}
+                            onChange={(e) => {
+                              const nuevasFaqs = [
+                                ...configTienda.preguntasFrecuentes,
+                              ];
+                              nuevasFaqs[index].pregunta = e.target.value;
+                              setConfigTienda({
+                                ...configTienda,
+                                preguntasFrecuentes: nuevasFaqs,
+                              });
+                            }}
+                            style={{
+                              width: "90%",
+                              padding: "10px",
+                              borderRadius: "8px",
+                              border: "1px solid #d1d5db",
+                              marginBottom: "10px",
+                              fontSize: "13px",
+                              boxSizing: "border-box",
+                            }}
+                          />
+
+                          <p
+                            style={{
+                              margin: "0 0 6px 0",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              color: "#4b5563",
+                            }}
+                          >
+                            Respuesta:
+                          </p>
+                          <textarea
+                            placeholder="Ej. Sí, en compras mayores a $500..."
+                            value={faq.respuesta}
+                            onChange={(e) => {
+                              const nuevasFaqs = [
+                                ...configTienda.preguntasFrecuentes,
+                              ];
+                              nuevasFaqs[index].respuesta = e.target.value;
+                              setConfigTienda({
+                                ...configTienda,
+                                preguntasFrecuentes: nuevasFaqs,
+                              });
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              borderRadius: "8px",
+                              border: "1px solid #d1d5db",
+                              fontSize: "13px",
+                              minHeight: "70px",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                        </div>
+                      ))}
+
+                      {configTienda.preguntasFrecuentes.length === 0 && (
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            color: "#6b7280",
+                            textAlign: "center",
+                            padding: "20px",
+                            border: "1px dashed #d1d5db",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          No has añadido ninguna pregunta frecuente. Puedes
+                          escribir una desde cero o usar el botón de
+                          sugerencias.
+                        </p>
+                      )}
                     </div>
 
                     <button

@@ -584,7 +584,8 @@ app.put("/api/tienda/config", authMiddleware, async (req, res) => {
       correoTienda,
       whatsappTienda,
       politicaReembolso, // <-- NUEVO
-      terminosServicio, // <-- NUEVO
+      terminosServicio,
+      preguntasFrecuentes, // <-- NUEVO
     } = req.body;
 
     const configActualizada = await ConfigTienda.findOneAndUpdate(
@@ -596,7 +597,8 @@ app.put("/api/tienda/config", authMiddleware, async (req, res) => {
         correoTienda,
         whatsappTienda,
         politicaReembolso, // <-- NUEVO
-        terminosServicio, // <-- NUEVO
+        terminosServicio,
+        preguntasFrecuentes, // <-- NUEVO
       },
       { returnDocument: "after", upsert: true },
     );
@@ -706,6 +708,24 @@ app.get("/api/tienda/:usuarioId/config", async (req, res) => {
         mensajeBanner: "¡Bienvenido a nuestra Tienda en Línea!",
         descripcionBanner:
           "Personaliza este banner desde tu panel de administración en la sección Mi Tienda Web.",
+        // <--- NUEVO: PREGUNTAS POR DEFECTO
+        preguntasFrecuentes: [
+          {
+            pregunta: "¿Cuánto tarda en llegar mi pedido?",
+            respuesta:
+              "El tiempo de entrega estándar es de 3 a 5 días hábiles a todo México tras procesar tu pago.",
+          },
+          {
+            pregunta: "¿Qué formas de pago aceptan?",
+            respuesta:
+              "Aceptamos tarjetas de crédito/débito, PayPal y pagos en efectivo a través de tiendas de conveniencia.",
+          },
+          {
+            pregunta: "¿Puedo devolver un producto si llega dañado?",
+            respuesta:
+              "Sí, tienes 7 días naturales desde que recibes el paquete para reportar cualquier daño y solicitar un reemplazo sin costo extra.",
+          },
+        ],
       });
     }
 

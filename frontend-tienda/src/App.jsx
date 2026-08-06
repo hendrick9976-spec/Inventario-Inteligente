@@ -39,7 +39,8 @@ function App() {
     correoTienda: "",
     whatsappTienda: "",
     politicaReembolso: "", // <-- NUEVO
-    terminosServicio: "", // <-- NUEVO
+    terminosServicio: "",
+    preguntasFrecuentes: [], // <-- NUEVO
   });
 
   // ESTADOS DEL CARRITO Y BASE DE DATOS
@@ -124,6 +125,7 @@ function App() {
           whatsappTienda: dataConfig.whatsappTienda || "",
           politicaReembolso: dataConfig.politicaReembolso || "",
           terminosServicio: dataConfig.terminosServicio || "",
+          preguntasFrecuentes: dataConfig.preguntasFrecuentes || [],
         });
       }
 
@@ -1471,26 +1473,21 @@ function App() {
           Preguntas Frecuentes
         </h2>
         <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-          <FaqItem
-            pregunta="¿Cuánto tarda en llegar mi pedido?"
-            respuesta="El tiempo de entrega estándar es de 3 a 5 días hábiles a todo México tras procesar tu pago."
-            theme={theme}
-          />
-          <FaqItem
-            pregunta="¿Qué formas de pago aceptan?"
-            respuesta="Aceptamos tarjetas de crédito/débito, PayPal y pagos en efectivo a través de tiendas de conveniencia."
-            theme={theme}
-          />
-          <FaqItem
-            pregunta="¿Puedo devolver un producto si llega dañado?"
-            respuesta="Sí, tienes 7 días naturales desde que recibes el paquete para reportar cualquier daño y solicitar un reemplazo sin costo extra."
-            theme={theme}
-          />
-          <FaqItem
-            pregunta="¿Cómo aplico mi código de descuento?"
-            respuesta="En la pantalla de pago (Checkout) encontrarás una casilla para ingresar tu cupón antes de finalizar la compra."
-            theme={theme}
-          />
+          {configTienda.preguntasFrecuentes &&
+          configTienda.preguntasFrecuentes.length > 0 ? (
+            configTienda.preguntasFrecuentes.map((faq, index) => (
+              <FaqItem
+                key={index}
+                pregunta={faq.pregunta}
+                respuesta={faq.respuesta}
+                theme={theme}
+              />
+            ))
+          ) : (
+            <p style={{ textAlign: "center", color: theme.textMuted }}>
+              No hay preguntas frecuentes disponibles por el momento.
+            </p>
+          )}
         </div>
       </section>
 
@@ -1767,7 +1764,12 @@ function App() {
             © 2026 {configTienda.nombreTienda}. Todos los derechos reservados. |
             Sistema administrado por{" "}
             <span
-              onClick={() => (window.location.href = "http://localhost:5173")}
+              onClick={() =>
+                window.open(
+                  "https://inventario-inteligente-three.vercel.app/",
+                  "_blank",
+                )
+              }
               style={{
                 color: theme.primary,
                 cursor: "pointer",
