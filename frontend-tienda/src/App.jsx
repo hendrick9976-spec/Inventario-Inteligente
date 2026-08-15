@@ -341,59 +341,190 @@ function App() {
           minHeight: "100vh",
           fontFamily: "'Segoe UI', sans-serif",
           color: theme.text,
+          overflowX: "clip",
         }}
       >
         <header
           style={{
             backgroundColor: theme.white,
             borderBottom: `1px solid ${theme.border}`,
-            padding: "20px 40px",
+            padding: "15px",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            flexDirection: "column",
+            gap: "15px",
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+            boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+            boxSizing: "border-box",
+            width: "100%",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div
-              style={{
-                width: "30px",
-                height: "30px",
-                borderRadius: "8px",
-                background: theme.blue,
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "16px",
-                fontWeight: "bold",
-              }}
-            >
-              ⚡
-            </div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: "800",
-                color: theme.text,
-              }}
-            >
-              {configTienda.nombreTienda}
-            </h2>
-          </div>
-          <button
-            onClick={() => setEnCheckout(false)}
+          <div
             style={{
-              background: "none",
-              border: "none",
-              color: theme.blue,
-              fontWeight: "600",
-              cursor: "pointer",
-              fontSize: "14px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              width: "100%",
             }}
           >
-            ← Volver a la tienda
-          </button>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "10px",
+                  backgroundColor: theme.blue,
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "18px",
+                  fontWeight: "bold",
+                }}
+              >
+                ⚡
+              </div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "20px",
+                  fontWeight: "800",
+                  letterSpacing: "-0.5px",
+                  color: theme.text,
+                }}
+              >
+                {configTienda.nombreTienda}
+              </h2>
+            </div>
+
+            <div
+              id="contenedor-buscador"
+              style={{ display: "flex", gap: "15px", alignItems: "center" }}
+            >
+              {mostrarBuscador && (
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  value={busquedaTienda}
+                  onChange={(e) => setBusquedaTienda(e.target.value)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                    border: `1px solid ${theme.border}`,
+                    outline: "none",
+                    fontSize: "12px",
+                    width: "100px",
+                  }}
+                  autoFocus
+                />
+              )}
+              <span
+                onClick={() => {
+                  setMostrarBuscador(!mostrarBuscador);
+                  if (mostrarBuscador) setBusquedaTienda("");
+                }}
+                style={{ cursor: "pointer", fontSize: "16px" }}
+              >
+                🔍
+              </span>
+              <span
+                onClick={() => alert("Próximamente")}
+                style={{ cursor: "pointer", fontSize: "16px" }}
+                title="Mi Cuenta"
+              >
+                👤
+              </span>
+              <button
+                onClick={() => setCarritoAbierto(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: 0,
+                }}
+              >
+                <span style={{ fontSize: "20px" }}>🛍️</span>
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "-5px",
+                    right: "-8px",
+                    backgroundColor: theme.primary,
+                    color: "white",
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {totalArticulos}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <nav
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: "12px",
+              fontWeight: "600",
+              fontSize: "12px",
+              color: theme.textMuted,
+              width: "100%",
+            }}
+          >
+            <span
+              onClick={() => setCategoriaActiva("TODAS")}
+              style={{
+                color:
+                  categoriaActiva === "TODAS" ? theme.primary : theme.textMuted,
+                cursor: "pointer",
+                borderBottom:
+                  categoriaActiva === "TODAS"
+                    ? `2px solid ${theme.primary}`
+                    : "none",
+              }}
+            >
+              TODO EL CATÁLOGO
+            </span>
+            {categorias.map((cat) => (
+              <span
+                key={cat._id}
+                onClick={() => setCategoriaActiva(cat._id)}
+                style={{
+                  color:
+                    categoriaActiva === cat._id
+                      ? theme.primary
+                      : theme.textMuted,
+                  cursor: "pointer",
+                  borderBottom:
+                    categoriaActiva === cat._id
+                      ? `2px solid ${theme.primary}`
+                      : "none",
+                  textTransform: "uppercase",
+                }}
+              >
+                {cat.nombre}
+              </span>
+            ))}
+          </nav>
         </header>
 
         <div
@@ -851,7 +982,7 @@ function App() {
         minHeight: "100vh",
         fontFamily: "'Segoe UI', sans-serif",
         color: theme.text,
-        overflowX: "hidden",
+        overflowX: "clip",
         width: "100%",
       }}
     >
@@ -859,12 +990,10 @@ function App() {
         style={{
           backgroundColor: theme.white,
           borderBottom: `1px solid ${theme.border}`,
-          padding: "clamp(10px, 3vw, 15px) clamp(15px, 5vw, 40px)",
+          padding: "10px 15px", // Redujimos el padding para ahorrar espacio
           display: "flex",
-          flexWrap: "wrap",
-          gap: "15px",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexDirection: "column", // Fuerza exactamente dos filas (arriba y abajo)
+          gap: "10px", // Espacio entre las dos filas
           position: "sticky",
           top: 0,
           zIndex: 50,
@@ -873,59 +1002,145 @@ function App() {
           width: "100%",
         }}
       >
+        {/* FILA 1: LOGO E ICONOS */}
         <div
           style={{
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            gap: "10px",
-            cursor: "pointer",
+            width: "100%",
           }}
         >
+          {/* LOGO */}
           <div
             style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "10px",
-              backgroundColor: theme.blue,
-              color: "white",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: "20px",
-              fontWeight: "bold",
+              gap: "10px",
+              cursor: "pointer",
             }}
           >
-            ⚡
+            <div
+              style={{
+                width: "30px",
+                height: "30px",
+                borderRadius: "8px",
+                backgroundColor: theme.blue,
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "16px",
+                fontWeight: "bold",
+              }}
+            >
+              ⚡
+            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "18px",
+                fontWeight: "800",
+                letterSpacing: "-0.5px",
+                color: theme.text,
+              }}
+            >
+              {configTienda.nombreTienda}
+            </h2>
           </div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "22px",
-              fontWeight: "800",
-              letterSpacing: "-0.5px",
-              color: theme.text,
-            }}
+
+          {/* ICONOS A LA DERECHA */}
+          <div
+            id="contenedor-buscador"
+            style={{ display: "flex", gap: "15px", alignItems: "center" }}
           >
-            {configTienda.nombreTienda}
-          </h2>
+            {mostrarBuscador && (
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={busquedaTienda}
+                onChange={(e) => setBusquedaTienda(e.target.value)}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "20px",
+                  border: `1px solid ${theme.border}`,
+                  outline: "none",
+                  fontSize: "12px",
+                  width: "120px",
+                }}
+                autoFocus
+              />
+            )}
+            <span
+              onClick={() => {
+                setMostrarBuscador(!mostrarBuscador);
+                if (mostrarBuscador) setBusquedaTienda("");
+              }}
+              style={{ cursor: "pointer", fontSize: "18px" }}
+            >
+              🔍
+            </span>
+            <span
+              onClick={() => alert("Próximamente")}
+              style={{ cursor: "pointer", fontSize: "18px" }}
+              title="Mi Cuenta"
+            >
+              👤
+            </span>
+            <button
+              onClick={() => setCarritoAbierto(true)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                padding: 0,
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>🛍️</span>
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-5px",
+                  right: "-8px",
+                  backgroundColor: theme.primary,
+                  color: "white",
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  width: "16px",
+                  height: "16px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {totalArticulos}
+              </span>
+            </button>
+          </div>
         </div>
 
+        {/* FILA 2: CATEGORÍAS (UNA SOLA LÍNEA CON SCROLL HORIZONTAL CENTRADO) */}
         <nav
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: "clamp(10px, 2vw, 25px)",
-            fontWeight: "600",
-            fontSize: "13px",
-            color: theme.textMuted,
-            flex: "1 1 auto",
+            width: "100%",
+            overflowX: "auto", // Activa el scroll horizontal en celular
+            whiteSpace: "nowrap", // Evita que salten a la segunda línea
+            textAlign: "center", // <-- ¡La magia! Centra todo en computadora
+            paddingBottom: "8px",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          {/* Botón estático para ver todo el catálogo */}
           <span
             onClick={() => setCategoriaActiva("TODAS")}
             style={{
+              display: "inline-block", // Permite que se formen uno al lado del otro
+              margin: "0 10px", // Crea el espacio entre cada categoría
+              fontWeight: "600",
+              fontSize: "12px",
               color:
                 categoriaActiva === "TODAS" ? theme.primary : theme.textMuted,
               cursor: "pointer",
@@ -937,13 +1152,15 @@ function App() {
           >
             TODO EL CATÁLOGO
           </span>
-
-          {/* Botones dinámicos generados desde la base de datos */}
           {categorias.map((cat) => (
             <span
               key={cat._id}
               onClick={() => setCategoriaActiva(cat._id)}
               style={{
+                display: "inline-block",
+                margin: "0 10px",
+                fontWeight: "600",
+                fontSize: "12px",
                 color:
                   categoriaActiva === cat._id ? theme.primary : theme.textMuted,
                 cursor: "pointer",
@@ -958,94 +1175,12 @@ function App() {
             </span>
           ))}
         </nav>
-
-        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-          {/* BARRA DE BÚSQUEDA DESPLEGABLE */}
-          <div
-            id="contenedor-buscador"
-            style={{ display: "flex", gap: "10px", alignItems: "center" }}
-          >
-            {mostrarBuscador && (
-              <input
-                type="text"
-                placeholder="Buscar producto..."
-                value={busquedaTienda}
-                onChange={(e) => setBusquedaTienda(e.target.value)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: "20px",
-                  border: `1px solid ${theme.border}`,
-                  outline: "none",
-                  fontSize: "13px",
-                  width: "150px",
-                }}
-                autoFocus
-              />
-            )}
-            <span
-              onClick={() => {
-                setMostrarBuscador(!mostrarBuscador);
-                if (mostrarBuscador) setBusquedaTienda(""); // Limpia al cerrar
-              }}
-              style={{ cursor: "pointer", fontSize: "18px" }}
-            >
-              🔍
-            </span>
-          </div>
-
-          {/* ICONO DE USUARIO CON AVISO */}
-          <span
-            onClick={() =>
-              alert(
-                "🛠️ El sistema de cuentas para clientes y registro de historial estará disponible en futuras actualizaciones. ¡Gracias por tu paciencia!",
-              )
-            }
-            style={{ cursor: "pointer", fontSize: "18px" }}
-            title="Mi Cuenta"
-          >
-            👤
-          </span>
-
-          <button
-            onClick={() => setCarritoAbierto(true)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              padding: 0,
-            }}
-          >
-            <span style={{ fontSize: "22px" }}>🛍️</span>
-            <span
-              style={{
-                position: "absolute",
-                top: "-5px",
-                right: "-8px",
-                backgroundColor: theme.primary,
-                color: "white",
-                fontSize: "11px",
-                fontWeight: "bold",
-                width: "18px",
-                height: "18px",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {totalArticulos}
-            </span>
-          </button>
-        </div>
       </header>
 
       {categoriaActiva === "TODAS" && busquedaTienda === "" && (
         <section
           style={{
-            padding: "clamp(15px, 3vw, 30px) clamp(15px, 4vw, 40px)",
+            padding: "15px clamp(15px, 4vw, 40px) 25px" /* Solo 15px arriba */,
             boxSizing: "border-box",
             width: "100%",
             maxWidth: "100vw",
@@ -1056,10 +1191,10 @@ function App() {
               backgroundColor: theme.white,
               border: `1px solid ${theme.border}`,
               borderRadius: "16px",
-              padding: "clamp(15px, 4vw, 40px)",
+              padding: "20px 30px",
               display: "flex",
               flexWrap: "wrap",
-              gap: "clamp(20px, 4vw, 40px)",
+              gap: "clamp(15px, 3vw, 25px)",
               boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
               overflow: "hidden",
               boxSizing: "border-box",
@@ -1096,7 +1231,7 @@ function App() {
               <h1
                 style={{
                   color: theme.text,
-                  fontSize: "clamp(32px, 5vw, 44px)",
+                  fontSize: "clamp(24px, 4vw, 34px)",
                   margin: "0 0 10px 0",
                   fontWeight: "900",
                   lineHeight: "1.1",
@@ -1115,37 +1250,20 @@ function App() {
               >
                 {configTienda.descripcionBanner}
               </p>
-              <div>
-                <button
-                  style={{
-                    backgroundColor: theme.primary,
-                    color: "white",
-                    border: "none",
-                    padding: "14px 32px",
-                    borderRadius: "8px",
-                    fontSize: "15px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 14px rgba(124, 58, 237, 0.2)",
-                  }}
-                >
-                  Ver Promociones
-                </button>
-              </div>
             </div>
 
             <div
               style={{
                 backgroundColor: theme.bg,
                 borderRadius: "12px",
-                padding: "clamp(15px, 4vw, 25px)",
+                padding: "15px",
                 border: `1px solid ${theme.border}`,
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
                 alignItems: "center",
-                minHeight: "350px",
+                minHeight: "260px",
                 flex: "1 1 280px",
                 minWidth: 0,
                 maxWidth: "100%",
@@ -1227,15 +1345,15 @@ function App() {
                     >
                       <div
                         style={{
-                          width: "140px",
-                          height: "140px",
+                          width: "100px",
+                          height: "100px",
                           backgroundColor: "#f1f3f5",
                           borderRadius: "12px",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: "60px",
-                          marginBottom: "15px",
+                          fontSize: "50px",
+                          marginBottom: "10px",
                           overflow: "hidden", // <-- Importante para que la foto respete el borde redondo
                         }}
                       >
@@ -1361,21 +1479,50 @@ function App() {
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "25px",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            marginBottom: "30px",
+            marginTop:
+              categoriaActiva !== "TODAS"
+                ? "20px"
+                : "0" /* Da aire si el banner desaparece */,
           }}
         >
           <h2
             style={{
-              fontSize: "24px",
+              fontSize:
+                categoriaActiva !== "TODAS"
+                  ? "28px"
+                  : "24px" /* Más grande si es categoría */,
               margin: 0,
               fontWeight: "800",
               color: theme.text,
+              textTransform:
+                categoriaActiva !== "TODAS" ? "capitalize" : "none",
             }}
           >
-            Catálogo de Productos
+            {/* Lógica dinámica para el título */}
+            {busquedaTienda !== ""
+              ? `Resultados para "${busquedaTienda}"`
+              : categoriaActiva === "TODAS"
+                ? "Catálogo de Productos"
+                : categorias.find((c) => c._id === categoriaActiva)?.nombre ||
+                  "Categoría"}
           </h2>
+
+          {/* Subtítulo sutil solo para categorías, para llenar el vacío visual */}
+          {categoriaActiva !== "TODAS" && busquedaTienda === "" && (
+            <p
+              style={{
+                margin: "8px 0 0 0",
+                color: theme.textMuted,
+                fontSize: "14px",
+              }}
+            >
+              Explora todos los productos que tenemos disponibles en esta
+              sección.
+            </p>
+          )}
         </div>
 
         {/* AQUÍ ESTÁ LA CORRECCIÓN: Un solo validador usando la variable filtrada */}
@@ -1393,8 +1540,8 @@ function App() {
           <div
             style={{
               display: "grid",
-              gap: "24px",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: "10px" /* Reduje el gap para que quepan mejor en móvil */,
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
             }}
           >
             {productosAMostrar.map((producto) => (
@@ -1806,7 +1953,7 @@ function App() {
               position: "fixed",
               top: 0,
               right: 0,
-              width: "450px",
+              width: "clamp(340px, 30vw, 450px)", // <-- La magia del responsive
               maxWidth: "100vw",
               height: "100vh",
               backgroundColor: theme.white,
@@ -1859,40 +2006,56 @@ function App() {
                     key={item._id}
                     style={{
                       display: "flex",
-                      gap: "15px",
-                      marginBottom: "20px",
-                      paddingBottom: "20px",
+                      gap: "12px", // Reducido para acercar la foto al texto
+                      marginBottom: "12px", // Menos espacio entre productos
+                      paddingBottom: "12px", // Menos relleno interior
                       borderBottom: `1px solid ${theme.border}`,
                       textAlign: "left",
                     }}
                   >
                     <div
                       style={{
-                        width: "80px",
-                        height: "80px",
+                        width: "60px", // Foto más pequeña (antes 80px)
+                        height: "60px",
                         backgroundColor: "#f1f3f5",
                         borderRadius: "8px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "30px",
+                        fontSize: "24px", // Icono más pequeño
+                        flexShrink: 0, // Evita que la foto se aplaste
                       }}
                     >
-                      📸
+                      {/* Lógica para mostrar la foto real si existe */}
+                      {item.fotos && item.fotos.length > 0 ? (
+                        <img
+                          src={item.fotos[0]}
+                          alt={item.nombre}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            borderRadius: "8px",
+                          }}
+                        />
+                      ) : (
+                        "📸"
+                      )}
                     </div>
                     <div
                       style={{
                         flex: 1,
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent: "space-between",
+                        justifyContent: "center",
+                        gap: "6px", // Alineación fina con la imagen
                       }}
                     >
                       <div>
                         <h4
                           style={{
-                            margin: "0 0 5px 0",
-                            fontSize: "15px",
+                            margin: "0 0 2px 0", // Menos margen abajo
+                            fontSize: "14px", // Letra un poco más ajustada
                             color: theme.text,
                             fontWeight: "700",
                           }}
@@ -1909,7 +2072,7 @@ function App() {
                           {item.precioOferta > 0 && (
                             <span
                               style={{
-                                fontSize: "12px",
+                                fontSize: "11px",
                                 color: theme.textMuted,
                                 textDecoration: "line-through",
                               }}
@@ -1920,7 +2083,7 @@ function App() {
                           <p
                             style={{
                               margin: 0,
-                              fontSize: "15px",
+                              fontSize: "14px",
                               fontWeight: "800",
                               color: theme.green,
                             }}
@@ -1934,7 +2097,7 @@ function App() {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          marginTop: "10px",
+                          marginTop: "6px", // Acerca los botones al texto
                         }}
                       >
                         <div
@@ -1949,7 +2112,7 @@ function App() {
                           <button
                             onClick={() => modificarCantidad(item._id, -1)}
                             style={{
-                              padding: "6px 12px",
+                              padding: "4px 10px", // Botones +/- más finos
                               border: "none",
                               cursor: "pointer",
                               backgroundColor: "#f8f9fa",
@@ -1962,7 +2125,7 @@ function App() {
                           </button>
                           <span
                             style={{
-                              padding: "6px 12px",
+                              padding: "4px 10px", // Número de cantidad más fino
                               fontSize: "13px",
                               borderLeft: `1px solid ${theme.border}`,
                               borderRight: `1px solid ${theme.border}`,
@@ -1976,7 +2139,7 @@ function App() {
                           <button
                             onClick={() => modificarCantidad(item._id, 1)}
                             style={{
-                              padding: "6px 12px",
+                              padding: "4px 10px",
                               border: "none",
                               cursor: "pointer",
                               backgroundColor: "#f8f9fa",
@@ -1995,9 +2158,9 @@ function App() {
                             color: "white",
                             border: "none",
                             borderRadius: "6px",
-                            padding: "6px 12px",
+                            padding: "4px 10px", // Botón eliminar más compacto
                             cursor: "pointer",
-                            fontSize: "12px",
+                            fontSize: "11px", // Letra un poco más chica
                             fontWeight: "600",
                           }}
                         >
@@ -2173,7 +2336,7 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
     >
       <div
         style={{
-          height: "200px",
+          height: "110px",
           backgroundColor: "#f1f3f5",
           display: "flex",
           alignItems: "center",
@@ -2202,11 +2365,12 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
               left: "10px",
               backgroundColor: "#fde8e8",
               color: "#9b1c1c",
-              padding: "6px 12px",
-              borderRadius: "6px",
-              fontSize: "11px",
+              padding: "2px 6px",
+              borderRadius: "4px",
+              fontSize: "9px",
               fontWeight: "bold",
               border: "1px solid #f8b4b4",
+              whiteSpace: "nowrap",
             }}
           >
             Agotado
@@ -2215,15 +2379,16 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
           <span
             style={{
               position: "absolute",
-              top: "10px",
-              left: "10px",
+              top: "8px",
+              left: "8px",
               backgroundColor: "#fef3c7",
               color: "#92400e",
-              padding: "6px 12px",
-              borderRadius: "6px",
-              fontSize: "11px",
+              padding: "2px 6px", // <-- Redujimos el relleno
+              borderRadius: "4px",
+              fontSize: "9px", // <-- Letra más pequeña
               fontWeight: "bold",
               border: "1px solid #fde68a",
+              whiteSpace: "nowrap", // <-- Esto evita que el texto se rompa en dos líneas
             }}
           >
             ¡Solo quedan {producto.stock}!
@@ -2232,14 +2397,21 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
       </div>
       <div
         style={{
-          padding: "20px",
+          padding: "10px",
           display: "flex",
           flexDirection: "column",
           flex: 1,
         }}
       >
         <h3
-          style={{ margin: "0 0 6px 0", fontSize: "16px", color: theme.text }}
+          style={{
+            margin: "0 0 4px 0",
+            fontSize: "12px",
+            color: theme.text,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
         >
           {producto.nombre}
         </h3>
@@ -2261,11 +2433,18 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
             marginBottom: "16px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "0px",
+            }}
+          >
             {tieneDescuento && (
               <span
                 style={{
-                  fontSize: "14px",
+                  fontSize: "10px", // <-- Más chiquito
                   color: theme.textMuted,
                   textDecoration: "line-through",
                   fontWeight: "500",
@@ -2276,7 +2455,7 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
             )}
             <span
               style={{
-                fontSize: "20px",
+                fontSize: "14px", // <-- Tamaño equilibrado
                 fontWeight: "800",
                 color: theme.green,
               }}
@@ -2290,12 +2469,12 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
           disabled={sinStock}
           style={{
             width: "100%",
-            padding: "12px",
+            padding: "8px",
             backgroundColor: sinStock ? "#e9ecef" : theme.blue,
             color: sinStock ? "#adb5bd" : "white",
             border: "none",
             borderRadius: "8px",
-            fontSize: "13px",
+            fontSize: "11px",
             fontWeight: "bold",
             cursor: sinStock ? "not-allowed" : "pointer",
             transition: "background-color 0.2s",
