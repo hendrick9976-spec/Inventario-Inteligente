@@ -88,111 +88,136 @@ app.get("/productos", authMiddleware, async (req, res) => {
   }
 });
 
-// Crear producto (ACTUALIZADO CON FOTOS Y CATEGORÍA)
-app.post(
-  "/productos",
+// Configuración para recibir foto y video simultáneamente
+const uploadProductFiles = upload.fields([
+  { name: "foto", maxCount: 1 },
+  { name: "video", maxCount: 1 },
+]);
+
+// Crear producto (ACTUALIZADO CON FOTOS, VIDEO Y CATEGORÍA)
+app.post("/productos", authMiddleware, uploadProductFiles, async (req, res) => {
+  try {
+    const {
+      nombre,
+      descripcion,
+      precio,
+      costoEnvio,
+      precioVenta,
+      stock,
+      stockMinimo,
+      proveedorInicial,
+      categoria,
+      precioOferta,
+    } = req.body;
+    if (
+      !nombre ||
+      !nombre.trim() ||
+      precio === undefined ||
+      precioVenta === undefined ||
+      stock === undefined ||
+      Number(precio) < 0 ||
+      Number(precioVenta) < 0 ||
+      Number(stock) < 0 ||
+      !categoria
+    ) {
+      return res.status(400).json({ error: "Datos inválidos o faltantes" });
+    }
+    const nuevoProducto = new Product({
+      nombre: nombre.trim(),
+      descripcion: descripcion ? descripcion.trim() : "",
+      precio: Number(precio),
+      costoEnvio: Number(costoEnvio || 0),
+      precioVenta: Number(precioVenta),
+      precioOferta: Number(precioOferta || 0),
+      stock: Number(stock),
+      stockMinimo: Number(stockMinimo || 5),
+      categoria: categoria,
+      user: req.user.userId,
+    });
+
+    // Guardamos las URLs de Cloudinary si vienen los archivos
+    if (req.files) {
+      if (req.files["foto"] && req.files["foto"][0]) {
+        nuevoProducto.fotos = [req.files["foto"][0].path];
+      }
+      if (req.files["video"] && req.files["video"][0]) {
+        nuevoProducto.videoUrl = req.files["video"][0].path;
+      }
+    }
+
+    await nuevoProducto.save();
+    if (Number(stock) > 0) {
+      const nuevaReposicion = new Reposicion({
+        productoId: nuevoProducto._id,
+        nombreProducto: nuevoProducto.nombre,
+        cantidad: Number(stock),
+        stockAntes: 0,
+        stockDespues: Number(stock),
+        proveedor: proveedorInicial || "",
+        user: req.user.userId,
+      });
+      await nuevaReposicion.save();
+    }
+    res.status(201).json(nuevoProducto);
+  } catch (error) {
+    console.error("Error al crear producto:", error);
+    res.status(500).json({ error: "Error al crear producto" });
+  }
+});
+
+// Editar producto (Actualizado para procesar textos, foto y video juntos)
+app.put(
+  "/productos/:id",
   authMiddleware,
-  upload.single("foto"),
+  uploadProductFiles,
   async (req, res) => {
     try {
+      //console.log("FILES RECIBIDOS:", req.files); // <--- AÑADE ESTO
+
       const {
         nombre,
         descripcion,
         precio,
         costoEnvio,
         precioVenta,
-        stock,
         stockMinimo,
-        proveedorInicial,
         categoria,
-        precioOferta, // NUEVO CAMPO
+        precioOferta,
       } = req.body;
 
-      if (
-        !nombre ||
-        !nombre.trim() ||
-        precio === undefined ||
-        precioVenta === undefined ||
-        stock === undefined ||
-        Number(precio) < 0 ||
-        Number(precioVenta) < 0 ||
-        Number(stock) < 0 ||
-        !categoria // Validación de la categoría
-      ) {
-        return res.status(400).json({ error: "Datos inválidos o faltantes" });
-      }
-
-      const nuevoProducto = new Product({
+      const updateData = {
         nombre: nombre.trim(),
         descripcion: descripcion ? descripcion.trim() : "",
         precio: Number(precio),
         costoEnvio: Number(costoEnvio || 0),
         precioVenta: Number(precioVenta),
-        precioOferta: Number(precioOferta || 0), // <-- NUEVO: Lo guardamos (0 si no hay oferta)
-        stock: Number(stock),
+        precioOferta: Number(precioOferta || 0),
         stockMinimo: Number(stockMinimo || 5),
-        categoria: categoria, // Guardamos el ID de la categoría
-        user: req.user.userId,
-      });
+        categoria: categoria,
+      };
 
-      // NUEVO: Si Cloudinary procesó una imagen, guardamos la URL
-      if (req.file) {
-        nuevoProducto.fotos = [req.file.path];
+      if (req.files) {
+        if (req.files["foto"] && req.files["foto"][0]) {
+          updateData.fotos = [req.files["foto"][0].path];
+        }
+        if (req.files["video"] && req.files["video"][0]) {
+          updateData.videoUrl = req.files["video"][0].path;
+          //console.log("URL DEL VIDEO A GUARDAR:", req.files["video"][0].path); // <--- Y ESTO
+        }
       }
 
-      await nuevoProducto.save();
-
-      if (Number(stock) > 0) {
-        const nuevaReposicion = new Reposicion({
-          productoId: nuevoProducto._id,
-          nombreProducto: nuevoProducto.nombre,
-          cantidad: Number(stock),
-          stockAntes: 0,
-          stockDespues: Number(stock),
-          proveedor: proveedorInicial || "",
-          user: req.user.userId,
-        });
-
-        await nuevaReposicion.save();
-      }
-
-      res.status(201).json(nuevoProducto);
-    } catch (error) {
-      console.error("Error al crear producto:", error);
-      res.status(500).json({ error: "Error al crear producto" });
-    }
-  },
-);
-
-// ==========================================
-// RUTA TEMPORAL PARA PRUEBA DE FOTOS
-// ==========================================
-app.post(
-  "/productos/:id/foto",
-  authMiddleware,
-  upload.single("foto"),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No se detectó ninguna imagen" });
-      }
-
-      // Usamos findOneAndUpdate para actualizar solo la foto y evitar
-      // el error de validación por la falta de 'categoria' en productos antiguos
-      const producto = await Product.findOneAndUpdate(
+      const productoActualizado = await Product.findOneAndUpdate(
         { _id: req.params.id, user: req.user.userId },
-        { $set: { fotos: [req.file.path] } },
-        { returnDocument: "after" }, // Esto nos devuelve el producto ya actualizado
+        { $set: updateData },
+        { new: true },
       );
 
-      if (!producto) {
-        return res.status(404).json({ error: "Producto no encontrado" });
-      }
+      //console.log("PRODUCTO EN MONGODB TRAS GUARDAR:", productoActualizado); // <--- Y ESTO
 
-      res.json({ mensaje: "Foto guardada con éxito", producto });
+      res.json(productoActualizado);
     } catch (error) {
-      console.error("Error al subir foto:", error);
-      res.status(500).json({ error: "Error al procesar la imagen" });
+      console.error("Error al actualizar producto:", error);
+      res.status(500).json({ error: "Error al actualizar producto" });
     }
   },
 );
@@ -213,60 +238,6 @@ app.delete("/productos/:id", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("Error al eliminar producto:", error);
     res.status(500).json({ error: "Error al eliminar producto" });
-  }
-});
-
-// Editar producto
-app.put("/productos/:id", authMiddleware, async (req, res) => {
-  try {
-    const {
-      nombre,
-      descripcion,
-      precio,
-      costoEnvio,
-      precioVenta,
-      stockMinimo,
-      categoria,
-      precioOferta, // <-- NUEVO
-    } = req.body;
-
-    if (
-      !nombre ||
-      !nombre.trim() ||
-      precio === undefined ||
-      precioVenta === undefined ||
-      Number(precio) < 0 ||
-      Number(precioVenta) < 0
-    ) {
-      return res.status(400).json({ error: "Datos inválidos" });
-    }
-
-    const productoActualizado = await Product.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        user: req.user.userId,
-      },
-      {
-        nombre: nombre.trim(),
-        descripcion: descripcion ? descripcion.trim() : "",
-        precio: Number(precio),
-        costoEnvio: Number(costoEnvio || 0),
-        precioVenta: Number(precioVenta),
-        precioOferta: Number(precioOferta || 0), // <-- NUEVO
-        stockMinimo: Number(stockMinimo || 5),
-        categoria: categoria,
-      },
-      { returnDocument: "after" },
-    );
-
-    if (!productoActualizado) {
-      return res.status(404).json({ error: "Producto no encontrado" });
-    }
-
-    res.json(productoActualizado);
-  } catch (error) {
-    console.error("Error al actualizar producto:", error);
-    res.status(500).json({ error: "Error al actualizar producto" });
   }
 });
 
@@ -575,30 +546,35 @@ app.get("/api/tienda/config", authMiddleware, async (req, res) => {
 
 // 2. Guardar/Actualizar la configuración (Privado - Para el dueño en el CMS)
 // Actualizar la ruta PUT /api/tienda/config
+// 2. Guardar/Actualizar la configuración (Backend)
 app.put("/api/tienda/config", authMiddleware, async (req, res) => {
   try {
     const {
       nombreTienda,
+      logoTienda,
       mensajeBanner,
       descripcionBanner,
       correoTienda,
       whatsappTienda,
-      politicaReembolso, // <-- NUEVO
+      politicaReembolso,
       terminosServicio,
-      preguntasFrecuentes, // <-- NUEVO
+      preguntasFrecuentes,
+      badgesConfianza, // <--- ¡AQUÍ ESTABA EL DETALLE! Lo agregamos
     } = req.body;
 
     const configActualizada = await ConfigTienda.findOneAndUpdate(
       { user: req.user.userId },
       {
         nombreTienda,
+        logoTienda,
         mensajeBanner,
         descripcionBanner,
         correoTienda,
         whatsappTienda,
-        politicaReembolso, // <-- NUEVO
+        politicaReembolso,
         terminosServicio,
-        preguntasFrecuentes, // <-- NUEVO
+        preguntasFrecuentes,
+        badgesConfianza, // <--- Y lo incluimos al guardar en la BD
       },
       { returnDocument: "after", upsert: true },
     );
@@ -608,6 +584,34 @@ app.put("/api/tienda/config", authMiddleware, async (req, res) => {
     res.status(500).json({ error: "Error al actualizar configuración" });
   }
 });
+
+// 3. Subir el logo de la tienda (Imagen)
+app.post(
+  "/api/tienda/config/logo",
+  authMiddleware,
+  upload.single("logo"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se detectó ninguna imagen" });
+      }
+
+      const configActualizada = await ConfigTienda.findOneAndUpdate(
+        { user: req.user.userId },
+        { $set: { logoTienda: req.file.path } },
+        { returnDocument: "after", upsert: true },
+      );
+
+      res.json({
+        mensaje: "Logo guardado con éxito",
+        config: configActualizada,
+      });
+    } catch (error) {
+      console.error("Error al subir logo:", error);
+      res.status(500).json({ error: "Error al procesar la imagen" });
+    }
+  },
+);
 
 // ==========================================
 // GESTOR DE OFERTAS (MARKETING)
@@ -724,6 +728,29 @@ app.get("/api/tienda/:usuarioId/config", async (req, res) => {
             pregunta: "¿Puedo devolver un producto si llega dañado?",
             respuesta:
               "Sí, tienes 7 días naturales desde que recibes el paquete para reportar cualquier daño y solicitar un reemplazo sin costo extra.",
+          },
+        ],
+        badgesConfianza: [
+          {
+            icono: "📦",
+            titulo: "Envíos a todo México",
+            descripcion: "Recíbelo en la puerta de tu casa de forma rápida.",
+          },
+          {
+            icono: "🛡️",
+            titulo: "Garantía de Calidad",
+            descripcion: "Productos probados y garantizados contra defectos.",
+          },
+          {
+            icono: "🔒",
+            titulo: "Compra Segura",
+            descripcion: "Tu información y tus pagos están 100% protegidos.",
+          },
+          {
+            icono: "⭐",
+            titulo: "Clientes Satisfechos",
+            descripcion:
+              "Más de 500 reseñas positivas respaldan nuestro servicio.",
           },
         ],
       });

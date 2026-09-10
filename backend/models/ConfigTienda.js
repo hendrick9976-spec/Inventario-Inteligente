@@ -12,6 +12,11 @@ const configTiendaSchema = new mongoose.Schema(
       type: String,
       default: "TechStore", // Valor por defecto si no han configurado nada
     },
+    // En models/ConfigTienda.js
+    logoTienda: {
+      type: String,
+      default: "⚡",
+    },
     mensajeBanner: {
       type: String,
       default: "HASTA 30% OFF EN TODA LA TIENDA",
@@ -41,6 +46,13 @@ const configTiendaSchema = new mongoose.Schema(
       {
         pregunta: String,
         respuesta: String,
+      },
+    ],
+    badgesConfianza: [
+      {
+        icono: String,
+        titulo: String,
+        descripcion: String,
       },
     ],
   },

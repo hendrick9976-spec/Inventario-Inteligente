@@ -42,6 +42,7 @@ function App() {
     terminosServicio: "",
     preguntasFrecuentes: [], // <-- NUEVO
   });
+  const [productoModal, setProductoModal] = useState(null);
 
   // ESTADOS DEL CARRITO Y BASE DE DATOS
   const [carrito, setCarrito] = useState([]);
@@ -98,6 +99,7 @@ function App() {
         // ESTANDARIZACIÓN DE PRECIOS DESDE EL ORIGEN
         const productosNormalizados = dataProd.map((p) => ({
           ...p,
+          videoUrl: p.videoUrl || "",
           precioOriginal: p.precioVenta,
           precioVenta:
             p.precioOferta && p.precioOferta > 0
@@ -115,6 +117,7 @@ function App() {
         const dataConfig = await resConfig.json();
         setConfigTienda({
           nombreTienda: dataConfig.nombreTienda || "Mi Tienda Virtual",
+          logoTienda: dataConfig.logoTienda || "⚡",
           mensajeBanner:
             dataConfig.mensajeBanner ||
             "¡Bienvenido a nuestra Tienda en Línea!",
@@ -126,6 +129,35 @@ function App() {
           politicaReembolso: dataConfig.politicaReembolso || "",
           terminosServicio: dataConfig.terminosServicio || "",
           preguntasFrecuentes: dataConfig.preguntasFrecuentes || [],
+          badgesConfianza:
+            dataConfig.badgesConfianza && dataConfig.badgesConfianza.length > 0
+              ? dataConfig.badgesConfianza
+              : [
+                  {
+                    icono: "📦",
+                    titulo: "Envíos a todo México",
+                    descripcion:
+                      "Recíbelo en la puerta de tu casa de forma rápida.",
+                  },
+                  {
+                    icono: "🛡️",
+                    titulo: "Garantía de Calidad",
+                    descripcion:
+                      "Productos probados y garantizados contra defectos.",
+                  },
+                  {
+                    icono: "🔒",
+                    titulo: "Compra Segura",
+                    descripcion:
+                      "Tu información y tus pagos están 100% protegidos.",
+                  },
+                  {
+                    icono: "⭐",
+                    titulo: "Clientes Satisfechos",
+                    descripcion:
+                      "Más de 500 reseñas positivas respaldan nuestro servicio.",
+                  },
+                ],
         });
       }
 
@@ -147,6 +179,22 @@ function App() {
   useEffect(() => {
     fetchTiendaData();
   }, []);
+
+  // === NUEVO: ABRIR MODAL AUTOMÁTICO SI HAY UN PRODUCTO EN EL LINK ===
+  useEffect(() => {
+    if (productos.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const productoIdUrl = params.get("producto");
+      if (productoIdUrl) {
+        const productoEncontrado = productos.find(
+          (p) => p._id === productoIdUrl,
+        );
+        if (productoEncontrado) {
+          setProductoModal(productoEncontrado);
+        }
+      }
+    }
+  }, [productos]);
 
   // Generar ofertas reales tomando únicamente los productos que tienen una oferta activa en el gestor
   const productosOferta = productos.filter(
@@ -305,10 +353,22 @@ function App() {
         setSlideActive((prev) =>
           prev === productosOferta.length - 1 ? 0 : prev + 1,
         );
-      }, 4000);
+      }, 5000);
       return () => clearInterval(intervalo);
     }
   }, [productosOferta.length]);
+
+  const abrirModalProducto = (producto) => {
+    setProductoModal(producto);
+    // Para el enlace compartible: Podrías añadir un hash a la URL
+    // window.history.pushState(null, '', `#producto-${producto._id}`);
+  };
+
+  const cerrarModalProducto = () => {
+    setProductoModal(null);
+    // Limpiar el hash de la URL
+    // window.history.pushState(null, '', window.location.pathname);
+  };
 
   // VISTAS
   if (cargandoProductos) {
@@ -381,7 +441,7 @@ function App() {
                   width: "32px",
                   height: "32px",
                   borderRadius: "10px",
-                  backgroundColor: theme.blue,
+                  backgroundColor: "transparent",
                   color: "white",
                   display: "flex",
                   alignItems: "center",
@@ -390,7 +450,21 @@ function App() {
                   fontWeight: "bold",
                 }}
               >
-                ⚡
+                {configTienda.logoTienda &&
+                configTienda.logoTienda.startsWith("http") ? (
+                  <img
+                    src={configTienda.logoTienda}
+                    alt="Logo Tienda"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      borderRadius: "8px",
+                    }}
+                  />
+                ) : (
+                  configTienda.logoTienda
+                )}
               </div>
               <h2
                 style={{
@@ -882,7 +956,7 @@ function App() {
                 width: "30px",
                 height: "30px",
                 borderRadius: "8px",
-                background: theme.blue,
+                background: "transparent",
                 color: "white",
                 display: "flex",
                 alignItems: "center",
@@ -891,7 +965,21 @@ function App() {
                 fontWeight: "bold",
               }}
             >
-              ⚡
+              {configTienda.logoTienda &&
+              configTienda.logoTienda.startsWith("http") ? (
+                <img
+                  src={configTienda.logoTienda}
+                  alt="Logo Tienda"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    borderRadius: "8px",
+                  }}
+                />
+              ) : (
+                configTienda.logoTienda
+              )}
             </div>
             <h2
               style={{
@@ -1025,7 +1113,7 @@ function App() {
                 width: "30px",
                 height: "30px",
                 borderRadius: "8px",
-                backgroundColor: theme.blue,
+                backgroundColor: "transparent",
                 color: "white",
                 display: "flex",
                 alignItems: "center",
@@ -1034,7 +1122,21 @@ function App() {
                 fontWeight: "bold",
               }}
             >
-              ⚡
+              {configTienda.logoTienda &&
+              configTienda.logoTienda.startsWith("http") ? (
+                <img
+                  src={configTienda.logoTienda}
+                  alt="Logo Tienda"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    borderRadius: "8px",
+                  }}
+                />
+              ) : (
+                configTienda.logoTienda
+              )}
             </div>
             <h2
               style={{
@@ -1180,7 +1282,7 @@ function App() {
       {categoriaActiva === "TODAS" && busquedaTienda === "" && (
         <section
           style={{
-            padding: "15px clamp(15px, 4vw, 40px) 25px" /* Solo 15px arriba */,
+            padding: "15px clamp(15px, 4vw, 40px) 25px",
             boxSizing: "border-box",
             width: "100%",
             maxWidth: "100vw",
@@ -1191,25 +1293,23 @@ function App() {
               backgroundColor: theme.white,
               border: `1px solid ${theme.border}`,
               borderRadius: "16px",
-              padding: "20px 30px",
+              padding: "25px 30px",
               display: "flex",
-              flexWrap: "wrap",
-              gap: "clamp(15px, 3vw, 25px)",
+              flexDirection: "column", // <-- Textos arriba, contenido abajo
+              gap: "20px",
               boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-              overflow: "hidden",
               boxSizing: "border-box",
               width: "100%",
             }}
           >
+            {/* 1. ARRIBA: Textos del Banner en horizontal */}
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "center",
-                textAlign: "left",
-                flex: "1 1 280px",
-                minWidth: 0,
-                boxSizing: "border-box",
+                alignItems: "center",
+                textAlign: "center",
+                width: "100%",
               }}
             >
               <div
@@ -1220,10 +1320,11 @@ function App() {
                   borderRadius: "20px",
                   fontSize: "12px",
                   fontWeight: "bold",
-                  marginBottom: "15px",
+                  marginBottom: "10px",
                   width: "fit-content",
                   letterSpacing: "1px",
                   textTransform: "uppercase",
+                  margin: "0 auto 10px auto",
                 }}
               >
                 ¡Especial de Verano!
@@ -1232,7 +1333,7 @@ function App() {
                 style={{
                   color: theme.text,
                   fontSize: "clamp(24px, 4vw, 34px)",
-                  margin: "0 0 10px 0",
+                  margin: "0 0 8px 0",
                   fontWeight: "900",
                   lineHeight: "1.1",
                 }}
@@ -1243,8 +1344,8 @@ function App() {
                 style={{
                   color: theme.textMuted,
                   fontSize: "15px",
-                  maxWidth: "450px",
-                  margin: "10px 0 25px 0",
+                  maxWidth: "900px",
+                  margin: "0",
                   lineHeight: "1.5",
                 }}
               >
@@ -1252,224 +1353,325 @@ function App() {
               </p>
             </div>
 
+            {/* 2. ABAJO: Dos columnas (Lado a lado: Carrusel y Video) */}
             <div
               style={{
-                backgroundColor: theme.bg,
-                borderRadius: "12px",
-                padding: "15px",
-                border: `1px solid ${theme.border}`,
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                alignItems: "center",
-                minHeight: "260px",
-                flex: "1 1 280px",
-                minWidth: 0,
-                maxWidth: "100%",
-                boxSizing: "border-box",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: "20px",
+                width: "100%",
               }}
             >
-              <span
-                style={{
-                  position: "absolute",
-                  top: "15px",
-                  left: "15px",
-                  backgroundColor: theme.red,
-                  color: "white",
-                  padding: "4px 10px",
-                  borderRadius: "6px",
-                  fontSize: "11px",
-                  fontWeight: "bold",
-                  zIndex: 2,
-                }}
-              >
-                OFERTA TOP
-              </span>
-              <button
-                onClick={anteriorSlide}
-                style={{
-                  position: "absolute",
-                  left: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.white,
-                  color: theme.text,
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 10,
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                }}
-              >
-                ←
-              </button>
-
+              {/* COLUMNA IZQUIERDA: CARRUSEL DE OFERTAS */}
               <div
                 style={{
-                  width: "100%",
-                  flex: 1,
-                  overflow: "hidden",
+                  backgroundColor: theme.bg,
+                  borderRadius: "12px",
+                  padding: "15px",
+                  border: `1px solid ${theme.border}`,
                   position: "relative",
                   display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  minHeight: "260px",
+                  boxSizing: "border-box",
                 }}
               >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "15px",
+                    left: "15px",
+                    backgroundColor: theme.red,
+                    color: "white",
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    zIndex: 2,
+                  }}
+                >
+                  OFERTA TOP
+                </span>
+                <button
+                  onClick={anteriorSlide}
+                  style={{
+                    position: "absolute",
+                    left: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.white,
+                    color: theme.text,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 10,
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  ←
+                </button>
                 <div
                   style={{
-                    display: "flex",
                     width: "100%",
-                    transition: "transform 0.5s ease-in-out",
-                    transform: `translateX(-${slideActual * 100}%)`,
-                    alignItems: "center",
+                    flex: 1,
+                    overflow: "hidden",
+                    position: "relative",
+                    display: "flex",
                   }}
                 >
-                  {productosOferta.map((producto) => (
-                    <div
-                      key={producto._id}
-                      style={{
-                        flex: "0 0 100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        textAlign: "center",
-                        padding: "0 clamp(20px, 8vw, 40px)",
-                        boxSizing: "border-box",
-                      }}
-                    >
+                  <div
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      transition: "transform 0.5s ease-in-out",
+                      transform: `translateX(-${slideActual * 100}%)`,
+                      alignItems: "center",
+                    }}
+                  >
+                    {productosOferta.map((producto) => (
                       <div
+                        key={producto._id}
                         style={{
-                          width: "100px",
-                          height: "100px",
-                          backgroundColor: "#f1f3f5",
-                          borderRadius: "12px",
+                          flex: "0 0 100%",
                           display: "flex",
-                          alignItems: "center",
+                          flexDirection: "column",
                           justifyContent: "center",
-                          fontSize: "50px",
-                          marginBottom: "10px",
-                          overflow: "hidden", // <-- Importante para que la foto respete el borde redondo
+                          alignItems: "center",
+                          textAlign: "center",
+                          padding: "0 clamp(20px, 8vw, 40px)",
+                          boxSizing: "border-box",
                         }}
                       >
-                        {producto.fotos && producto.fotos.length > 0 ? (
-                          <img
-                            src={producto.fotos[0]}
-                            alt={producto.nombre}
+                        {/* CONTENEDOR CLICKEABLE PARA ABRIR EL MODAL */}
+                        <div
+                          onClick={() => abrirModalProducto(producto)}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            cursor: "pointer",
+                          }}
+                          title="Haz clic para ver detalles"
+                        >
+                          <div
                             style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
+                              width: "90px",
+                              height: "90px",
+                              backgroundColor: "#f1f3f5",
+                              borderRadius: "12px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "45px",
+                              marginBottom: "10px",
+                              overflow: "hidden",
                             }}
-                          />
-                        ) : (
-                          "📸"
-                        )}
-                      </div>
-                      <h3
-                        style={{
-                          margin: "0 0 5px 0",
-                          fontSize: "16px",
-                          color: theme.text,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {producto.nombre}
-                      </h3>
-                      <p
-                        style={{
-                          margin: "0 0 10px 0",
-                          fontSize: "13px",
-                          color: theme.textMuted,
-                        }}
-                      >
-                        {producto.descripcion}
-                      </p>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px",
-                          justifyContent: "center",
-                          marginBottom: "10px",
-                        }}
-                      >
-                        <span
+                          >
+                            {producto.fotos && producto.fotos.length > 0 ? (
+                              <img
+                                src={producto.fotos[0]}
+                                alt={producto.nombre}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              "📸"
+                            )}
+                          </div>
+                          <h3
+                            style={{
+                              margin: "0 0 8px 0",
+                              fontSize: "16px",
+                              color: theme.text,
+                              fontWeight: "700",
+                            }}
+                          >
+                            {producto.nombre}
+                          </h3>
+                        </div>
+
+                        <div
                           style={{
-                            fontSize: "14px",
-                            color: theme.textMuted,
-                            textDecoration: "line-through",
-                            fontWeight: "500",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            justifyContent: "center",
+                            marginBottom: "10px",
                           }}
                         >
-                          ${producto.precioOriginal.toFixed(2)}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "22px",
-                            color: theme.green,
-                            fontWeight: "900",
-                          }}
-                        >
-                          ${producto.precioVenta.toFixed(2)}
-                        </span>
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              color: theme.textMuted,
+                              textDecoration: "line-through",
+                              fontWeight: "500",
+                            }}
+                          >
+                            ${producto.precioOriginal.toFixed(2)}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "20px",
+                              color: theme.green,
+                              fontWeight: "900",
+                            }}
+                          >
+                            ${producto.precioVenta.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+                <button
+                  onClick={siguienteSlide}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.white,
+                    color: theme.text,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 10,
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  →
+                </button>
+                {productosOferta.length > 0 && (
+                  <button
+                    onClick={() =>
+                      agregarAlCarrito(productosOferta[slideActual])
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      backgroundColor: theme.blue,
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      transition: "background-color 0.2s",
+                      marginTop: "auto",
+                      zIndex: 2,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    Añadir al carrito
+                  </button>
+                )}
               </div>
 
-              <button
-                onClick={siguienteSlide}
+              {/* COLUMNA DERECHA: REPRODUCTOR DE VIDEO SINCRONIZADO */}
+              <div
                 style={{
-                  position: "absolute",
-                  right: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
+                  backgroundColor: theme.bg,
+                  borderRadius: "12px",
+                  padding: "15px",
                   border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.white,
-                  color: theme.text,
-                  cursor: "pointer",
-                  fontWeight: "bold",
                   display: "flex",
-                  alignItems: "center",
+                  flexDirection: "column",
                   justifyContent: "center",
-                  zIndex: 10,
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                  alignItems: "center",
+                  minHeight: "260px",
+                  boxSizing: "border-box",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
               >
-                →
-              </button>
-              {productosOferta.length > 0 && (
-                <button
-                  onClick={() => agregarAlCarrito(productosOferta[slideActual])}
+                <span
                   style={{
-                    width: "100%",
-                    padding: "12px",
-                    backgroundColor: theme.blue,
+                    position: "absolute",
+                    top: "15px",
+                    left: "15px",
+                    backgroundColor: theme.primary,
                     color: "white",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "13px",
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
                     fontWeight: "bold",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                    marginTop: "auto",
                     zIndex: 2,
-                    boxSizing: "border-box",
                   }}
                 >
-                  Añadir al carrito
-                </button>
-              )}
+                  🎥 VIDEO PROMOCIONAL
+                </span>
+
+                {productosOferta.length > 0 &&
+                productosOferta[slideActual]?.videoUrl ? (
+                  <video
+                    key={productosOferta[slideActual]._id}
+                    src={productosOferta[slideActual].videoUrl}
+                    autoPlay
+                    muted
+                    playsInline
+                    onTimeUpdate={(e) => {
+                      if (e.target.currentTime >= 5) {
+                        e.target.currentTime = 0; // <-- Reinicia el video exactamente a los 5 segundos
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      height: "180px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                      marginTop: "20px",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "180px",
+                      backgroundColor: "#e9ecef",
+                      borderRadius: "8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: theme.textMuted,
+                      marginTop: "20px",
+                      textAlign: "center",
+                      padding: "10px",
+                    }}
+                  >
+                    <span style={{ fontSize: "32px", marginBottom: "5px" }}>
+                      🎬
+                    </span>
+                    <p
+                      style={{ margin: 0, fontSize: "13px", fontWeight: "600" }}
+                    >
+                      Video promocional corto (5s)
+                    </p>
+                    <p style={{ margin: "4px 0 0", fontSize: "11px" }}>
+                      {productosOferta.length > 0
+                        ? `(Sube un video a "${productosOferta[slideActual]?.nombre}" desde tu panel)`
+                        : "No hay productos en oferta activa"}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -1550,6 +1752,7 @@ function App() {
                 producto={producto}
                 theme={theme}
                 agregarAlCarrito={agregarAlCarrito}
+                abrirModalProducto={abrirModalProducto}
               />
             ))}
           </div>
@@ -1573,30 +1776,22 @@ function App() {
             gap: "40px",
           }}
         >
-          <BadgeConfianza
-            icono="📦"
-            titulo="Envíos a todo México"
-            descripcion="Recíbelo en la puerta de tu casa de forma rápida."
-            theme={theme}
-          />
-          <BadgeConfianza
-            icono="🛡️"
-            titulo="Garantía de Calidad"
-            descripcion="Productos probados y garantizados contra defectos."
-            theme={theme}
-          />
-          <BadgeConfianza
-            icono="🔒"
-            titulo="Compra Segura"
-            descripcion="Tu información y tus pagos están 100% protegidos."
-            theme={theme}
-          />
-          <BadgeConfianza
-            icono="⭐"
-            titulo="Clientes Satisfechos"
-            descripcion="Más de 500 reseñas positivas respaldan nuestro servicio."
-            theme={theme}
-          />
+          {configTienda.badgesConfianza &&
+          configTienda.badgesConfianza.length > 0 ? (
+            configTienda.badgesConfianza.map((badge, idx) => (
+              <BadgeConfianza
+                key={idx}
+                icono={badge.icono}
+                titulo={badge.titulo}
+                descripcion={badge.descripcion}
+                theme={theme}
+              />
+            ))
+          ) : (
+            <p style={{ textAlign: "center", color: theme.textMuted }}>
+              Información de confianza no disponible.
+            </p>
+          )}
         </div>
       </section>
 
@@ -1666,7 +1861,23 @@ function App() {
                 marginBottom: "20px",
               }}
             >
-              <span style={{ fontSize: "24px" }}>⚡</span>
+              <span style={{ fontSize: "24px" }}>
+                {configTienda.logoTienda &&
+                configTienda.logoTienda.startsWith("http") ? (
+                  <img
+                    src={configTienda.logoTienda}
+                    alt="Logo Tienda"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      borderRadius: "8px",
+                    }}
+                  />
+                ) : (
+                  configTienda.logoTienda
+                )}
+              </span>
               <span
                 style={{
                   color: theme.text,
@@ -1929,6 +2140,255 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* =========================================
+          MODAL DE DETALLES DEL PRODUCTO
+          ========================================= */}
+      {productoModal && (
+        <div
+          onClick={cerrarModalProducto}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            zIndex: 1005,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: theme.white,
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "500px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+              position: "relative",
+            }}
+          >
+            {/* Botón de cerrar */}
+            <button
+              onClick={cerrarModalProducto}
+              style={{
+                position: "absolute",
+                top: "15px",
+                right: "15px",
+                background: "rgba(255,255,255,0.8)",
+                border: "none",
+                borderRadius: "50%",
+                width: "30px",
+                height: "30px",
+                fontSize: "16px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              ✖
+            </button>
+
+            {/* Imagen o Video en el Modal */}
+            <div
+              style={{
+                width: "100%",
+                height: "300px",
+                backgroundColor: "#f1f3f5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderTopLeftRadius: "16px",
+                borderTopRightRadius: "16px",
+                overflow: "hidden",
+              }}
+            >
+              {productoModal.videoUrl ? (
+                <video
+                  src={productoModal.videoUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : productoModal.fotos && productoModal.fotos.length > 0 ? (
+                <img
+                  src={productoModal.fotos[0]}
+                  alt={productoModal.nombre}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: "60px", color: "#dee2e6" }}>📸</span>
+              )}
+            </div>
+
+            {/* Detalles */}
+            <div
+              style={{
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "15px",
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    margin: "0 0 10px 0",
+                    fontSize: "22px",
+                    color: theme.text,
+                    fontWeight: "800",
+                  }}
+                >
+                  {productoModal.nombre}
+                </h2>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginBottom: "15px",
+                  }}
+                >
+                  {productoModal.precioOferta > 0 && (
+                    <span
+                      style={{
+                        fontSize: "16px",
+                        color: theme.textMuted,
+                        textDecoration: "line-through",
+                      }}
+                    >
+                      ${productoModal.precioOriginal.toFixed(2)}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      fontSize: "28px",
+                      color: theme.green,
+                      fontWeight: "900",
+                    }}
+                  >
+                    ${productoModal.precioVenta.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "#f8f9fa",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    color: theme.text,
+                    lineHeight: "1.6",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {productoModal.descripcion ||
+                    "Este producto no tiene una descripción detallada."}
+                </p>
+              </div>
+
+              {/* Sección del Link Compartible */}
+              <div style={{ marginTop: "10px" }}>
+                <p
+                  style={{
+                    margin: "0 0 5px 0",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: theme.textMuted,
+                  }}
+                >
+                  🔗 Link directo a este producto:
+                </p>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}${window.location.pathname}?producto=${productoModal._id}`}
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: `1px solid ${theme.border}`,
+                      fontSize: "12px",
+                      backgroundColor: "#f3f4f6",
+                      color: theme.textMuted,
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}${window.location.pathname}?producto=${productoModal._id}`,
+                      );
+                      alert("¡Enlace del producto copiado!");
+                    }}
+                    style={{
+                      backgroundColor: theme.blue,
+                      color: "white",
+                      border: "none",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Copiar
+                  </button>
+                </div>
+              </div>
+
+              {/* Botón de Añadir */}
+              <button
+                onClick={() => {
+                  agregarAlCarrito(productoModal);
+                  cerrarModalProducto();
+                }}
+                disabled={productoModal.stock === 0}
+                style={{
+                  width: "100%",
+                  padding: "16px",
+                  backgroundColor:
+                    productoModal.stock === 0 ? "#e9ecef" : theme.green,
+                  color: productoModal.stock === 0 ? "#adb5bd" : "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  cursor: productoModal.stock === 0 ? "not-allowed" : "pointer",
+                  marginTop: "10px",
+                }}
+              >
+                {productoModal.stock === 0 ? "Agotado" : "Añadir al carrito"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =========================================
           OVERLAY Y CARRITO LATERAL (DRAWER)
@@ -2307,13 +2767,19 @@ function FaqItem({ pregunta, respuesta, theme }) {
   );
 }
 
-function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
+function TarjetaProducto({
+  producto,
+  theme,
+  agregarAlCarrito,
+  abrirModalProducto,
+}) {
   const sinStock = producto.stock === 0;
   const pocoStock = producto.stock > 0 && producto.stock <= 5;
   const tieneDescuento = producto.precioOferta > 0;
 
   return (
     <div
+      onClick={() => abrirModalProducto(producto)}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-4px)";
         e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.08)";
@@ -2332,6 +2798,7 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
         flexDirection: "column",
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
         textAlign: "left",
+        cursor: "pointer",
       }}
     >
       <div
@@ -2345,7 +2812,6 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
           overflow: "hidden",
         }}
       >
-        {/* Lógica para renderizar la foto de Cloudinary si existe */}
         {producto.fotos && producto.fotos.length > 0 ? (
           <img
             src={producto.fotos[0]}
@@ -2356,7 +2822,6 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
           <span style={{ fontSize: "40px", color: "#dee2e6" }}>📸</span>
         )}
 
-        {/* Tus badges originales de inventario */}
         {sinStock ? (
           <span
             style={{
@@ -2383,18 +2848,19 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
               left: "8px",
               backgroundColor: "#fef3c7",
               color: "#92400e",
-              padding: "2px 6px", // <-- Redujimos el relleno
+              padding: "2px 6px",
               borderRadius: "4px",
-              fontSize: "9px", // <-- Letra más pequeña
+              fontSize: "9px",
               fontWeight: "bold",
               border: "1px solid #fde68a",
-              whiteSpace: "nowrap", // <-- Esto evita que el texto se rompa en dos líneas
+              whiteSpace: "nowrap",
             }}
           >
             ¡Solo quedan {producto.stock}!
           </span>
         ) : null}
       </div>
+
       <div
         style={{
           padding: "10px",
@@ -2408,29 +2874,25 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
             margin: "0 0 4px 0",
             fontSize: "12px",
             color: theme.text,
-            whiteSpace: "nowrap",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            textOverflow: "ellipsis",
           }}
         >
           {producto.nombre}
         </h3>
-        <p
-          style={{
-            margin: "0 0 16px 0",
-            fontSize: "13px",
-            color: theme.textMuted,
-            flex: 1,
-          }}
-        >
-          {producto.descripcion}
-        </p>
+
+        {/* Espaciador para empujar el precio y el botón hacia abajo */}
+        <div style={{ flex: 1 }}></div>
+
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "16px",
+            marginTop: "10px",
           }}
         >
           <div
@@ -2444,7 +2906,7 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
             {tieneDescuento && (
               <span
                 style={{
-                  fontSize: "10px", // <-- Más chiquito
+                  fontSize: "10px",
                   color: theme.textMuted,
                   textDecoration: "line-through",
                   fontWeight: "500",
@@ -2455,7 +2917,7 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
             )}
             <span
               style={{
-                fontSize: "14px", // <-- Tamaño equilibrado
+                fontSize: "14px",
                 fontWeight: "800",
                 color: theme.green,
               }}
@@ -2464,8 +2926,12 @@ function TarjetaProducto({ producto, theme, agregarAlCarrito }) {
             </span>
           </div>
         </div>
+
         <button
-          onClick={() => agregarAlCarrito(producto)}
+          onClick={(e) => {
+            e.stopPropagation();
+            agregarAlCarrito(producto);
+          }}
           disabled={sinStock}
           style={{
             width: "100%",

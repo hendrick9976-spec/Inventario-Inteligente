@@ -53,6 +53,11 @@ const productSchema = new mongoose.Schema(
       },
     ],
 
+    videoUrl: {
+      type: String,
+      default: "",
+    },
+
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
