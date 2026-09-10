@@ -52,6 +52,7 @@ function App() {
   // ----------------------
   const [configTienda, setConfigTienda] = useState({
     nombreTienda: "Mi Tienda",
+    logoTienda: "⚡",
     mensajeBanner: "¡Especial de Verano!",
     descripcionBanner:
       "Lleva los mejores artículos al mejor precio por tiempo limitado.",
@@ -61,6 +62,7 @@ function App() {
     terminosServicio: "",
     preguntasFrecuentes: [],
   });
+  const [logoArchivo, setLogoArchivo] = useState(null);
 
   // ----------------------
   // AUTENTICACIÓN
@@ -91,6 +93,7 @@ function App() {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [foto, setFoto] = useState(null);
+  const [videoArchivo, setVideoArchivo] = useState(null);
   const [precio, setPrecio] = useState("");
   const [costoEnvio, setCostoEnvio] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
@@ -497,191 +500,81 @@ function App() {
 
   const guardarProducto = async (e) => {
     e.preventDefault();
+    try {
+      const formData = new FormData();
 
-    if (!nombre.trim()) {
-      alert("El nombre del producto es obligatorio");
-      return;
-    }
+      // Textos y números
+      formData.append("nombre", nombre ? nombre.trim() : "");
+      formData.append("descripcion", descripcion ? descripcion.trim() : "");
+      formData.append("precio", Number(precio || 0));
+      formData.append("costoEnvio", Number(costoEnvio || 0));
+      formData.append("precioVenta", Number(precioVenta || 0));
+      formData.append("precioOferta", Number(precioOferta || 0));
+      formData.append("stockMinimo", Number(stockMinimo || 5));
+      formData.append("categoria", categoriaId || "");
 
-    // Stock obligatorio
-    if (!editandoId && stock === "") {
-      alert(
-        "El stock inicial es obligatorio. Si es un producto nuevo que aún no llega, coloca 0 explícitamente.",
-      );
-      return;
-    }
-
-    // Precio de venta es obligatorio
-    if (precioVenta === "" || Number(precioVenta) < 0) {
-      alert("El precio de venta es obligatorio y debe ser mayor o igual a 0");
-      return;
-    }
-
-    // Costo del producto ya es opcional (solo valida si escribe algo)
-    if (precio !== "" && Number(precio) < 0) {
-      alert("El costo del producto no puede ser negativo");
-      return;
-    }
-
-    if (costoEnvio !== "" && Number(costoEnvio) < 0) {
-      alert("El costo de envío/manejo no puede ser negativo");
-      return;
-    }
-
-    const costoTotalUnitario = Number(precio || 0) + Number(costoEnvio || 0);
-
-    // Solo lanza alerta de pérdida si realmente registró costos
-    if (costoTotalUnitario > 0 && Number(precioVenta) < costoTotalUnitario) {
-      alert(
-        "El precio de venta no puede ser menor que el costo total unitario",
-      );
-      return;
-    }
-
-    // 3. Regla del stock mínimo: Si lo deja en blanco, asume 1
-    const stockMinimoCalculado = stockMinimo === "" ? 1 : Number(stockMinimo);
-
-    // === LÓGICA DE CATEGORÍAS ANTES DE GUARDAR EL PRODUCTO ===
-    let idCategoriaFinal = categoriaId;
-
-    if (creandoCategoria) {
-      const nombreLimpio = nombreNuevaCategoria.trim();
-
-      if (!nombreLimpio) {
-        alert("Escribe el nombre de la nueva categoría");
-        return;
+      // Si es un producto nuevo, mandamos stock y proveedor
+      if (!editandoId) {
+        formData.append("stock", Number(stock || 0));
+        formData.append("proveedorInicial", proveedorProductoNuevo || "");
       }
 
-      // 1. Buscamos si ya existe una categoría con ese nombre (ignorando mayúsculas/minúsculas)
-      const categoriaExistente = categorias.find(
-        (cat) => cat.nombre.toLowerCase() === nombreLimpio.toLowerCase(),
-      );
-
-      if (categoriaExistente) {
-        // Si ya existe, atrapamos su ID y nos saltamos la creación
-        idCategoriaFinal = categoriaExistente._id;
-      } else {
-        // 2. Si realmente no existe, entonces sí hacemos el fetch al backend para crearla
-        try {
-          const resCat = await fetch(`${API_URL}/categorias`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ nombre: nombreLimpio }),
-          });
-          const dataCat = await resCat.json();
-          if (!resCat.ok) {
-            alert(dataCat.error || "Error al crear la categoría");
-            return;
-          }
-          idCategoriaFinal = dataCat._id;
-          setCategorias([...categorias, dataCat]); // Actualizamos la lista local
-        } catch (error) {
-          console.error("Error:", error);
-          alert("Error de conexión al crear la categoría");
-          return;
-        }
+      // 1. ADJUNTAR FOTO
+      if (foto) {
+        formData.append("foto", foto);
       }
-    } else if (!idCategoriaFinal && !editandoId) {
-      alert("Por favor selecciona o crea una categoría para el producto.");
-      return;
-    }
-    // ==========================================================
-    if (editandoId) {
-      const confirmado = window.confirm(
-        "¿Seguro que quieres actualizar este producto?",
-      );
-      if (!confirmado) return;
 
-      // 1. Actualizamos los datos de texto (JSON)
-      const res = await fetch(`${API_URL}/productos/${editandoId}`, {
-        method: "PUT",
+      // 2. ADJUNTAR VIDEO CORTO
+      if (videoArchivo) {
+        formData.append("video", videoArchivo);
+      }
+
+      // Definimos si es creación (POST) o edición (PUT)
+      const url = editandoId
+        ? `${API_URL}/productos/${editandoId}`
+        : `${API_URL}/productos`;
+
+      const method = editandoId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method: method,
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          nombre,
-          descripcion,
-          precio: Number(precio || 0),
-          costoEnvio: Number(costoEnvio || 0),
-          precioVenta: Number(precioVenta),
-          precioOferta: Number(precioOferta || 0),
-          stockMinimo: stockMinimoCalculado,
-          categoria: idCategoriaFinal,
-        }),
-      });
-
-      // 2. Si el dueño seleccionó una nueva foto, disparamos la ruta de imagen
-      if (res.ok && foto) {
-        const formDataFoto = new FormData();
-        formDataFoto.append("foto", foto);
-
-        await fetch(`${API_URL}/productos/${editandoId}/foto`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`, // FormData va sin Content-Type
-          },
-          body: formDataFoto,
-        });
-      }
-
-      setEditandoId(null);
-      setSeccionActiva("inventario");
-    } else {
-      // Para producto NUEVO, empaquetamos todo en FormData
-      const formDataNuevo = new FormData();
-      formDataNuevo.append("nombre", nombre.trim());
-      formDataNuevo.append(
-        "descripción",
-        descripcion ? descripcion.trim() : "",
-      );
-      formDataNuevo.append("precio", Number(precio || 0));
-      formDataNuevo.append("costoEnvio", Number(costoEnvio || 0));
-      formDataNuevo.append("precioVenta", Number(precioVenta));
-      formDataNuevo.append("precioOferta", Number(precioOferta || 0));
-      formDataNuevo.append("stock", Number(stock || 0));
-      formDataNuevo.append("stockMinimo", stockMinimoCalculado);
-      formDataNuevo.append("proveedorInicial", proveedorProductoNuevo || "");
-      formDataNuevo.append("categoria", idCategoriaFinal);
-      if (foto) {
-        formDataNuevo.append("foto", foto);
-      }
-
-      const res = await fetch(`${API_URL}/productos`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`, // FormData va sin Content-Type
-        },
-        body: formDataNuevo,
+        body: formData,
       });
 
       const data = await res.json();
+
       if (!res.ok) {
-        alert(data.error || "Error al crear producto");
+        alert(data.error || "Error al guardar el producto");
         return;
       }
-      alert("Producto agregado correctamente");
+
+      // Limpiamos los campos y archivos al terminar con éxito
+      setNombre("");
+      setDescripcion("");
+      setPrecio("");
+      setCostoEnvio("");
+      setPrecioVenta("");
+      setPrecioOferta("");
+      setStock("");
+      setStockMinimo("");
+      setCategoriaId("");
+      setCreandoCategoria(false);
+      setNombreNuevaCategoria("");
+      setProveedorProductoNuevo("");
+      setFoto(null);
+      setVideoArchivo(null);
+      setEditandoId(null);
+
+      obtenerProductos();
+
+      alert("¡Producto guardado exitosamente!");
+    } catch (error) {
+      console.error("Error al guardar el producto:", error);
+      alert("Hubo un error de conexión al guardar");
     }
-
-    // Limpiar el formulario
-    setNombre("");
-    setDescripcion("");
-    setPrecio("");
-    setCostoEnvio("");
-    setPrecioVenta("");
-    setPrecioOferta("");
-    setStock("");
-    setStockMinimo("");
-    setProveedorProductoNuevo("");
-    setCategoriaId("");
-    setFoto(null);
-    setCreandoCategoria(false);
-    setNombreNuevaCategoria("");
-
-    obtenerProductos();
   };
 
   const eliminarProducto = async (id) => {
@@ -1147,13 +1040,43 @@ function App() {
           if (!data.error) {
             setConfigTienda({
               nombreTienda: data.nombreTienda || "",
+              logoTienda: data.logoTienda || "⚡",
               mensajeBanner: data.mensajeBanner || "",
               descripcionBanner: data.descripcionBanner || "",
-              correoTienda: data.correoTienda || "", // <-- NUEVO
+              correoTienda: data.correoTienda || "",
               whatsappTienda: data.whatsappTienda || "",
               politicaReembolso: data.politicaReembolso || "",
               terminosServicio: data.terminosServicio || "",
-              preguntasFrecuentes: data.preguntasFrecuentes || [], // <-- NUEVO
+              preguntasFrecuentes: data.preguntasFrecuentes || [],
+              badgesConfianza:
+                data.badgesConfianza && data.badgesConfianza.length > 0
+                  ? data.badgesConfianza
+                  : [
+                      {
+                        icono: "📦",
+                        titulo: "Envíos a todo México",
+                        descripcion:
+                          "Recíbelo en la puerta de tu casa de forma rápida.",
+                      },
+                      {
+                        icono: "🛡️",
+                        titulo: "Garantía de Calidad",
+                        descripcion:
+                          "Productos probados y garantizados contra defectos.",
+                      },
+                      {
+                        icono: "🔒",
+                        titulo: "Compra Segura",
+                        descripcion:
+                          "Tu información y tus pagos están 100% protegidos.",
+                      },
+                      {
+                        icono: "⭐",
+                        titulo: "Clientes Satisfechos",
+                        descripcion:
+                          "Más de 500 reseñas positivas respaldan nuestro servicio.",
+                      },
+                    ],
             });
           }
         })
@@ -2639,6 +2562,7 @@ function App() {
                     onSubmit={async (e) => {
                       e.preventDefault();
                       try {
+                        // 1. Guardamos los textos JSON
                         const res = await fetch(
                           `${API_URL}/api/tienda/config`,
                           {
@@ -2650,6 +2574,22 @@ function App() {
                             body: JSON.stringify(configTienda),
                           },
                         );
+
+                        // 2. Si el usuario seleccionó una imagen, la enviamos
+                        if (res.ok && logoArchivo) {
+                          const formDataLogo = new FormData();
+                          formDataLogo.append("logo", logoArchivo);
+
+                          await fetch(`${API_URL}/api/tienda/config/logo`, {
+                            method: "POST",
+                            headers: {
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: formDataLogo,
+                          });
+
+                          setLogoArchivo(null); // Limpiamos el input
+                        }
 
                         if (res.ok) {
                           alert("¡Configuración guardada correctamente! 💾");
@@ -2670,7 +2610,7 @@ function App() {
                           fontSize: "13px",
                         }}
                       >
-                        Nombre de tu Tienda (Logo)
+                        Nombre de tu Tienda
                       </p>
                       <input
                         type="text"
@@ -2686,6 +2626,31 @@ function App() {
                           padding: "10px",
                           borderRadius: "8px",
                           border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Logo de la Tienda (Imagen)
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setLogoArchivo(e.target.files[0])}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px dashed #d1d5db",
+                          backgroundColor: "#f8f9fa",
                           boxSizing: "border-box",
                         }}
                       />
@@ -2868,7 +2833,144 @@ function App() {
                       />
                     </div>
 
-                    {/* === SECCIÓN DE PREGUNTAS FRECUENTES === */}
+                    {/* === SECCIÓN DE INSIGNIAS DE CONFIANZA === */}
+                    <div
+                      style={{
+                        marginBottom: "25px",
+                        borderTop: "2px dashed #e5e7eb",
+                        paddingTop: "20px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: "0 0 15px 0",
+                          fontWeight: "700",
+                          fontSize: "15px",
+                          color: "#111827",
+                        }}
+                      >
+                        🛡️ Insignias de Confianza (Garantía, Envíos, etc.)
+                      </p>
+                      {configTienda.badgesConfianza &&
+                        configTienda.badgesConfianza.map((badge, index) => (
+                          <div
+                            key={index}
+                            style={{
+                              backgroundColor: "#f9fafb",
+                              padding: "15px",
+                              borderRadius: "10px",
+                              border: "1px solid #e5e7eb",
+                              marginBottom: "15px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "10px",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              <div style={{ width: "60px" }}>
+                                <p
+                                  style={{
+                                    margin: "0 0 4px 0",
+                                    fontSize: "11px",
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  Icono
+                                </p>
+                                <input
+                                  type="text"
+                                  value={badge.icono}
+                                  onChange={(e) => {
+                                    const nuevosBadges = [
+                                      ...configTienda.badgesConfianza,
+                                    ];
+                                    nuevosBadges[index].icono = e.target.value;
+                                    setConfigTienda({
+                                      ...configTienda,
+                                      badgesConfianza: nuevosBadges,
+                                    });
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px",
+                                    textAlign: "center",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                  }}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <p
+                                  style={{
+                                    margin: "0 0 4px 0",
+                                    fontSize: "11px",
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  Título
+                                </p>
+                                <input
+                                  type="text"
+                                  value={badge.titulo}
+                                  onChange={(e) => {
+                                    const nuevosBadges = [
+                                      ...configTienda.badgesConfianza,
+                                    ];
+                                    nuevosBadges[index].titulo = e.target.value;
+                                    setConfigTienda({
+                                      ...configTienda,
+                                      badgesConfianza: nuevosBadges,
+                                    });
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                    boxSizing: "border-box",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <p
+                              style={{
+                                margin: "0 0 4px 0",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Descripción
+                            </p>
+                            <input
+                              type="text"
+                              value={badge.descripcion}
+                              onChange={(e) => {
+                                const nuevosBadges = [
+                                  ...configTienda.badgesConfianza,
+                                ];
+                                nuevosBadges[index].descripcion =
+                                  e.target.value;
+                                setConfigTienda({
+                                  ...configTienda,
+                                  badgesConfianza: nuevosBadges,
+                                });
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "8px",
+                                borderRadius: "6px",
+                                border: "1px solid #d1d5db",
+                                boxSizing: "border-box",
+                              }}
+                            />
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* === SECCIÓN DE PREGUNTAS FRECUENTES (ORDENADA ABAJO) === */}
                     <div
                       style={{
                         marginBottom: "25px",
@@ -2921,7 +3023,6 @@ function App() {
                           ➕ Añadir nueva pregunta
                         </button>
                       </div>
-
                       <button
                         type="button"
                         onClick={() => {
@@ -2964,7 +3065,6 @@ function App() {
                       >
                         💡 Cargar sugerencias por defecto
                       </button>
-
                       {configTienda.preguntasFrecuentes.map((faq, index) => (
                         <div
                           key={index}
@@ -3037,7 +3137,6 @@ function App() {
                               boxSizing: "border-box",
                             }}
                           />
-
                           <p
                             style={{
                               margin: "0 0 6px 0",
@@ -3073,7 +3172,6 @@ function App() {
                           />
                         </div>
                       ))}
-
                       {configTienda.preguntasFrecuentes.length === 0 && (
                         <p
                           style={{
@@ -3091,7 +3189,6 @@ function App() {
                         </p>
                       )}
                     </div>
-
                     <button
                       type="submit"
                       style={{
@@ -5344,6 +5441,37 @@ function App() {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setFoto(e.target.files[0])}
+                  style={{
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px dashed #ccc",
+                    fontSize: "12.5px",
+                    marginBottom: "15px",
+                    backgroundColor: "#f8f9fa",
+                    cursor: "pointer",
+                    boxSizing: "border-box",
+                  }}
+                />
+
+                {/* --- CAMPO NUEVO PARA EL VIDEO CORTO --- */}
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Video corto del producto{" "}
+                  <span
+                    style={{
+                      color: "#666",
+                      fontWeight: "normal",
+                      fontSize: "11px",
+                    }}
+                  >
+                    (Opcional - máx. 5s)
+                  </span>
+                </p>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setVideoArchivo(e.target.files[0])}
                   style={{
                     width: "350px",
                     maxWidth: "100%",
