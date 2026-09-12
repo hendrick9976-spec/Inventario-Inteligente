@@ -24,7 +24,7 @@ const configTiendaSchema = new mongoose.Schema(
     descripcionBanner: {
       type: String,
       default:
-        "Lleva los mejores accesorios tecnológicos al mejor precio con liquidaciones de inventario por tiempo limitado.",
+        "Lleva los mejores accesorios al mejor precio con liquidaciones de inventario por tiempo limitado.",
     },
     correoTienda: {
       type: String,
@@ -34,11 +34,15 @@ const configTiendaSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    politicaReembolso: {
+    terminosServicio: {
       type: String,
       default: "",
     },
-    terminosServicio: {
+    politicaPrivacidad: {
+      type: String,
+      default: "",
+    },
+    politicaReembolso: {
       type: String,
       default: "",
     },
@@ -55,6 +59,11 @@ const configTiendaSchema = new mongoose.Schema(
         descripcion: String,
       },
     ],
+
+    moneda: {
+      type: String,
+      default: "MXN",
+    },
   },
   { timestamps: true },
 );

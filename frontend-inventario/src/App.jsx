@@ -60,7 +60,9 @@ function App() {
     whatsappTienda: "",
     politicaReembolso: "",
     terminosServicio: "",
+    politicaPrivacidad: "",
     preguntasFrecuentes: [],
+    moneda: "MXN", // <-- NUEVO
   });
   const [logoArchivo, setLogoArchivo] = useState(null);
 
@@ -87,7 +89,8 @@ function App() {
   const [ticketAbierto, setTicketAbierto] = useState(false);
   const [datosTicket, setDatosTicket] = useState(null);
   const [diasGarantia, setDiasGarantia] = useState(7);
-  const [ventaConfirmada, setVentaConfirmada] = useState(false); // NUEVO ESTADO DE CONFIRMACIÓN
+  const [unidadGarantia, setUnidadGarantia] = useState("días");
+  const [ventaConfirmada, setVentaConfirmada] = useState(false);
 
   const [productos, setProductos] = useState([]);
   const [nombre, setNombre] = useState("");
@@ -100,6 +103,7 @@ function App() {
   const [precioOferta, setPrecioOferta] = useState("");
   const [stock, setStock] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
+  const [condicion, setCondicion] = useState("Nuevo"); // <-- NUEVO
   const [mostrarOpcionesProducto, setMostrarOpcionesProducto] = useState(false);
 
   // ESTADOS PARA CATEGORÍAS
@@ -512,6 +516,7 @@ function App() {
       formData.append("precioOferta", Number(precioOferta || 0));
       formData.append("stockMinimo", Number(stockMinimo || 5));
       formData.append("categoria", categoriaId || "");
+      formData.append("condicion", condicion); // <-- NUEVO
 
       // Si es un producto nuevo, mandamos stock y proveedor
       if (!editandoId) {
@@ -561,6 +566,7 @@ function App() {
       setStock("");
       setStockMinimo("");
       setCategoriaId("");
+      setCondicion("Nuevo");
       setCreandoCategoria(false);
       setNombreNuevaCategoria("");
       setProveedorProductoNuevo("");
@@ -612,6 +618,7 @@ function App() {
     setStock("");
     setStockMinimo("");
     setCategoriaId(""); // <--- AÑADIR
+    setCondicion("Nuevo"); // <-- NUEVO
     setCreandoCategoria(false); // <--- AÑADIR
     setNombreNuevaCategoria(""); // <--- AÑADIR
     setFoto(null);
@@ -821,6 +828,7 @@ function App() {
       // --- PRE-VENTA: SOLO ABRIR TICKET ---
       setDatosTicket({
         producto: prodVerificar.nombre,
+        descripcion: prodVerificar.descripcion || "",
         cantidad: cantidadMovimiento,
         monto: ingresoEstimado,
         fecha: new Date().toLocaleString(),
@@ -1047,7 +1055,9 @@ function App() {
               whatsappTienda: data.whatsappTienda || "",
               politicaReembolso: data.politicaReembolso || "",
               terminosServicio: data.terminosServicio || "",
+              politicaPrivacidad: data.politicaPrivacidad || "", // <-- Asegurada
               preguntasFrecuentes: data.preguntasFrecuentes || [],
+              moneda: data.moneda || "MXN", // <-- Asegurada
               badgesConfianza:
                 data.badgesConfianza && data.badgesConfianza.length > 0
                   ? data.badgesConfianza
@@ -1743,13 +1753,29 @@ function App() {
   const recomendaciones = [];
   const nombresProductosBajos = [];
 
-  // === NUEVA REGLA AZUL: Pedidos Web Pendientes ===
+  // === CONTAR PEDIDOS ÚNICOS DE FORMA SEGURA ===
   const pedidosWebPendientes = ventas.filter((v) => v.estado === "En proceso");
-  if (pedidosWebPendientes.length > 0) {
+  const gruposPedidosUnicos = {};
+  pedidosWebPendientes.forEach((v) => {
+    let fechaSegunda = "sin_fecha";
+    try {
+      if (v.createdAt) {
+        fechaSegunda = new Date(v.createdAt).toISOString().slice(0, 19);
+      }
+    } catch (e) {
+      fechaSegunda = String(v.createdAt || "sin_fecha");
+    }
+    const clave = `${v.cliente || "Sin cliente"}_${v.telefonoCliente || ""}_${fechaSegunda}`;
+    gruposPedidosUnicos[clave] = true;
+  });
+  const totalPedidosUnicos = Object.keys(gruposPedidosUnicos).length;
+
+  // ESTO ES LO QUE HACE QUE APAREZCA EL AVISO AL INICIO
+  if (totalPedidosUnicos > 0) {
     recomendaciones.push({
       tipo: "pedido_web",
       icono: "🌐",
-      mensaje: `¡Tienes ${pedidosWebPendientes.length} pedido(s) web pendiente(s) por atender!`,
+      mensaje: `¡Tienes ${totalPedidosUnicos} pedido(s) web pendiente(s) por atender!`,
       accion: "ir_a_pedidos_web",
     });
   }
@@ -2639,6 +2665,39 @@ function App() {
                           fontSize: "13px",
                         }}
                       >
+                        Moneda de la Tienda {/* <-- NUEVO BLOQUE */}
+                      </p>
+                      <select
+                        value={configTienda.moneda}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            moneda: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <option value="MXN">Pesos Mexicanos (MXN)</option>
+                        <option value="RD$">Pesos Dominicanos (RD$)</option>
+                        <option value="USD">Dólares (USD)</option>
+                        <option value="EUR">Euros (EUR)</option>
+                      </select>
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
                         Logo de la Tienda (Imagen)
                       </p>
                       <input
@@ -2803,6 +2862,7 @@ function App() {
                         placeholder="Ej. Tienes 30 días para solicitar un reembolso si el producto está sellado..."
                       />
                     </div>
+
                     <div style={{ marginBottom: "20px" }}>
                       <p
                         style={{
@@ -2830,6 +2890,36 @@ function App() {
                           minHeight: "100px",
                         }}
                         placeholder="Ej. Al comprar en esta tienda aceptas que los tiempos de envío pueden variar..."
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "20px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Política de Privacidad
+                      </p>
+                      <textarea
+                        value={configTienda.politicaPrivacidad}
+                        onChange={(e) =>
+                          setConfigTienda({
+                            ...configTienda,
+                            politicaPrivacidad: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #d1d5db",
+                          boxSizing: "border-box",
+                          minHeight: "100px",
+                        }}
+                        placeholder="Ej. Los datos solicitados se usan únicamente para coordinar la entrega..."
                       />
                     </div>
 
@@ -3896,8 +3986,8 @@ function App() {
                 }}
               >
                 🌐 Gestor de Pedidos Web
-                {/* Globlito rojo si hay pedidos pendientes */}
-                {ventas.filter((v) => v.estado === "En proceso").length > 0 && (
+                {/* === GLOBLITO ROJO === */}
+                {totalPedidosUnicos > 0 && (
                   <span
                     style={{
                       backgroundColor: "#dc3545",
@@ -3907,7 +3997,7 @@ function App() {
                       fontSize: "11px",
                     }}
                   >
-                    {ventas.filter((v) => v.estado === "En proceso").length}
+                    {totalPedidosUnicos}
                   </span>
                 )}
               </button>
@@ -4087,7 +4177,7 @@ function App() {
               </div>
             )}
 
-            {/* === SUB-MÓDULO: GESTOR WEB === */}
+            {/* === SUB-MÓDULO: GESTOR WEB LIMPIO Y CON MODAL === */}
             {subSeccionVentas === "web" && (
               <div
                 style={{
@@ -4107,11 +4197,10 @@ function App() {
                     marginBottom: "20px",
                   }}
                 >
-                  Aquí aparecen las compras realizadas en tu sitio web. Contacta
-                  al cliente para coordinar la entrega/pago y márcalo como
-                  entregado cuando lo finalices.
+                  Aquí aparecen las compras de tu sitio web organizadas por
+                  cliente. Haz clic en "Ver detalles del pedido" para revisar o
+                  modificar los artículos.
                 </p>
-
                 <div
                   style={{
                     display: "flex",
@@ -4119,108 +4208,190 @@ function App() {
                     gap: "15px",
                   }}
                 >
-                  {ventas.filter((v) => v.estado === "En proceso").length ===
-                  0 ? (
-                    <div
-                      style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        backgroundColor: "#f8f9fa",
-                        borderRadius: "8px",
-                        border: "1px dashed #ccc",
-                      }}
-                    >
-                      <span style={{ fontSize: "30px" }}>🙌</span>
-                      <p style={{ color: "#666", margin: "10px 0 0" }}>
-                        No tienes pedidos web pendientes. ¡Todo al día!
-                      </p>
-                    </div>
-                  ) : (
-                    ventas
-                      .filter((v) => v.estado === "En proceso")
-                      .map((pedido) => (
+                  {(() => {
+                    const pedidosEnProceso = ventas.filter(
+                      (v) => v.estado === "En proceso",
+                    );
+                    if (pedidosEnProceso.length === 0) {
+                      return (
                         <div
-                          key={pedido._id}
                           style={{
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "15px",
-                            display: "flex",
-                            flexWrap: "wrap",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: "15px",
-                            backgroundColor: "#faf5ff",
+                            padding: "40px",
+                            textAlign: "center",
+                            backgroundColor: "#f8f9fa",
+                            borderRadius: "8px",
+                            border: "1px dashed #ccc",
                           }}
                         >
-                          <div>
-                            <div
+                          <span style={{ fontSize: "30px" }}>🙌</span>
+                          <p style={{ color: "#666", margin: "10px 0 0" }}>
+                            No tienes pedidos web pendientes. ¡Todo al día!
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const gruposMap = {};
+                    pedidosEnProceso.forEach((v) => {
+                      let fechaSegunda = "sin_fecha";
+                      try {
+                        if (v.createdAt)
+                          fechaSegunda = new Date(v.createdAt)
+                            .toISOString()
+                            .slice(0, 19);
+                      } catch (e) {
+                        fechaSegunda = String(v.createdAt || "sin_fecha");
+                      }
+                      const clave = `${v.cliente || "Sin cliente"}_${v.telefonoCliente || ""}_${fechaSegunda}`;
+                      if (!gruposMap[clave]) {
+                        gruposMap[clave] = {
+                          cliente: v.cliente || "Público General",
+                          telefonoCliente: v.telefonoCliente || "",
+                          createdAt: v.createdAt,
+                          items: [],
+                          totalGrupo: 0,
+                        };
+                      }
+                      gruposMap[clave].items.push(v);
+                      gruposMap[clave].totalGrupo += Number(
+                        v.ingresoTotal || 0,
+                      );
+                    });
+
+                    return Object.values(gruposMap).map((grupo, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          backgroundColor: "#faf5ff",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: "15px",
+                        }}
+                      >
+                        {/* Info Principal Limpia */}
+                        <div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "10px",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            <span
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px",
-                                marginBottom: "8px",
+                                backgroundColor: "#7c3aed",
+                                color: "white",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                                fontWeight: "bold",
                               }}
                             >
-                              <span
-                                style={{
-                                  backgroundColor: "#7c3aed",
-                                  color: "white",
-                                  padding: "3px 8px",
-                                  borderRadius: "4px",
-                                  fontSize: "11px",
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                NUEVO PEDIDO
-                              </span>
-                              <span style={{ fontSize: "12px", color: "#666" }}>
-                                {new Date(pedido.createdAt).toLocaleString()}
-                              </span>
-                            </div>
-                            <h4
+                              PEDIDO
+                            </span>
+                            <span style={{ fontSize: "12px", color: "#666" }}>
+                              {new Date(grupo.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <h4
+                            style={{
+                              margin: "4px 0 2px 0",
+                              fontSize: "16px",
+                              color: "#111827",
+                            }}
+                          >
+                            Cliente: {grupo.cliente}
+                          </h4>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "12px",
+                              color: "#4b5563",
+                            }}
+                          >
+                            Tel: {grupo.telefonoCliente || "No proporcionado"} •{" "}
+                            <strong>{grupo.items.length} producto(s)</strong>
+                          </p>
+                        </div>
+
+                        {/* Total y Botones en una línea */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "15px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ textAlign: "right" }}>
+                            <span
                               style={{
-                                margin: "0 0 5px 0",
-                                fontSize: "16px",
-                                color: "#111827",
+                                fontSize: "11px",
+                                color: "#666",
+                                display: "block",
                               }}
                             >
-                              {pedido.cantidad}x {pedido.nombreProducto}
-                            </h4>
-                            <p
+                              Total:
+                            </span>
+                            <span
                               style={{
-                                margin: "0 0 5px 0",
-                                fontSize: "13px",
-                                color: "#4b5563",
+                                fontSize: "18px",
+                                fontWeight: "900",
+                                color: "#198754",
                               }}
                             >
-                              <strong>Cliente:</strong> {pedido.cliente}
-                            </p>
-                            <p
-                              style={{
-                                margin: "0",
-                                fontSize: "13px",
-                                color: "#4b5563",
-                              }}
-                            >
-                              <strong>Total a cobrar:</strong>{" "}
-                              <span
-                                style={{ color: "#198754", fontWeight: "bold" }}
-                              >
-                                ${pedido.ingresoTotal.toFixed(2)}
-                              </span>
-                            </p>
+                              ${grupo.totalGrupo.toFixed(2)}
+                            </span>
                           </div>
 
-                          <div style={{ display: "flex", gap: "10px" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {/* BOTÓN MÁGICO QUE ABRE EL MODAL */}
+                            <button
+                              onClick={() =>
+                                setProductoDetalle({
+                                  tipoModal: "pedidoWeb",
+                                  ...grupo,
+                                })
+                              }
+                              style={{
+                                backgroundColor: "#6366f1",
+                                color: "white",
+                                border: "none",
+                                padding: "9px 14px",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              👁️ Ver detalles
+                            </button>
+
                             <button
                               onClick={() => {
-                                const numero = pedido.telefonoCliente.replace(
+                                const numero = grupo.telefonoCliente.replace(
                                   /\D/g,
                                   "",
                                 );
-                                // MENSAJE DE WHATSAPP DINÁMICO Y CORREGIDO
-                                const mensaje = `Hola ${pedido.cliente}, somos de ${configTienda.nombreTienda}. Hemos recibido tu pedido de ${pedido.cantidad}x ${pedido.nombreProducto} por un total de $${pedido.ingresoTotal.toFixed(2)}. Escríbenos por aquí para coordinar la entrega o recolección de tus artículos. ¡Gracias!`;
+                                const lista = grupo.items
+                                  .map(
+                                    (i) =>
+                                      `▪️ ${i.cantidad}x ${i.nombreProducto}`,
+                                  )
+                                  .join("\n");
+                                const mensaje = `Hola ${grupo.cliente}, somos de ${configTienda.nombreTienda}. Hemos recibido tu pedido:\n\n${lista}\n\n*Total a pagar: $${grupo.totalGrupo.toFixed(2)}*\n\nEscríbenos por aquí para coordinar la entrega. ¡Gracias!`;
                                 window.open(
                                   `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`,
                                   "_blank",
@@ -4230,63 +4401,87 @@ function App() {
                                 backgroundColor: "#25D366",
                                 color: "white",
                                 border: "none",
-                                padding: "10px 15px",
-                                borderRadius: "8px",
+                                padding: "9px 14px",
+                                borderRadius: "6px",
                                 cursor: "pointer",
-                                fontSize: "13px",
+                                fontSize: "12px",
                                 fontWeight: "bold",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
                               }}
                             >
-                              📲 Enviar WhatsApp
+                              📲 WhatsApp
                             </button>
 
                             <button
-                              onClick={() =>
-                                cambiarEstadoVenta(pedido._id, "Completado")
-                              }
+                              onClick={() => {
+                                grupo.items.forEach((i) =>
+                                  cambiarEstadoVenta(i._id, "Completado"),
+                                );
+                                setDatosTicket({
+                                  producto: grupo.items
+                                    .map(
+                                      (i) =>
+                                        `${i.cantidad}x ${i.nombreProducto}`,
+                                    )
+                                    .join(", "),
+                                  descripcion: "Pedido Web Consolidado",
+                                  cantidad: grupo.items.reduce(
+                                    (acc, i) => acc + i.cantidad,
+                                    0,
+                                  ),
+                                  monto: grupo.totalGrupo,
+                                  fecha: new Date(
+                                    grupo.createdAt,
+                                  ).toLocaleString(),
+                                  cliente: grupo.cliente,
+                                });
+                                setClienteVenta(grupo.cliente || "");
+                                setVentaConfirmada(true);
+                                setTicketAbierto(true);
+                              }}
                               style={{
                                 backgroundColor: "#198754",
                                 color: "white",
                                 border: "none",
-                                padding: "10px 15px",
-                                borderRadius: "8px",
+                                padding: "9px 14px",
+                                borderRadius: "6px",
                                 cursor: "pointer",
-                                fontSize: "13px",
+                                fontSize: "12px",
                                 fontWeight: "bold",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
                               }}
                             >
-                              ✔ Marcar Entregado
+                              ✔ Entregado
                             </button>
 
-                            {/* NUEVO BOTÓN DE CANCELAR */}
                             <button
-                              onClick={() => cancelarPedidoWeb(pedido._id)}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    "¿Seguro que deseas cancelar todo este pedido? Se liberará el stock.",
+                                  )
+                                ) {
+                                  grupo.items.forEach((i) =>
+                                    cancelarPedidoWeb(i._id),
+                                  );
+                                }
+                              }}
                               style={{
                                 backgroundColor: "#dc3545",
                                 color: "white",
                                 border: "none",
-                                padding: "10px 15px",
-                                borderRadius: "8px",
+                                padding: "9px 14px",
+                                borderRadius: "6px",
                                 cursor: "pointer",
-                                fontSize: "13px",
+                                fontSize: "12px",
                                 fontWeight: "bold",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
                               }}
                             >
                               ❌ Cancelar
                             </button>
                           </div>
                         </div>
-                      ))
-                  )}
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
@@ -5395,6 +5590,30 @@ function App() {
                   }}
                 />
                 <div style={{ height: "14px" }} />
+
+                {/* <-- NUEVO BLOQUE DE CONDICIÓN --> */}
+                <p style={{ marginBottom: "6px", fontWeight: "600" }}>
+                  Condición del producto
+                </p>
+                <select
+                  value={condicion}
+                  onChange={(e) => setCondicion(e.target.value)}
+                  style={{
+                    width: "350px",
+                    maxWidth: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #ccc",
+                    fontSize: "12.5px",
+                  }}
+                >
+                  <option value="Nuevo">Nuevo</option>
+                  <option value="Buen estado">Buen estado</option>
+                  <option value="Usado">Usado</option>
+                  <option value="Reacondicionado">Reacondicionado</option>
+                </select>
+                <div style={{ height: "14px" }} />
+                {/* <-- FIN DEL NUEVO BLOQUE --> */}
 
                 <p style={{ marginBottom: "6px", fontWeight: "600" }}>
                   Descripción del producto{" "}
@@ -6718,6 +6937,7 @@ function App() {
                                         ? producto.categoria?._id
                                         : producto.categoria || "";
                                     setCategoriaId(catId);
+                                    setCondicion(producto.condicion || "Nuevo"); // <-- NUEVO
                                     setEditandoId(producto._id);
                                     setSeccionActiva("registrar");
                                     setTimeout(() => {
@@ -7344,6 +7564,224 @@ function App() {
               </div>
             )}
           </div>{" "}
+          {/* ======================================================
+            MODAL DE DETALLES DEL PEDIDO WEB
+            ====================================================== */}
+          {productoDetalle && productoDetalle.tipoModal === "pedidoWeb" && (
+            <div
+              onClick={() => setProductoDetalle(null)}
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                backgroundColor: "rgba(0,0,0,0.6)",
+                zIndex: 10000,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: "20px",
+                boxSizing: "border-box",
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: "white",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  width: "100%",
+                  maxWidth: "450px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                  maxHeight: "90vh",
+                  overflowY: "auto",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "15px",
+                  }}
+                >
+                  <h3 style={{ margin: 0, color: "#222", fontSize: "18px" }}>
+                    🛍️ Detalles del Pedido
+                  </h3>
+                  <button
+                    onClick={() => setProductoDetalle(null)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "16px",
+                      cursor: "pointer",
+                      color: "#666",
+                    }}
+                  >
+                    ✖
+                  </button>
+                </div>
+
+                <p
+                  style={{
+                    margin: "0 0 4px 0",
+                    fontSize: "13px",
+                    color: "#555",
+                  }}
+                >
+                  <strong>Cliente:</strong> {productoDetalle.cliente}
+                </p>
+                <p
+                  style={{
+                    margin: "0 0 15px 0",
+                    fontSize: "13px",
+                    color: "#555",
+                  }}
+                >
+                  <strong>Teléfono:</strong>{" "}
+                  {productoDetalle.telefonoCliente || "No registrado"}
+                </p>
+
+                <p
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    color: "#777",
+                    textTransform: "uppercase",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Productos solicitados:
+                </p>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  {productoDetalle.items.map((item) => {
+                    // BUSCAMOS LA DESCRIPCIÓN EN EL INVENTARIO ORIGINAL
+                    const productoOriginal = productos.find(
+                      (p) => p._id === item.productoId,
+                    );
+                    const descripcionProd = productoOriginal?.descripcion || "";
+
+                    return (
+                      <div
+                        key={item._id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          backgroundColor: "#f9fafb",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid #e5e7eb",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <div style={{ flex: 1, paddingRight: "10px" }}>
+                          <strong>{item.cantidad}x</strong>{" "}
+                          {item.nombreProducto}
+                          {/* === AQUÍ SE MUESTRA LA DESCRIPCIÓN === */}
+                          {descripcionProd && (
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#777",
+                                marginTop: "3px",
+                                lineHeight: "1.3",
+                              }}
+                            >
+                              {descripcionProd}
+                            </div>
+                          )}
+                          <div
+                            style={{
+                              color: "#198754",
+                              fontWeight: "600",
+                              fontSize: "12px",
+                              marginTop: "4px",
+                            }}
+                          >
+                            ${Number(item.ingresoTotal).toFixed(2)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `¿Quitar ${item.nombreProducto} del pedido?`,
+                              )
+                            ) {
+                              cancelarPedidoWeb(item._id);
+                              setProductoDetalle(null); // Cierra el modal para actualizar la vista
+                            }
+                          }}
+                          style={{
+                            backgroundColor: "#fee2e2",
+                            color: "#dc2626",
+                            border: "none",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          🗑️ Quitar
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div
+                  style={{
+                    borderTop: "1px solid #eee",
+                    paddingTop: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <span style={{ fontWeight: "700", fontSize: "14px" }}>
+                    Total del Pedido:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: "900",
+                      fontSize: "18px",
+                      color: "#198754",
+                    }}
+                  >
+                    ${productoDetalle.totalGrupo.toFixed(2)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setProductoDetalle(null)}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#6366f1",
+                    color: "white",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: "none",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cerrar Ventana
+                </button>
+              </div>
+            </div>
+          )}
           {/* <-- Aquí cierra la zonaInventario */}
           {/* ======================================================
             MODAL DEL TICKET DE VENTA (CONFIRMACIÓN Y COMPROBANTE)
@@ -7371,9 +7809,11 @@ function App() {
                   padding: "20px",
                   borderRadius: "12px",
                   width: "100%",
-                  maxWidth: "350px",
+                  maxWidth: "360px",
                   textAlign: "center",
                   boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                  maxHeight: "90vh",
+                  overflowY: "auto",
                 }}
               >
                 <div
@@ -7383,43 +7823,87 @@ function App() {
                     border: "1px dashed #ccc",
                     marginBottom: "15px",
                     textAlign: "left",
+                    backgroundColor: "#fff",
                   }}
                 >
-                  <h3
-                    style={{
-                      textAlign: "center",
-                      margin: "0 0 10px 0",
-                      color: "#222",
-                    }}
-                  >
-                    📄 Ticket de Compra
-                  </h3>
-                  <p style={{ margin: "2px 0", fontSize: "14px" }}>
+                  {/* CABECERA CON LOGO Y NOMBRE DE TIENDA */}
+                  <div style={{ textAlign: "center", marginBottom: "10px" }}>
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        margin: "0 auto 6px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "24px",
+                      }}
+                    >
+                      {configTienda.logoTienda &&
+                      configTienda.logoTienda.startsWith("http") ? (
+                        <img
+                          src={configTienda.logoTienda}
+                          alt="Logo"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                          }}
+                        />
+                      ) : (
+                        configTienda.logoTienda || "⚡"
+                      )}
+                    </div>
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: "16px",
+                        color: "#111827",
+                        fontWeight: "800",
+                      }}
+                    >
+                      {configTienda.nombreTienda}
+                    </h3>
+                    <p
+                      style={{
+                        margin: "2px 0 0",
+                        fontSize: "11px",
+                        color: "#6b7280",
+                      }}
+                    >
+                      Comprobante de Compra
+                    </p>
+                  </div>
+
+                  <hr
+                    style={{ borderTop: "1px dashed #eee", margin: "10px 0" }}
+                  />
+
+                  <p style={{ margin: "2px 0", fontSize: "13px" }}>
                     <strong>Fecha:</strong> {datosTicket.fecha}
                   </p>
 
-                  {/* CAMPO DE CLIENTE AHORA DENTRO DEL TICKET */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "10px",
-                      margin: "8px 0",
+                      gap: "8px",
+                      margin: "6px 0",
                     }}
                   >
-                    <strong style={{ fontSize: "14px" }}>Cliente:</strong>
+                    <strong style={{ fontSize: "13px" }}>Cliente:</strong>
                     <input
                       type="text"
                       placeholder="Nombre (Opcional)"
                       value={clienteVenta}
                       onChange={(e) => setClienteVenta(e.target.value)}
-                      disabled={ventaConfirmada} // Se bloquea si ya se confirmó la venta
+                      disabled={ventaConfirmada}
                       style={{
                         flex: 1,
                         padding: "4px 8px",
                         borderRadius: "4px",
                         border: "1px solid #ccc",
-                        fontSize: "13px",
+                        fontSize: "12px",
                         backgroundColor: ventaConfirmada ? "#f1f3f5" : "white",
                       }}
                     />
@@ -7428,75 +7912,127 @@ function App() {
                   <hr
                     style={{ borderTop: "1px dashed #eee", margin: "10px 0" }}
                   />
-                  <p style={{ margin: "5px 0", fontSize: "14px" }}>
-                    {datosTicket.cantidad}x {datosTicket.producto}
-                  </p>
+
+                  <div>
+                    <p
+                      style={{
+                        margin: "3px 0 1px",
+                        fontSize: "14px",
+                        fontWeight: "700",
+                      }}
+                    >
+                      {datosTicket.cantidad}x {datosTicket.producto}
+                    </p>
+                    {datosTicket.descripcion && (
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontSize: "11px",
+                          color: "#6b7280",
+                          lineHeight: "1.3",
+                        }}
+                      >
+                        {datosTicket.descripcion}
+                      </p>
+                    )}
+                  </div>
+
                   <p
                     style={{
-                      margin: "10px 0",
-                      fontSize: "20px",
+                      margin: "8px 0",
+                      fontSize: "18px",
                       fontWeight: "900",
                       color: "#198754",
                     }}
                   >
-                    Total: ${datosTicket.monto.toFixed(2)}
+                    Total: {configTienda.moneda || "MXN"} $
+                    {Number(datosTicket.monto).toFixed(2)}
                   </p>
-                  <p style={{ margin: "2px 0", fontSize: "14px" }}>
-                    <strong>Pago en:</strong> Efectivo
+
+                  <p
+                    style={{
+                      margin: "2px 0",
+                      fontSize: "12px",
+                      color: "#4b5563",
+                    }}
+                  >
+                    <strong>Método:</strong> Pago en efectivo contra entrega
                   </p>
+
                   <hr
                     style={{ borderTop: "1px dashed #eee", margin: "10px 0" }}
                   />
 
+                  {/* SELECTOR FLEXIBLE DE GARANTÍA */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "10px",
-                      marginTop: "10px",
+                      gap: "6px",
+                      marginTop: "8px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <label style={{ fontSize: "14px", fontWeight: "bold" }}>
-                      Garantía (días):
+                    <label style={{ fontSize: "12px", fontWeight: "bold" }}>
+                      Garantía:
                     </label>
                     <input
                       type="number"
+                      min="1"
                       value={diasGarantia}
                       onChange={(e) => setDiasGarantia(e.target.value)}
                       disabled={ventaConfirmada}
                       style={{
-                        width: "60px",
+                        width: "50px",
                         padding: "4px",
                         borderRadius: "4px",
                         border: "1px solid #ccc",
                         textAlign: "center",
+                        fontSize: "12px",
                         backgroundColor: ventaConfirmada ? "#f1f3f5" : "white",
                       }}
                     />
+                    <select
+                      value={unidadGarantia}
+                      onChange={(e) => setUnidadGarantia(e.target.value)}
+                      disabled={ventaConfirmada}
+                      style={{
+                        padding: "4px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "12px",
+                        backgroundColor: ventaConfirmada ? "#f1f3f5" : "white",
+                      }}
+                    >
+                      <option value="días">días</option>
+                      <option value="semanas">semanas</option>
+                      <option value="meses">meses</option>
+                      <option value="año(s)">año(s)</option>
+                    </select>
                   </div>
                 </div>
 
+                {/* BOTONES DE ACCIÓN */}
                 <div
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "10px",
+                    gap: "8px",
                   }}
                 >
                   {!ventaConfirmada ? (
-                    // --- BOTONES DE PRE-VENTA (AÚN NO SE DESCUENTA STOCK) ---
                     <>
                       <button
                         onClick={confirmarVentaFinal}
                         style={{
                           backgroundColor: "#198754",
                           color: "white",
-                          padding: "12px",
+                          padding: "10px",
                           borderRadius: "8px",
                           border: "none",
                           fontWeight: "bold",
                           cursor: "pointer",
-                          fontSize: "15px",
+                          fontSize: "14px",
                         }}
                       >
                         ✅ Confirmar y Descontar Stock
@@ -7504,27 +8040,30 @@ function App() {
                       <button
                         onClick={() => {
                           setTicketAbierto(false);
-                          setClienteVenta(""); // Reseteamos por si acaso
+                          setClienteVenta("");
                         }}
                         style={{
                           backgroundColor: "#dc3545",
                           color: "white",
-                          padding: "10px",
+                          padding: "8px",
                           borderRadius: "8px",
                           border: "none",
                           fontWeight: "bold",
                           cursor: "pointer",
+                          fontSize: "13px",
                         }}
                       >
                         ❌ Cancelar Venta
                       </button>
                     </>
                   ) : (
-                    // --- BOTONES POST-VENTA (YA SE CONFIRMÓ, SOLO IMPRIMIR/COPIAR) ---
                     <>
                       <button
                         onClick={() => {
-                          const textoTicket = `📄 *TICKET DE COMPRA*\nFecha: ${datosTicket.fecha}\nCliente: ${clienteVenta || "Público en general"}\n\n▪️ ${datosTicket.cantidad}x ${datosTicket.producto}\n*Total pagado: $${datosTicket.monto.toFixed(2)} (Efectivo)*\n\n🛡️ Garantía válida por ${diasGarantia} días.\n¡Gracias por su compra!`;
+                          const descTxt = datosTicket.descripcion
+                            ? ` (${datosTicket.descripcion})`
+                            : "";
+                          const textoTicket = `📄 *TICKET DE COMPRA*\n*${configTienda.nombreTienda}*\nFecha: ${datosTicket.fecha}\nCliente: ${clienteVenta || "Público en general"}\n\n▪️ ${datosTicket.cantidad}x ${datosTicket.producto}${descTxt}\n*Total pagado: ${configTienda.moneda || "MXN"} $${Number(datosTicket.monto).toFixed(2)} (Efectivo)*\n\n🛡️ Garantía válida por ${diasGarantia} ${unidadGarantia}.\n¡Gracias por su compra!`;
                           navigator.clipboard
                             .writeText(textoTicket)
                             .then(() =>
@@ -7541,6 +8080,7 @@ function App() {
                           border: "none",
                           fontWeight: "bold",
                           cursor: "pointer",
+                          fontSize: "13px",
                         }}
                       >
                         📋 Copiar Texto a WhatsApp
@@ -7555,6 +8095,7 @@ function App() {
                           border: "none",
                           fontWeight: "bold",
                           cursor: "pointer",
+                          fontSize: "13px",
                         }}
                       >
                         🖨️ Imprimir / Guardar PDF
@@ -7562,16 +8103,17 @@ function App() {
                       <button
                         onClick={() => {
                           setTicketAbierto(false);
-                          setClienteVenta(""); // Limpiamos para la próxima venta
+                          setClienteVenta("");
                         }}
                         style={{
                           backgroundColor: "transparent",
                           color: "#666",
-                          padding: "10px",
+                          padding: "8px",
                           borderRadius: "8px",
                           border: "1px solid #ccc",
                           fontWeight: "bold",
                           cursor: "pointer",
+                          fontSize: "13px",
                         }}
                       >
                         Cerrar Ticket

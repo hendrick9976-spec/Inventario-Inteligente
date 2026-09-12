@@ -108,6 +108,7 @@ app.post("/productos", authMiddleware, uploadProductFiles, async (req, res) => {
       proveedorInicial,
       categoria,
       precioOferta,
+      condicion,
     } = req.body;
     if (
       !nombre ||
@@ -132,6 +133,7 @@ app.post("/productos", authMiddleware, uploadProductFiles, async (req, res) => {
       stock: Number(stock),
       stockMinimo: Number(stockMinimo || 5),
       categoria: categoria,
+      condicion: condicion || "Nuevo",
       user: req.user.userId,
     });
 
@@ -183,6 +185,7 @@ app.put(
         stockMinimo,
         categoria,
         precioOferta,
+        condicion,
       } = req.body;
 
       const updateData = {
@@ -194,6 +197,7 @@ app.put(
         precioOferta: Number(precioOferta || 0),
         stockMinimo: Number(stockMinimo || 5),
         categoria: categoria,
+        condicion: condicion || "Nuevo",
       };
 
       if (req.files) {
@@ -558,8 +562,10 @@ app.put("/api/tienda/config", authMiddleware, async (req, res) => {
       whatsappTienda,
       politicaReembolso,
       terminosServicio,
+      politicaPrivacidad,
       preguntasFrecuentes,
-      badgesConfianza, // <--- ¡AQUÍ ESTABA EL DETALLE! Lo agregamos
+      badgesConfianza,
+      moneda,
     } = req.body;
 
     const configActualizada = await ConfigTienda.findOneAndUpdate(
@@ -573,8 +579,10 @@ app.put("/api/tienda/config", authMiddleware, async (req, res) => {
         whatsappTienda,
         politicaReembolso,
         terminosServicio,
+        politicaPrivacidad,
         preguntasFrecuentes,
-        badgesConfianza, // <--- Y lo incluimos al guardar en la BD
+        badgesConfianza,
+        moneda,
       },
       { returnDocument: "after", upsert: true },
     );
@@ -712,6 +720,9 @@ app.get("/api/tienda/:usuarioId/config", async (req, res) => {
         mensajeBanner: "¡Bienvenido a nuestra Tienda en Línea!",
         descripcionBanner:
           "Personaliza este banner desde tu panel de administración en la sección Mi Tienda Web.",
+        descripcionBanner:
+          "Personaliza este banner desde tu panel de administración en la sección Mi Tienda Web.",
+        moneda: "MXN", // <--- NUEVO: MONEDA POR DEFECTO
         // <--- NUEVO: PREGUNTAS POR DEFECTO
         preguntasFrecuentes: [
           {

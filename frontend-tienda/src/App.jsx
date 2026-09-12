@@ -3,34 +3,40 @@ import { useState, useEffect } from "react";
 // Variable dinámica: Usará el URL público en Vercel, o localhost si estás programando.
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// <-- AÑADE ESTA FUNCIÓN NUEVA AQUÍ -->
+export const formatoPrecio = (valor) => {
+  return Number(valor).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 function App() {
   const [carritoAbierto, setCarritoAbierto] = useState(false);
   const [enCheckout, setEnCheckout] = useState(false);
 
-  // === NUEVO: ESTADO Y CONTROL DEL HISTORIAL DEL NAVEGADOR ===
-  const [vistaLegal, setVistaLegal] = useState(false);
+  // === CONTROL INDEPENDIENTE DE PÁGINAS LEGALES ===
+  const [vistaLegal, setVistaLegal] = useState(null); // 'terminos', 'privacidad' o 'reembolso'
+
   useEffect(() => {
     const manejarBotonAtras = () => {
-      // Si el usuario presiona la flecha de "Atrás" en su navegador, cerramos la vista
-      setVistaLegal(false);
-      // Extra: también podemos aprovechar para cerrar el checkout si estaba ahí
+      setVistaLegal(null);
       setEnCheckout(false);
     };
     window.addEventListener("popstate", manejarBotonAtras);
     return () => window.removeEventListener("popstate", manejarBotonAtras);
   }, []);
 
-  // Función para abrir la vista y crear un "paso falso" en el historial
-  const abrirVistaLegal = () => {
-    window.history.pushState({ pagina: "legal" }, "");
-    setVistaLegal(true);
+  const abrirVistaLegal = (seccion) => {
+    window.history.pushState({ pagina: seccion }, "");
+    setVistaLegal(seccion);
     window.scrollTo(0, 0);
   };
   // ==========================================================
   const [slideActual, setSlideActive] = useState(0);
   const [nombreCliente, setNombreCliente] = useState("");
   const [apellidoCliente, setApellidoCliente] = useState("");
-  const [telefonoCliente, setTelefonoCliente] = useState(""); // <--- NUEVO
+  const [telefonoCliente, setTelefonoCliente] = useState("");
 
   const [configTienda, setConfigTienda] = useState({
     nombreTienda: "Cargando Tienda...",
@@ -38,9 +44,11 @@ function App() {
     descripcionBanner: "Por favor espera un momento...",
     correoTienda: "",
     whatsappTienda: "",
-    politicaReembolso: "", // <-- NUEVO
+    politicaReembolso: "",
     terminosServicio: "",
-    preguntasFrecuentes: [], // <-- NUEVO
+    politicaPrivacidad: "",
+    preguntasFrecuentes: [],
+    moneda: "MXN",
   });
   const [productoModal, setProductoModal] = useState(null);
 
@@ -128,7 +136,9 @@ function App() {
           whatsappTienda: dataConfig.whatsappTienda || "",
           politicaReembolso: dataConfig.politicaReembolso || "",
           terminosServicio: dataConfig.terminosServicio || "",
+          politicaPrivacidad: dataConfig.politicaPrivacidad || "",
           preguntasFrecuentes: dataConfig.preguntasFrecuentes || [],
+          moneda: dataConfig.moneda || "MXN",
           badgesConfianza:
             dataConfig.badgesConfianza && dataConfig.badgesConfianza.length > 0
               ? dataConfig.badgesConfianza
@@ -391,9 +401,11 @@ function App() {
   }
 
   // =========================================
-  // VISTA 2: CHECKOUT
+  // VISTA 2: CHECKOUT (OPTIMIZADA PARA MÓVIL)
   // =========================================
   if (enCheckout) {
+    const esMovil = typeof window !== "undefined" && window.innerWidth <= 768;
+
     return (
       <div
         style={{
@@ -428,13 +440,16 @@ function App() {
               width: "100%",
             }}
           >
+            {/* CLIC AL LOGO PARA VOLVER A LA TIENDA */}
             <div
+              onClick={() => setEnCheckout(false)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
                 cursor: "pointer",
               }}
+              title="Volver al catálogo"
             >
               <div
                 style={{
@@ -479,79 +494,25 @@ function App() {
               </h2>
             </div>
 
-            <div
-              id="contenedor-buscador"
-              style={{ display: "flex", gap: "15px", alignItems: "center" }}
+            {/* BOTÓN VOLVER ARRIBA */}
+            <button
+              onClick={() => setEnCheckout(false)}
+              style={{
+                background: "none",
+                border: `1px solid ${theme.border}`,
+                padding: "6px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: theme.textMuted,
+                cursor: "pointer",
+              }}
             >
-              {mostrarBuscador && (
-                <input
-                  type="text"
-                  placeholder="Buscar..."
-                  value={busquedaTienda}
-                  onChange={(e) => setBusquedaTienda(e.target.value)}
-                  style={{
-                    padding: "4px 10px",
-                    borderRadius: "20px",
-                    border: `1px solid ${theme.border}`,
-                    outline: "none",
-                    fontSize: "12px",
-                    width: "100px",
-                  }}
-                  autoFocus
-                />
-              )}
-              <span
-                onClick={() => {
-                  setMostrarBuscador(!mostrarBuscador);
-                  if (mostrarBuscador) setBusquedaTienda("");
-                }}
-                style={{ cursor: "pointer", fontSize: "16px" }}
-              >
-                🔍
-              </span>
-              <span
-                onClick={() => alert("Próximamente")}
-                style={{ cursor: "pointer", fontSize: "16px" }}
-                title="Mi Cuenta"
-              >
-                👤
-              </span>
-              <button
-                onClick={() => setCarritoAbierto(true)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 0,
-                }}
-              >
-                <span style={{ fontSize: "20px" }}>🛍️</span>
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-5px",
-                    right: "-8px",
-                    backgroundColor: theme.primary,
-                    color: "white",
-                    fontSize: "10px",
-                    fontWeight: "bold",
-                    width: "16px",
-                    height: "16px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {totalArticulos}
-                </span>
-              </button>
-            </div>
+              ← Seguir comprando
+            </button>
           </div>
 
+          {/* BARRA DE CATEGORÍAS FUNCIONAL EN CHECKOUT */}
           <nav
             style={{
               display: "flex",
@@ -565,7 +526,10 @@ function App() {
             }}
           >
             <span
-              onClick={() => setCategoriaActiva("TODAS")}
+              onClick={() => {
+                setCategoriaActiva("TODAS");
+                setEnCheckout(false);
+              }}
               style={{
                 color:
                   categoriaActiva === "TODAS" ? theme.primary : theme.textMuted,
@@ -581,7 +545,10 @@ function App() {
             {categorias.map((cat) => (
               <span
                 key={cat._id}
-                onClick={() => setCategoriaActiva(cat._id)}
+                onClick={() => {
+                  setCategoriaActiva(cat._id);
+                  setEnCheckout(false);
+                }}
                 style={{
                   color:
                     categoriaActiva === cat._id
@@ -604,80 +571,225 @@ function App() {
         <div
           style={{
             maxWidth: "1000px",
-            margin: "40px auto",
-            display: "grid",
-            gridTemplateColumns: "3fr 2fr",
-            gap: "40px",
-            padding: "0 20px",
+            margin: esMovil ? "15px auto" : "40px auto",
+            display: "flex",
+            flexDirection: esMovil ? "column" : "row", // En celular, el resumen va arriba y formulario abajo
+            gap: "25px",
+            padding: "0 15px",
+            boxSizing: "border-box",
           }}
         >
-          <div>
+          {/* 1. RESUMEN DEL PEDIDO */}
+          <div
+            style={{
+              flex: esMovil ? "none" : "2",
+              order: esMovil ? 1 : 2, // En móvil se ubica primero arriba
+              backgroundColor: theme.white,
+              padding: "20px",
+              borderRadius: "12px",
+              border: `1px solid ${theme.border}`,
+              height: "fit-content",
+            }}
+          >
             <h3
               style={{
-                fontSize: "18px",
-                marginBottom: "15px",
+                margin: "0 0 15px 0",
+                fontSize: "16px",
                 color: theme.text,
               }}
             >
-              Contacto
+              Resumen del Pedido ({totalArticulos})
             </h3>
-            <p
+
+            <div
               style={{
-                margin: "0 0 5px 0",
-                fontSize: "13px",
-                color: theme.textMuted,
+                maxHeight: "240px",
+                overflowY: "auto",
+                marginBottom: "15px",
               }}
             >
-              Correo electrónico (Opcional)
-            </p>
-            <input
-              type="email"
-              placeholder="Ej. correo@ejemplo.com"
+              {carrito.map((item) => (
+                <div
+                  key={item._id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "12px",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "45px",
+                        height: "45px",
+                        backgroundColor: "#f3f4f6",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        position: "relative",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.fotos && item.fotos.length > 0 ? (
+                        <img
+                          src={item.fotos[0]}
+                          alt={item.nombre}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        "📸"
+                      )}
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "2px",
+                          right: "2px",
+                          backgroundColor: theme.primary,
+                          color: "white",
+                          fontSize: "10px",
+                          width: "16px",
+                          height: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "50%",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {item.cantidadSeleccionada}
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "600",
+                        color: theme.text,
+                      }}
+                    >
+                      {item.nombre}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      color: theme.text,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {configTienda.moneda}{" "}
+                    {formatoPrecio(
+                      item.precioVenta * item.cantidadSeleccionada,
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div
               style={{
-                backgroundColor: "white",
-                color: theme.text,
-                width: "100%",
+                borderTop: `1px solid ${theme.border}`,
+                paddingTop: "15px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "8px",
+                  fontSize: "13px",
+                  color: theme.textMuted,
+                }}
+              >
+                <span>Subtotal</span>
+                <span>
+                  {configTienda.moneda} {formatoPrecio(subtotalCarrito)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: "18px",
+                  fontWeight: "900",
+                  color: theme.text,
+                }}
+              >
+                <span>Total</span>
+                <span style={{ color: theme.green }}>
+                  {configTienda.moneda} {formatoPrecio(subtotalCarrito)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. FORMULARIO DE CONTACTO Y ENTREGA */}
+          <div
+            style={{
+              flex: esMovil ? "none" : "3",
+              order: esMovil ? 2 : 1, // En móvil va abajo
+              backgroundColor: theme.white,
+              padding: "20px",
+              borderRadius: "12px",
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            {/* AVISO IMPORTANTE: PAGO CONTRA ENTREGA */}
+            <div
+              style={{
+                backgroundColor: "#e0f2fe",
+                borderLeft: "4px solid #0284c7",
                 padding: "12px",
                 borderRadius: "6px",
-                border: `1px solid ${theme.border}`,
-                marginBottom: "25px",
-                fontSize: "14px",
-                boxSizing: "border-box",
+                marginBottom: "20px",
+                fontSize: "13px",
+                color: "#0369a1",
+                lineHeight: "1.4",
               }}
-            />
+            >
+              ℹ️ <strong>Pago Contra Entrega:</strong> No realizas ningún pago
+              en este momento. Al confirmar tu pedido, te contactaremos por
+              WhatsApp para coordinar la entrega y el cobro en efectivo.
+            </div>
 
             <h3
               style={{
-                fontSize: "18px",
+                fontSize: "16px",
                 marginBottom: "15px",
                 color: theme.text,
               }}
             >
-              Entrega{" "}
-              <span
-                style={{
-                  fontSize: "12px",
-                  color: theme.textMuted,
-                  fontWeight: "normal",
-                }}
-              >
-                (<span style={{ color: "red" }}>*</span> Obligatorios)
-              </span>
+              Datos de Entrega
             </h3>
 
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "15px",
+                gridTemplateColumns: esMovil ? "1fr" : "1fr 1fr",
+                gap: "12px",
                 marginBottom: "15px",
               }}
             >
               <div>
                 <p
                   style={{
-                    margin: "0 0 5px 0",
-                    fontSize: "13px",
+                    margin: "0 0 4px 0",
+                    fontSize: "12px",
                     color: theme.text,
                     fontWeight: "600",
                   }}
@@ -693,10 +805,10 @@ function App() {
                     backgroundColor: "white",
                     color: theme.text,
                     width: "100%",
-                    padding: "12px",
+                    padding: "10px",
                     borderRadius: "6px",
                     border: `1px solid ${theme.border}`,
-                    fontSize: "14px",
+                    fontSize: "13px",
                     boxSizing: "border-box",
                   }}
                 />
@@ -704,8 +816,8 @@ function App() {
               <div>
                 <p
                   style={{
-                    margin: "0 0 5px 0",
-                    fontSize: "13px",
+                    margin: "0 0 4px 0",
+                    fontSize: "12px",
                     color: theme.text,
                     fontWeight: "600",
                   }}
@@ -721,10 +833,10 @@ function App() {
                     backgroundColor: "white",
                     color: theme.text,
                     width: "100%",
-                    padding: "12px",
+                    padding: "10px",
                     borderRadius: "6px",
                     border: `1px solid ${theme.border}`,
-                    fontSize: "14px",
+                    fontSize: "13px",
                     boxSizing: "border-box",
                   }}
                 />
@@ -734,8 +846,8 @@ function App() {
             <div style={{ marginBottom: "15px" }}>
               <p
                 style={{
-                  margin: "0 0 5px 0",
-                  fontSize: "13px",
+                  margin: "0 0 4px 0",
+                  fontSize: "12px",
                   color: theme.text,
                   fontWeight: "600",
                 }}
@@ -751,10 +863,10 @@ function App() {
                   backgroundColor: "white",
                   color: theme.text,
                   width: "100%",
-                  padding: "12px",
+                  padding: "10px",
                   borderRadius: "6px",
                   border: `1px solid ${theme.border}`,
-                  fontSize: "14px",
+                  fontSize: "13px",
                   boxSizing: "border-box",
                 }}
               />
@@ -771,12 +883,12 @@ function App() {
               }
               style={{
                 width: "100%",
-                padding: "16px",
+                padding: "14px",
                 backgroundColor: theme.green,
                 color: "white",
                 border: "none",
                 borderRadius: "8px",
-                fontSize: "16px",
+                fontSize: "15px",
                 fontWeight: "bold",
                 cursor:
                   procesando ||
@@ -795,132 +907,29 @@ function App() {
                     : 1,
               }}
             >
-              {procesando ? "Procesando pedido..." : "Completar pedido"}
+              {procesando
+                ? "Confirmando pedido..."
+                : "Confirmar Pedido (Contra Entrega)"}
             </button>
-          </div>
 
-          <div
-            style={{
-              backgroundColor: theme.white,
-              padding: "25px",
-              borderRadius: "12px",
-              border: `1px solid ${theme.border}`,
-              height: "fit-content",
-              position: "sticky",
-              top: "20px",
-            }}
-          >
-            {carrito.map((item) => (
-              <div
-                key={item._id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "15px",
-                }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "15px" }}
-                >
-                  <div
-                    style={{
-                      width: "50px",
-                      height: "50px",
-                      backgroundColor: "#f3f4f6",
-                      borderRadius: "8px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                    }}
-                  >
-                    📸
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: "-5px",
-                        right: "-5px",
-                        backgroundColor: theme.textMuted,
-                        color: "white",
-                        fontSize: "10px",
-                        width: "18px",
-                        height: "18px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: "50%",
-                      }}
-                    >
-                      {item.cantidadSeleccionada}
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "600",
-                      color: theme.text,
-                    }}
-                  >
-                    {item.nombre}
-                  </span>
-                </div>
-                <span
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: theme.text,
-                  }}
-                >
-                  ${(item.precioVenta * item.cantidadSeleccionada).toFixed(2)}
-                </span>
-              </div>
-            ))}
-
-            <div
+            {/* BOTÓN CANCELAR PEDIDO */}
+            <button
+              onClick={() => setEnCheckout(false)}
               style={{
-                borderTop: `1px solid ${theme.border}`,
-                margin: "20px 0",
-                paddingTop: "20px",
+                width: "100%",
+                padding: "10px",
+                backgroundColor: "transparent",
+                color: theme.red,
+                border: `1px solid ${theme.red}`,
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "bold",
+                cursor: "pointer",
+                marginTop: "10px",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "10px",
-                  fontSize: "14px",
-                  color: theme.textMuted,
-                }}
-              >
-                <span>Subtotal</span>
-                <span>${subtotalCarrito.toFixed(2)}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  fontSize: "18px",
-                  fontWeight: "800",
-                  color: theme.text,
-                }}
-              >
-                <span>Total</span>
-                <span style={{ color: theme.green }}>
-                  ${subtotalCarrito.toFixed(2)}{" "}
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      color: theme.textMuted,
-                      fontWeight: "normal",
-                    }}
-                  >
-                    MXN
-                  </span>
-                </span>
-              </div>
-            </div>
+              Cancelar y volver a la tienda
+            </button>
           </div>
         </div>
       </div>
@@ -928,7 +937,7 @@ function App() {
   }
 
   // =========================================
-  // VISTA 3: POLÍTICAS LEGALES
+  // VISTA 3: POLÍTICAS LEGALES INDEPENDIENTES
   // =========================================
   if (vistaLegal) {
     return (
@@ -944,37 +953,41 @@ function App() {
           style={{
             backgroundColor: theme.white,
             borderBottom: `1px solid ${theme.border}`,
-            padding: "20px 40px",
+            padding: "15px 30px",
             display: "flex",
-            justifyContent: "center",
+            justifyContent: "space-between",
             alignItems: "center",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div
+            onClick={() => setVistaLegal(null)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              cursor: "pointer",
+            }}
+          >
             <div
               style={{
                 width: "30px",
                 height: "30px",
                 borderRadius: "8px",
-                background: "transparent",
-                color: "white",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "16px",
-                fontWeight: "bold",
+                fontSize: "18px",
               }}
             >
               {configTienda.logoTienda &&
               configTienda.logoTienda.startsWith("http") ? (
                 <img
                   src={configTienda.logoTienda}
-                  alt="Logo Tienda"
+                  alt="Logo"
                   style={{
                     width: "100%",
                     height: "100%",
                     objectFit: "contain",
-                    borderRadius: "8px",
                   }}
                 />
               ) : (
@@ -984,7 +997,7 @@ function App() {
             <h2
               style={{
                 margin: 0,
-                fontSize: "20px",
+                fontSize: "18px",
                 fontWeight: "800",
                 color: theme.text,
               }}
@@ -992,69 +1005,110 @@ function App() {
               {configTienda.nombreTienda}
             </h2>
           </div>
+          <button
+            onClick={() => setVistaLegal(null)}
+            style={{
+              background: "none",
+              border: `1px solid ${theme.border}`,
+              padding: "6px 14px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            ← Volver a la Tienda
+          </button>
         </header>
 
         <div
           style={{
             maxWidth: "800px",
-            margin: "40px auto",
-            padding: "40px",
+            margin: "30px auto",
+            padding: "30px",
             backgroundColor: theme.white,
             borderRadius: "12px",
             border: `1px solid ${theme.border}`,
+            boxSizing: "border-box",
           }}
         >
-          <h1
-            style={{
-              textAlign: "center",
-              marginBottom: "40px",
-              color: theme.text,
-            }}
-          >
-            Información Legal y Soporte
-          </h1>
-          <section style={{ marginBottom: "40px" }}>
-            <h2
-              style={{
-                borderBottom: "2px solid #eee",
-                paddingBottom: "10px",
-                color: theme.text,
-              }}
-            >
-              Política de Reembolso y Devoluciones
-            </h2>
-            <p
-              style={{
-                lineHeight: "1.6",
-                color: theme.textMuted,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {configTienda.politicaReembolso ||
-                "El administrador de la tienda aún no ha establecido una política de reembolsos."}
-            </p>
-          </section>
-          <section>
-            <h2
-              style={{
-                borderBottom: "2px solid #eee",
-                paddingBottom: "10px",
-                color: theme.text,
-              }}
-            >
-              Términos de Servicio
-            </h2>
-            <p
-              style={{
-                lineHeight: "1.6",
-                color: theme.textMuted,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {configTienda.terminosServicio ||
-                "El administrador de la tienda aún no ha establecido los términos de servicio."}
-            </p>
-          </section>
+          {vistaLegal === "terminos" && (
+            <section>
+              <h1
+                style={{
+                  fontSize: "22px",
+                  borderBottom: "2px solid #eee",
+                  paddingBottom: "10px",
+                  color: theme.text,
+                }}
+              >
+                Términos del Servicio
+              </h1>
+              <p
+                style={{
+                  lineHeight: "1.7",
+                  color: theme.textMuted,
+                  whiteSpace: "pre-wrap",
+                  fontSize: "14px",
+                }}
+              >
+                {configTienda.terminosServicio ||
+                  "El administrador aún no ha establecido los términos de servicio."}
+              </p>
+            </section>
+          )}
+
+          {vistaLegal === "reembolso" && (
+            <section>
+              <h1
+                style={{
+                  fontSize: "22px",
+                  borderBottom: "2px solid #eee",
+                  paddingBottom: "10px",
+                  color: theme.text,
+                }}
+              >
+                Política de Reembolso y Devoluciones
+              </h1>
+              <p
+                style={{
+                  lineHeight: "1.7",
+                  color: theme.textMuted,
+                  whiteSpace: "pre-wrap",
+                  fontSize: "14px",
+                }}
+              >
+                {configTienda.politicaReembolso ||
+                  "El administrador aún no ha establecido una política de reembolsos."}
+              </p>
+            </section>
+          )}
+
+          {vistaLegal === "privacidad" && (
+            <section>
+              <h1
+                style={{
+                  fontSize: "22px",
+                  borderBottom: "2px solid #eee",
+                  paddingBottom: "10px",
+                  color: theme.text,
+                }}
+              >
+                Política de Privacidad
+              </h1>
+              <p
+                style={{
+                  lineHeight: "1.7",
+                  color: theme.textMuted,
+                  whiteSpace: "pre-wrap",
+                  fontSize: "14px",
+                }}
+              >
+                {configTienda.politicaPrivacidad ||
+                  "El administrador aún no ha establecido una política de privacidad."}
+              </p>
+            </section>
+          )}
         </div>
       </div>
     );
@@ -1753,6 +1807,8 @@ function App() {
                 theme={theme}
                 agregarAlCarrito={agregarAlCarrito}
                 abrirModalProducto={abrirModalProducto}
+                categorias={categorias}
+                moneda={configTienda.moneda}
               />
             ))}
           </div>
@@ -2012,7 +2068,7 @@ function App() {
             >
               <li>
                 <span
-                  onClick={abrirVistaLegal}
+                  onClick={() => abrirVistaLegal("terminos")}
                   style={{
                     cursor: "pointer",
                     color: theme.textMuted,
@@ -2026,7 +2082,7 @@ function App() {
               </li>
               <li>
                 <span
-                  onClick={abrirVistaLegal}
+                  onClick={() => abrirVistaLegal("privacidad")}
                   style={{
                     cursor: "pointer",
                     color: theme.textMuted,
@@ -2040,7 +2096,7 @@ function App() {
               </li>
               <li>
                 <span
-                  onClick={abrirVistaLegal}
+                  onClick={() => abrirVistaLegal("reembolso")}
                   style={{
                     cursor: "pointer",
                     color: theme.textMuted,
@@ -2651,7 +2707,9 @@ function App() {
                 }}
               >
                 <span>Subtotal</span>
-                <span>${subtotalCarrito.toFixed(2)}</span>
+                <span>
+                  {configTienda.moneda} {formatoPrecio(subtotalCarrito)}
+                </span>
               </div>
               <button
                 onClick={() => setCarritoAbierto(false)}
@@ -2772,10 +2830,29 @@ function TarjetaProducto({
   theme,
   agregarAlCarrito,
   abrirModalProducto,
+  categorias, // <-- Lo recibimos
+  moneda, // <-- Lo recibimos
 }) {
   const sinStock = producto.stock === 0;
   const pocoStock = producto.stock > 0 && producto.stock <= 5;
   const tieneDescuento = producto.precioOferta > 0;
+
+  // 1. PROTECCIÓN ANTI PANTALLA BLANCA: Si 'categorias' viene vacío un milisegundo, usa un array temporal []
+  const nombreCategoria =
+    typeof producto.categoria === "object"
+      ? producto.categoria?.nombre
+      : (categorias || []).find((c) => c._id === producto.categoria)?.nombre ||
+        "Sin Categoría";
+
+  // 2. FUNCIÓN SEGURA DE PRECIO: Da formato con comas aquí mismo
+  const formatearPrecio = (valor) => {
+    return Number(valor || 0).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const simboloMoneda = moneda || "MXN"; // Por si la moneda tarda en cargar
 
   return (
     <div
@@ -2799,11 +2876,12 @@ function TarjetaProducto({
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
         textAlign: "left",
         cursor: "pointer",
+        position: "relative",
       }}
     >
       <div
         style={{
-          height: "110px",
+          height: "130px", // Un poco más alto para que quepan las viñetas
           backgroundColor: "#f1f3f5",
           display: "flex",
           alignItems: "center",
@@ -2822,12 +2900,61 @@ function TarjetaProducto({
           <span style={{ fontSize: "40px", color: "#dee2e6" }}>📸</span>
         )}
 
+        {/* --- NUEVO: CONDICIÓN DEL PRODUCTO (Izquierda Arriba) --- */}
+        <span
+          style={{
+            position: "absolute",
+            top: "8px",
+            left: "8px",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            color: "white",
+            padding: "3px 6px",
+            borderRadius: "4px",
+            fontSize: "10px",
+            fontWeight: "bold",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {producto.condicion || "Nuevo"}
+        </span>
+
+        {/* --- NUEVO: BOTÓN COMPARTIR (Derecha Arriba) --- */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation(); // Evita que se abra el modal al compartir
+            navigator.clipboard.writeText(
+              `${window.location.origin}${window.location.pathname}?producto=${producto._id}`,
+            );
+            alert("¡Enlace copiado para compartir!");
+          }}
+          style={{
+            position: "absolute",
+            top: "8px",
+            right: "8px",
+            backgroundColor: "rgba(255,255,255,0.9)",
+            border: "none",
+            borderRadius: "50%",
+            width: "28px",
+            height: "28px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: "14px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+          }}
+          title="Compartir"
+        >
+          🔗
+        </button>
+
+        {/* ESTADO DE STOCK (Movido abajo a la derecha para no chocar) */}
         {sinStock ? (
           <span
             style={{
               position: "absolute",
-              top: "10px",
-              left: "10px",
+              bottom: "8px",
+              right: "8px",
               backgroundColor: "#fde8e8",
               color: "#9b1c1c",
               padding: "2px 6px",
@@ -2844,8 +2971,8 @@ function TarjetaProducto({
           <span
             style={{
               position: "absolute",
-              top: "8px",
-              left: "8px",
+              bottom: "8px",
+              right: "8px",
               backgroundColor: "#fef3c7",
               color: "#92400e",
               padding: "2px 6px",
@@ -2856,42 +2983,58 @@ function TarjetaProducto({
               whiteSpace: "nowrap",
             }}
           >
-            ¡Solo quedan {producto.stock}!
+            ¡Quedan {producto.stock}!
           </span>
         ) : null}
       </div>
 
       <div
         style={{
-          padding: "10px",
+          padding: "12px",
           display: "flex",
           flexDirection: "column",
           flex: 1,
         }}
       >
+        {/* --- NUEVO: NOMBRE DE CATEGORÍA A COLOR --- */}
+        <span
+          style={{
+            color: theme.primary,
+            fontSize: "10px",
+            fontWeight: "800",
+            textTransform: "uppercase",
+            marginBottom: "4px",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {nombreCategoria}
+        </span>
+
         <h3
           style={{
             margin: "0 0 4px 0",
-            fontSize: "12px",
+            fontSize: "13px", // Ligeramente más grande
             color: theme.text,
+            fontWeight: "700",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
+            lineHeight: "1.3",
           }}
         >
           {producto.nombre}
         </h3>
 
-        {/* Espaciador para empujar el precio y el botón hacia abajo */}
+        {/* Espaciador */}
         <div style={{ flex: 1 }}></div>
 
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px",
+            alignItems: "flex-end", // Alinea los precios y el texto abajo
+            marginBottom: "12px",
             marginTop: "10px",
           }}
         >
@@ -2906,25 +3049,39 @@ function TarjetaProducto({
             {tieneDescuento && (
               <span
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   color: theme.textMuted,
                   textDecoration: "line-through",
                   fontWeight: "500",
                 }}
               >
-                ${producto.precioOriginal.toFixed(2)}
+                {simboloMoneda} {formatearPrecio(producto.precioOriginal)}
               </span>
             )}
             <span
               style={{
-                fontSize: "14px",
-                fontWeight: "800",
+                fontSize: "16px", // Precio resaltado
+                fontWeight: "900",
                 color: theme.green,
               }}
             >
-              ${producto.precioVenta.toFixed(2)}
+              {simboloMoneda} {formatearPrecio(producto.precioVenta)}
             </span>
           </div>
+
+          {/* --- NUEVO: TEXTO DE VER DETALLE --- */}
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: "700",
+              color: theme.textMuted,
+              display: "flex",
+              alignItems: "center",
+              gap: "2px",
+            }}
+          >
+            Ver detalle <span style={{ fontSize: "14px" }}>›</span>
+          </span>
         </div>
 
         <button
