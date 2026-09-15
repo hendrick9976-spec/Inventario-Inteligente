@@ -2512,8 +2512,9 @@ function App() {
                   </button>
                   <button
                     onClick={() =>
-                      navigator.clipboard.writeText(
+                      window.open(
                         `${STORE_URL}/${configTienda.slug || usuario?.id}`,
+                        "_blank",
                       )
                     }
                     style={{
