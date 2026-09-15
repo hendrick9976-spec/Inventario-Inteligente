@@ -52,7 +52,10 @@ function App() {
   // ----------------------
   const [configTienda, setConfigTienda] = useState({
     nombreTienda: "Mi Tienda",
+    slug: "", // <--- NUEVO
+    colorPrincipal: "#7c3aed", // <--- NUEVO (El morado por defecto)
     logoTienda: "⚡",
+    imagenBanner: "", // <--- 1. AÑADE ESTA LÍNEA AQUÍ
     mensajeBanner: "¡Especial de Verano!",
     descripcionBanner:
       "Lleva los mejores artículos al mejor precio por tiempo limitado.",
@@ -65,6 +68,7 @@ function App() {
     moneda: "MXN", // <-- NUEVO
   });
   const [logoArchivo, setLogoArchivo] = useState(null);
+  const [bannerArchivo, setBannerArchivo] = useState(null);
 
   // ----------------------
   // AUTENTICACIÓN
@@ -111,6 +115,9 @@ function App() {
   const [categoriaId, setCategoriaId] = useState("");
   const [creandoCategoria, setCreandoCategoria] = useState(false);
   const [nombreNuevaCategoria, setNombreNuevaCategoria] = useState("");
+  const [modalCategoriasAbierto, setModalCategoriasAbierto] = useState(false);
+  const [categoriaEditandoId, setCategoriaEditandoId] = useState(null);
+  const [categoriaEditandoNombre, setCategoriaEditandoNombre] = useState("");
 
   // ----------------------
   // GENERADOR DE PEDIDOS (WHATSAPP)
@@ -118,26 +125,21 @@ function App() {
   const [modalPedidoAbierto, setModalPedidoAbierto] = useState(false);
   const [itemsPedido, setItemsPedido] = useState([]);
   const [busquedaExtra, setBusquedaExtra] = useState("");
-
   // ----------------------
   // EDICIÓN DE PRODUCTOS
   // Control del modo edición
   // ----------------------
-
   const [editandoId, setEditandoId] = useState(null);
   const [productoReposicionId, setProductoReposicionId] = useState("");
   const [cantidadReposicion, setCantidadReposicion] = useState("");
   const [modoRegistro, setModoRegistro] = useState("nuevo");
   const [cantidadesMasivas, setCantidadesMasivas] = useState({});
-
   // ----------------------
   // NAVEGACIÓN DEL DASHBOARD
   // Sidebar y módulos activos
   // ----------------------
-
   const [seccionActiva, setSeccionActiva] = useState("inicio");
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
-
   // ----------------------
   // REGISTRO DE VENTAS Y MOVIMIENTOS
   // Ventas normales y mayoreo
@@ -154,12 +156,10 @@ function App() {
   const [proveedorReposicion, setProveedorReposicion] = useState("");
   const [proveedorProductoNuevo, setProveedorProductoNuevo] = useState("");
   const [mostrarOpcionesVenta, setMostrarOpcionesVenta] = useState(false);
-
   // ----------------------
   // HISTORIAL Y REPORTES
   // Ventas, reposiciones y métricas
   // ----------------------
-
   const [ventas, setVentas] = useState([]);
   const [filtroFechaVenta, setFiltroFechaVenta] = useState("");
   const [fechaInicioGrafica, setFechaInicioGrafica] = useState(() => {
@@ -174,12 +174,10 @@ function App() {
   const [ordenVentas, setOrdenVentas] = useState("");
   const [reposiciones, setReposiciones] = useState([]);
   const [datosOrigenVentas, setDatosOrigenVentas] = useState([]);
-
   // ----------------------
   // FILTROS Y BÚSQUEDAS
   // Inventario e historial
   // ----------------------
-
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState("");
   const [filtroStock, setFiltroStock] = useState("todos");
@@ -195,7 +193,6 @@ function App() {
   const [origenSeleccionadoPie, setOrigenSeleccionadoPie] = useState(null);
   const [categoriaSeleccionadaPie, setCategoriaSeleccionadaPie] =
     useState(null);
-
   // ----------------------
   // GESTOR DE OFERTAS
   // ----------------------
@@ -208,10 +205,8 @@ function App() {
   // FUNCIONES DE AUTENTICACIÓN
   // Registro, login y cierre de sesión
   // ======================================================
-
   const registrarUsuario = async (e) => {
     e.preventDefault();
-
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
@@ -224,14 +219,11 @@ function App() {
           password: regPassword,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         alert(data.message || "Error al registrar");
         return;
       }
-
       alert("Usuario registrado correctamente");
       setRegNombre("");
       setRegEmail("");
@@ -243,7 +235,6 @@ function App() {
 
   const iniciarSesion = async (e) => {
     e.preventDefault();
-
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
@@ -255,19 +246,15 @@ function App() {
           password: loginPassword,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         alert(data.message || "Error al iniciar sesión");
         return;
       }
-
       localStorage.setItem("token", data.token);
       setToken(data.token);
       localStorage.setItem("usuario", JSON.stringify(data.user));
       setUsuario(data.user);
-
       setLoginEmail("");
       setLoginPassword("");
     } catch (error) {
@@ -286,27 +273,22 @@ function App() {
   // FUNCIÓN DE PERFIL DE USUARIO
   // Actualiza nombre, correo y contraseña
   // ======================================================
-
   const actualizarPerfil = async (e) => {
     e.preventDefault();
-
     if (!perfilNombre.trim() || !perfilEmail.trim()) {
       alert("Nombre y correo son obligatorios");
       return;
     }
-
     if (perfilPassword || perfilConfirmarPassword) {
       if (perfilPassword !== perfilConfirmarPassword) {
         alert("Las contraseñas no coinciden");
         return;
       }
-
       if (perfilPassword.length < 6) {
         alert("La contraseña debe tener al menos 6 caracteres");
         return;
       }
     }
-
     try {
       const res = await fetch(`${API_URL}/api/auth/perfil`, {
         method: "PUT",
@@ -321,20 +303,15 @@ function App() {
           confirmarPassword: perfilConfirmarPassword,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         alert(data.message || "Error al actualizar perfil");
         return;
       }
-
       localStorage.setItem("usuario", JSON.stringify(data.user));
       setUsuario(data.user);
-
       setPerfilPassword("");
       setPerfilConfirmarPassword("");
-
       alert("Perfil actualizado correctamente");
       setSeccionActiva("inicio");
     } catch (error) {
@@ -347,7 +324,6 @@ function App() {
   // FUNCIONES PARA OBTENER DATOS DEL BACKEND
   // Productos, ventas y reposiciones
   // ======================================================
-
   const obtenerProductos = async () => {
     try {
       const res = await fetch(`${API_URL}/productos`, {
@@ -355,14 +331,11 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setProductos([]);
         return;
       }
-
       setProductos(data);
     } catch (error) {
       console.error("Error al obtener productos:", error);
@@ -387,6 +360,50 @@ function App() {
     }
   };
 
+  const actualizarCategoria = async (id) => {
+    if (!categoriaEditandoNombre.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/categorias/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nombre: categoriaEditandoNombre }),
+      });
+      if (res.ok) {
+        setCategoriaEditandoId(null);
+        setCategoriaEditandoNombre("");
+        obtenerCategorias(); // Recarga la lista al instante
+      } else {
+        alert("Error al actualizar la categoría");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const eliminarCategoria = async (id) => {
+    const confirmado = window.confirm(
+      "¿Seguro que deseas eliminar esta categoría? (Los productos que la usaban quedarán sin categoría asignada).",
+    );
+    if (!confirmado) return;
+    try {
+      const res = await fetch(`${API_URL}/categorias/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        obtenerCategorias();
+        if (categoriaId === id) setCategoriaId(""); // Si estaba seleccionada, la limpia
+      } else {
+        alert("Error al eliminar la categoría");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const obtenerVentas = async () => {
     try {
       const res = await fetch(`${API_URL}/ventas`, {
@@ -394,14 +411,11 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setVentas([]);
         return;
       }
-
       setVentas(data);
     } catch (error) {
       console.error("Error al obtener ventas:", error);
@@ -415,14 +429,11 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setReposiciones([]);
         return;
       }
-
       setReposiciones(data);
     } catch (error) {
       console.error("Error al obtener reposiciones:", error);
@@ -431,20 +442,16 @@ function App() {
 
   const obtenerDatosOrigen = async () => {
     try {
-      // Asegúrate de que la ruta coincida con cómo registraste el endpoint en Node
       const res = await fetch(`${API_URL}/ventas/dashboard/origen`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setDatosOrigenVentas([]);
         return;
       }
-
       setDatosOrigenVentas(data);
     } catch (error) {
       console.error("Error al obtener el consolidado de origen:", error);
@@ -476,7 +483,6 @@ function App() {
       "¿Seguro que deseas cancelar este pedido? El stock retenido volverá a estar disponible en tu tienda de inmediato.",
     );
     if (!confirmado) return;
-
     try {
       const res = await fetch(`${API_URL}/api/ventas/${id}/cancelar`, {
         method: "DELETE",
@@ -484,7 +490,6 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (res.ok) {
         obtenerVentas(); // Quita el pedido de la pantalla
         obtenerProductos(); // Actualiza los numeritos de stock
@@ -501,12 +506,10 @@ function App() {
   // FUNCIONES DE INVENTARIO Y PRODUCTOS
   // Crear, editar, eliminar y cancelar edición
   // ======================================================
-
   const guardarProducto = async (e) => {
     e.preventDefault();
     try {
       const formData = new FormData();
-
       // Textos y números
       formData.append("nombre", nombre ? nombre.trim() : "");
       formData.append("descripcion", descripcion ? descripcion.trim() : "");
@@ -517,30 +520,24 @@ function App() {
       formData.append("stockMinimo", Number(stockMinimo || 5));
       formData.append("categoria", categoriaId || "");
       formData.append("condicion", condicion); // <-- NUEVO
-
       // Si es un producto nuevo, mandamos stock y proveedor
       if (!editandoId) {
         formData.append("stock", Number(stock || 0));
         formData.append("proveedorInicial", proveedorProductoNuevo || "");
       }
-
       // 1. ADJUNTAR FOTO
       if (foto) {
         formData.append("foto", foto);
       }
-
       // 2. ADJUNTAR VIDEO CORTO
       if (videoArchivo) {
         formData.append("video", videoArchivo);
       }
-
       // Definimos si es creación (POST) o edición (PUT)
       const url = editandoId
         ? `${API_URL}/productos/${editandoId}`
         : `${API_URL}/productos`;
-
       const method = editandoId ? "PUT" : "POST";
-
       const res = await fetch(url, {
         method: method,
         headers: {
@@ -548,14 +545,11 @@ function App() {
         },
         body: formData,
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         alert(data.error || "Error al guardar el producto");
         return;
       }
-
       // Limpiamos los campos y archivos al terminar con éxito
       setNombre("");
       setDescripcion("");
@@ -573,9 +567,7 @@ function App() {
       setFoto(null);
       setVideoArchivo(null);
       setEditandoId(null);
-
       obtenerProductos();
-
       alert("¡Producto guardado exitosamente!");
     } catch (error) {
       console.error("Error al guardar el producto:", error);
@@ -588,9 +580,7 @@ function App() {
       "¿Seguro que quieres eliminar este producto?",
     );
     if (!confirmado) return;
-
     console.log("Eliminando id:", id);
-
     try {
       await fetch(`${API_URL}/productos/${id}`, {
         method: "DELETE",
@@ -598,11 +588,9 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (editandoId === id) {
         cancelarEdicion();
       }
-
       obtenerProductos();
     } catch (error) {
       console.error("Error al eliminar producto:", error);
@@ -668,7 +656,6 @@ function App() {
       "¿Seguro que deseas retirar la(s) oferta(s)? Los precios volverán a la normalidad.",
     );
     if (!confirmar) return;
-
     try {
       const res = await fetch(`${API_URL}/api/tienda/ofertas/quitar`, {
         method: "POST",
@@ -694,13 +681,11 @@ function App() {
   // ======================================================
   // GENERADOR DE PEDIDOS PARA PROVEEDORES
   // ======================================================
-
   const abrirGeneradorPedido = () => {
     // 1. Filtrar los productos que ya necesitan reposición (Agotados o bajos)
     const productosBajos = productos.filter(
       (p) => Number(p.stock) <= Number(p.stockMinimo || 5),
     );
-
     // 2. Armar la lista inicial
     const itemsIniciales = productosBajos.map((p) => ({
       id: p._id,
@@ -709,7 +694,6 @@ function App() {
       stockActual: Number(p.stock),
       cantidad: "", // Empieza vacío para que él decida cuánto pedir
     }));
-
     setItemsPedido(itemsIniciales);
     setBusquedaExtra("");
     setModalPedidoAbierto(true);
@@ -747,19 +731,16 @@ function App() {
     const itemsValidos = itemsPedido.filter(
       (item) => item.cantidad !== "" && Number(item.cantidad) > 0,
     );
-
     if (itemsValidos.length === 0) {
       alert("Ingresa al menos una cantidad para generar el pedido.");
       return;
     }
-
     let texto = "📦 *Pedido de Mercancía*\n\n";
     itemsValidos.forEach((item) => {
       // Si tiene descripción, la agregamos al mensaje
       const detalle = item.descripcion ? ` (${item.descripcion})` : "";
       texto += `▪️ ${item.cantidad}x ${item.nombre}${detalle}\n`;
     });
-
     navigator.clipboard
       .writeText(texto)
       .then(() => {
@@ -778,7 +759,6 @@ function App() {
   // FUNCIONES DE VENTAS Y MOVIMIENTOS
   // Registra ventas normales, mayoreo y reposiciones
   // ======================================================
-
   const guardarMovimiento = async (e) => {
     if (e) e.preventDefault();
     if (!productoMovimientoId) {
@@ -789,7 +769,6 @@ function App() {
       alert("La cantidad debe ser mayor a 0");
       return;
     }
-
     // --- VALIDACIÓN DE STOCK ---
     const prodVerificar = productos.find((p) => p._id === productoMovimientoId);
     if (
@@ -801,30 +780,25 @@ function App() {
       );
       return;
     }
-
     if (precioUnitarioNegociado !== "" && Number(precioUnitarioNegociado) < 0) {
       alert("El precio unitario negociado no puede ser negativo");
       return;
     }
-
     if (tipoMovimiento === "venta") {
       // Calculamos el ingreso total: Si puso un precio negociado, usamos ese; si no, multiplicamos.
       const ingresoEstimado =
         precioUnitarioNegociado !== ""
           ? Number(precioUnitarioNegociado)
           : Number(prodVerificar.precioVenta) * Number(cantidadMovimiento);
-
       const costoTotal =
         (Number(prodVerificar.precio) + Number(prodVerificar.costoEnvio || 0)) *
         Number(cantidadMovimiento);
-
       if (ingresoEstimado - costoTotal < 0) {
         const confirmado = window.confirm(
           "⚠ Esta venta generará pérdida. ¿Seguro que quieres registrarla?",
         );
         if (!confirmado) return;
       }
-
       // --- PRE-VENTA: SOLO ABRIR TICKET ---
       setDatosTicket({
         producto: prodVerificar.nombre,
@@ -837,7 +811,6 @@ function App() {
       setTicketAbierto(true);
       return;
     }
-
     // --- FLUJO ORIGINAL PARA REPOSICIÓN (tipoMovimiento !== "venta") ---
     try {
       const res = await fetch(
@@ -859,7 +832,6 @@ function App() {
         alert(data.error || "Error al guardar movimiento");
         return;
       }
-
       alert("¡Inventario repuesto correctamente! 📥");
       setProductoMovimientoId("");
       setCantidadMovimiento("");
@@ -898,16 +870,13 @@ function App() {
         alert(data.error || "Error al procesar la venta");
         return;
       }
-
       // Si todo sale bien, marcamos como confirmada y refrescamos bases de datos
       setVentaConfirmada(true);
       obtenerProductos();
       obtenerVentas();
       obtenerDatosOrigen();
-
       // Lanzamos la alerta nativa que ya usas en el resto del sistema
       alert("¡Venta registrada satisfactoriamente! 🎉");
-
       // Limpiamos la pantalla trasera de ventas
       setProductoMovimientoId("");
       setCantidadMovimiento("");
@@ -927,12 +896,10 @@ function App() {
       alert("Selecciona un producto para reponer");
       return;
     }
-
     if (cantidadReposicion === "" || Number(cantidadReposicion) <= 0) {
       alert("La cantidad a reponer debe ser mayor a 0");
       return;
     }
-
     try {
       const res = await fetch(
         `${API_URL}/productos/${productoReposicionId}/reponer`,
@@ -948,20 +915,15 @@ function App() {
           }),
         },
       );
-
       const data = await res.json();
-
       if (!res.ok) {
         alert(data.error || "Error al reponer inventario");
         return;
       }
-
       alert("¡Inventario repuesto correctamente! 📥");
-
       setProductoReposicionId("");
       setCantidadReposicion("");
       setProveedorReposicion("");
-
       obtenerProductos();
       obtenerReposiciones();
     } catch (error) {
@@ -972,17 +934,14 @@ function App() {
 
   const guardarReposicionMasiva = async (e) => {
     e.preventDefault();
-
     // Filtramos solo los productos a los que el usuario les escribió un número mayor a 0
     const itemsAReponer = Object.entries(cantidadesMasivas).filter(
       ([id, cant]) => Number(cant) > 0,
     );
-
     if (itemsAReponer.length === 0) {
       alert("Ingresa al menos una cantidad para reponer.");
       return;
     }
-
     try {
       // Promise.all enviará todas las reposiciones al backend simultáneamente
       await Promise.all(
@@ -1000,7 +959,6 @@ function App() {
           }),
         ),
       );
-
       alert("¡Inventario repuesto masivamente! 📥✅");
       setCantidadesMasivas({});
       setProveedorReposicion("");
@@ -1048,7 +1006,10 @@ function App() {
           if (!data.error) {
             setConfigTienda({
               nombreTienda: data.nombreTienda || "",
+              slug: data.slug || "", // <--- NUEVO
+              colorPrincipal: data.colorPrincipal || "#7c3aed", // <--- NUEVO
               logoTienda: data.logoTienda || "⚡",
+              imagenBanner: data.imagenBanner || "", // <--- AÑADE ESTA LÍNEA AQUÍ
               mensajeBanner: data.mensajeBanner || "",
               descripcionBanner: data.descripcionBanner || "",
               correoTienda: data.correoTienda || "",
@@ -2512,7 +2473,7 @@ function App() {
                   <input
                     type="text"
                     readOnly
-                    value={`${STORE_URL}/${usuario?.id}`}
+                    value={`${STORE_URL}/${configTienda.slug || usuario?.id}`}
                     style={{
                       flex: 1,
                       padding: "12px",
@@ -2529,7 +2490,7 @@ function App() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(
-                        `${STORE_URL}/${usuario?.id}`,
+                        `${STORE_URL}/${configTienda.slug || usuario?.id}`,
                       );
                       alert(
                         "¡Enlace copiado al portapapeles! Ya puedes pegarlo en WhatsApp.",
@@ -2551,7 +2512,9 @@ function App() {
                   </button>
                   <button
                     onClick={() =>
-                      window.open(`${STORE_URL}/${usuario?.id}`, "_blank")
+                      navigator.clipboard.writeText(
+                        `${STORE_URL}/${configTienda.slug || usuario?.id}`,
+                      )
                     }
                     style={{
                       backgroundColor: "#10b981",
@@ -2601,22 +2564,31 @@ function App() {
                           },
                         );
 
-                        // 2. Si el usuario seleccionó una imagen, la enviamos
+                        // 2. Si el usuario seleccionó un LOGO, lo enviamos
                         if (res.ok && logoArchivo) {
                           const formDataLogo = new FormData();
                           formDataLogo.append("logo", logoArchivo);
-
                           await fetch(`${API_URL}/api/tienda/config/logo`, {
                             method: "POST",
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                            },
+                            headers: { Authorization: `Bearer ${token}` },
                             body: formDataLogo,
                           });
-
                           setLogoArchivo(null); // Limpiamos el input
                         }
 
+                        // 3. Si el usuario seleccionó un BANNER, lo enviamos
+                        if (res.ok && bannerArchivo) {
+                          const formDataBanner = new FormData();
+                          formDataBanner.append("banner", bannerArchivo);
+                          await fetch(`${API_URL}/api/tienda/config/banner`, {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${token}` },
+                            body: formDataBanner,
+                          });
+                          setBannerArchivo(null); // Limpiamos el input
+                        }
+
+                        // 4. Avisamos que todo salió bien
                         if (res.ok) {
                           alert("¡Configuración guardada correctamente! 💾");
                         } else {
@@ -2655,6 +2627,53 @@ function App() {
                           boxSizing: "border-box",
                         }}
                       />
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Color Principal de la Tienda
+                      </p>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <input
+                          type="color"
+                          value={configTienda.colorPrincipal || "#7c3aed"}
+                          onChange={(e) =>
+                            setConfigTienda({
+                              ...configTienda,
+                              colorPrincipal: e.target.value,
+                            })
+                          }
+                          style={{
+                            width: "50px",
+                            height: "40px",
+                            borderRadius: "8px",
+                            border: "1px solid #d1d5db",
+                            cursor: "pointer",
+                            padding: "2px",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            color: "#666",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {configTienda.colorPrincipal || "#7c3aed"}
+                        </span>
+                      </div>
                     </div>
 
                     <div style={{ marginBottom: "15px" }}>
@@ -2704,6 +2723,32 @@ function App() {
                         type="file"
                         accept="image/*"
                         onChange={(e) => setLogoArchivo(e.target.files[0])}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px dashed #d1d5db",
+                          backgroundColor: "#f8f9fa",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "15px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: "600",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Imagen Promocional del Mega Banner (Recomendado:
+                        Horizontal)
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setBannerArchivo(e.target.files[0])}
                         style={{
                           width: "100%",
                           padding: "10px",
@@ -5712,7 +5757,8 @@ function App() {
                 <div
                   style={{
                     display: "flex",
-                    flexDirection: "column",
+                    flexDirection: "row",
+                    alignItems: "center",
                     gap: "10px",
                     width: "350px",
                     maxWidth: "100%",
@@ -5731,6 +5777,7 @@ function App() {
                       }
                     }}
                     style={{
+                      flex: 1,
                       padding: "8px",
                       borderRadius: "8px",
                       border: "1px solid #ccc",
@@ -5743,25 +5790,25 @@ function App() {
                         {cat.nombre}
                       </option>
                     ))}
-                    <option value="nueva">➕ Añadir nueva categoría...</option>
+                    <option value="nueva">➕ Añadir nueva...</option>
                   </select>
-
-                  {creandoCategoria && (
-                    <input
-                      type="text"
-                      placeholder="Escribe el nombre de la nueva categoría"
-                      value={nombreNuevaCategoria}
-                      onChange={(e) => setNombreNuevaCategoria(e.target.value)}
-                      style={{
-                        padding: "8px",
-                        borderRadius: "8px",
-                        border: "1px solid #0d6efd",
-                        fontSize: "12.5px",
-                        backgroundColor: "#f8f9fa",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setModalCategoriasAbierto(true)}
+                    style={{
+                      backgroundColor: "#f3f0ff",
+                      color: "#7c3aed",
+                      border: "1px solid #d8b4fe",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontWeight: "bold",
+                      fontSize: "12px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ⚙️ Gestionar
+                  </button>
                 </div>
 
                 <p style={{ marginBottom: "6px", fontWeight: "600" }}>
@@ -8121,6 +8168,204 @@ function App() {
                     </>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+          {/* ======================================================
+            MODAL GESTIONAR CATEGORÍAS
+            ====================================================== */}
+          {modalCategoriasAbierto && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                backgroundColor: "rgba(0,0,0,0.6)",
+                zIndex: 99999,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: "20px",
+                boxSizing: "border-box",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "white",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  width: "100%",
+                  maxWidth: "400px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "15px",
+                  }}
+                >
+                  <h3 style={{ margin: 0, color: "#222", fontSize: "16px" }}>
+                    ⚙️ Gestionar Categorías
+                  </h3>
+                  <button
+                    onClick={() => setModalCategoriasAbierto(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "16px",
+                      cursor: "pointer",
+                      color: "#666",
+                    }}
+                  >
+                    ✖
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    maxHeight: "300px",
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    paddingRight: "5px",
+                  }}
+                >
+                  {!categorias || categorias.length === 0 ? (
+                    <p
+                      style={{
+                        color: "#666",
+                        fontSize: "13px",
+                        textAlign: "center",
+                      }}
+                    >
+                      No hay categorías creadas.
+                    </p>
+                  ) : (
+                    categorias.map((cat) => (
+                      <div
+                        key={cat._id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "10px",
+                          backgroundColor: "#f8f9fa",
+                          borderRadius: "8px",
+                          border: "1px solid #e5e7eb",
+                        }}
+                      >
+                        {categoriaEditandoId === cat._id ? (
+                          <input
+                            type="text"
+                            value={categoriaEditandoNombre}
+                            onChange={(e) =>
+                              setCategoriaEditandoNombre(e.target.value)
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                actualizarCategoria(cat._id);
+                              }
+                            }}
+                            autoFocus
+                            style={{
+                              padding: "6px",
+                              borderRadius: "6px",
+                              border: "1px solid #ccc",
+                              flex: 1,
+                              marginRight: "10px",
+                              fontSize: "13px",
+                            }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              fontWeight: "600",
+                              fontSize: "13px",
+                              color: "#333",
+                              flex: 1,
+                            }}
+                          >
+                            {cat.nombre}
+                          </span>
+                        )}
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          {categoriaEditandoId === cat._id ? (
+                            <button
+                              onClick={() => actualizarCategoria(cat._id)}
+                              style={{
+                                backgroundColor: "#198754",
+                                color: "white",
+                                border: "none",
+                                padding: "6px 10px",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              Guardar
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setCategoriaEditandoId(cat._id);
+                                setCategoriaEditandoNombre(cat.nombre);
+                              }}
+                              style={{
+                                backgroundColor: "#0d6efd",
+                                color: "white",
+                                border: "none",
+                                padding: "6px 10px",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                              }}
+                            >
+                              ✏️
+                            </button>
+                          )}
+                          <button
+                            onClick={() => eliminarCategoria(cat._id)}
+                            style={{
+                              backgroundColor: "#dc3545",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setModalCategoriasAbierto(false)}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#f1f3f5",
+                    color: "#333",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: "none",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    marginTop: "15px",
+                  }}
+                >
+                  Cerrar Ventana
+                </button>
               </div>
             </div>
           )}

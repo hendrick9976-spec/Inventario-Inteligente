@@ -40,6 +40,8 @@ function App() {
 
   const [configTienda, setConfigTienda] = useState({
     nombreTienda: "Cargando Tienda...",
+    colorPrincipal: "",
+    imagenBanner: "", // <--- 1. AÑADE ESTO AQUÍ
     mensajeBanner: "Preparando ofertas...",
     descripcionBanner: "Por favor espera un momento...",
     correoTienda: "",
@@ -63,6 +65,8 @@ function App() {
   // === NUEVOS ESTADOS PARA EL BUSCADOR ===
   const [mostrarBuscador, setMostrarBuscador] = useState(false);
   const [busquedaTienda, setBusquedaTienda] = useState("");
+  const [menuCategoriasAbierto, setMenuCategoriasAbierto] = useState(false); // <--- AÑADE ESTA LÍNEA
+
   // === CERRAR BUSCADOR AL HACER CLIC AFUERA ===
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -80,8 +84,8 @@ function App() {
     white: "#ffffff",
     text: "#212529",
     textMuted: "#6c757d",
-    primary: "#7c3aed",
-    blue: "#0d6efd",
+    primary: configTienda.colorPrincipal || "#7c3aed", // <--- AHORA ES DINÁMICO
+    blue: configTienda.colorPrincipal || "#0d6efd", // <--- BOTONES PRINCIPALES
     green: "#198754",
     red: "#dc3545",
     border: "#e5e7eb",
@@ -125,7 +129,9 @@ function App() {
         const dataConfig = await resConfig.json();
         setConfigTienda({
           nombreTienda: dataConfig.nombreTienda || "Mi Tienda Virtual",
+          colorPrincipal: dataConfig.colorPrincipal || "#7c3aed", // <--- AÑADE ESTA LÍNEA
           logoTienda: dataConfig.logoTienda || "⚡",
+          imagenBanner: dataConfig.imagenBanner || "", // <--- 2. AÑADE ESTO AQUÍ
           mensajeBanner:
             dataConfig.mensajeBanner ||
             "¡Bienvenido a nuestra Tienda en Línea!",
@@ -1128,14 +1134,19 @@ function App() {
         width: "100%",
       }}
     >
+      {/* =========================================
+          NUEVO HEADER ESTILO AMAZON / MERCADO LIBRE
+          ========================================= */}
       <header
         style={{
           backgroundColor: theme.white,
           borderBottom: `1px solid ${theme.border}`,
-          padding: "10px 15px", // Redujimos el padding para ahorrar espacio
+          padding: "15px 40px",
           display: "flex",
-          flexDirection: "column", // Fuerza exactamente dos filas (arriba y abajo)
-          gap: "10px", // Espacio entre las dos filas
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap", // Permite que en celular el buscador baje
+          gap: "20px",
           position: "sticky",
           top: 0,
           zIndex: 50,
@@ -1144,118 +1155,240 @@ function App() {
           width: "100%",
         }}
       >
-        {/* FILA 1: LOGO E ICONOS */}
+        {/* LOGO */}
+        <div
+          onClick={() => setCategoriaActiva("TODAS")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: "35px",
+              height: "35px",
+              borderRadius: "8px",
+              backgroundColor: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "20px",
+            }}
+          >
+            {configTienda.logoTienda &&
+            configTienda.logoTienda.startsWith("http") ? (
+              <img
+                src={configTienda.logoTienda}
+                alt="Logo"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  borderRadius: "8px",
+                }}
+              />
+            ) : (
+              configTienda.logoTienda
+            )}
+          </div>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "22px",
+              fontWeight: "900",
+              color: theme.text,
+              letterSpacing: "-0.5px",
+            }}
+          >
+            {configTienda.nombreTienda}
+          </h2>
+        </div>
+
+        {/* BOTÓN DESPLEGABLE DE CATEGORÍAS */}
+        <div
+          onMouseEnter={() => setMenuCategoriasAbierto(true)}
+          onMouseLeave={() => setMenuCategoriasAbierto(false)}
+          style={{ position: "relative" }}
+        >
+          <button
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "#f3f4f6",
+              border: "none",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "700",
+              color: theme.text,
+            }}
+          >
+            🗂️ Categorías ▾
+          </button>
+
+          {menuCategoriasAbierto && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                width: "220px",
+                backgroundColor: "white",
+                boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                borderRadius: "8px",
+                border: `1px solid ${theme.border}`,
+                overflow: "hidden",
+                zIndex: 100,
+                display: "flex",
+                flexDirection: "column",
+                marginTop: "5px",
+              }}
+            >
+              <div
+                onClick={() => {
+                  setCategoriaActiva("TODAS");
+                  setMenuCategoriasAbierto(false);
+                }}
+                style={{
+                  padding: "12px 16px",
+                  cursor: "pointer",
+                  borderBottom: `1px solid ${theme.border}`,
+                  fontWeight: "bold",
+                  color:
+                    categoriaActiva === "TODAS" ? theme.primary : theme.text,
+                }}
+              >
+                Todo el catálogo
+              </div>
+              {categorias.map((cat) => (
+                <div
+                  key={cat._id}
+                  onClick={() => {
+                    setCategoriaActiva(cat._id);
+                    setMenuCategoriasAbierto(false);
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color:
+                      categoriaActiva === cat._id
+                        ? theme.primary
+                        : theme.textMuted,
+                    backgroundColor:
+                      categoriaActiva === cat._id ? "#f8f9fa" : "white",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.target.style.backgroundColor = "#f8f9fa")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.target.style.backgroundColor =
+                      categoriaActiva === cat._id ? "#f8f9fa" : "white")
+                  }
+                >
+                  {cat.nombre}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* BUSCADOR CENTRAL ALARGADO */}
+        <div
+          style={{
+            flex: 1,
+            minWidth: "250px",
+            maxWidth: "600px",
+            display: "flex",
+          }}
+        >
+          <input
+            type="text"
+            placeholder="Buscar productos, marcas, modelos..."
+            value={busquedaTienda}
+            onChange={(e) => setBusquedaTienda(e.target.value)}
+            style={{
+              flex: 1,
+              padding: "12px 15px",
+              borderRadius: "8px 0 0 8px",
+              border: `1px solid ${theme.border}`,
+              borderRight: "none",
+              outline: "none",
+              fontSize: "14px",
+            }}
+          />
+          <button
+            style={{
+              backgroundColor: theme.primary,
+              color: "white",
+              border: "none",
+              padding: "0 20px",
+              borderRadius: "0 8px 8px 0",
+              cursor: "pointer",
+              fontSize: "16px",
+            }}
+          >
+            🔍
+          </button>
+        </div>
+
+        {/* ICONOS LATERALES (Mi Cuenta, Favoritos, Carrito) */}
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
+            gap: "20px",
             alignItems: "center",
-            width: "100%",
+            flexShrink: 0,
           }}
         >
-          {/* LOGO */}
           <div
+            onClick={() => alert("Próximamente: Panel de clientes")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              cursor: "pointer",
+              color: theme.textMuted,
+              fontSize: "13px",
+              fontWeight: "600",
+            }}
+          >
+            <span style={{ fontSize: "18px" }}>👤</span> Mi cuenta
+          </div>
+          <div
+            onClick={() => alert("Próximamente: Lista de deseos")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              cursor: "pointer",
+              color: theme.textMuted,
+              fontSize: "13px",
+              fontWeight: "600",
+            }}
+          >
+            <span style={{ fontSize: "18px" }}>🤍</span> Favoritos
+          </div>
+          <div
+            onClick={() => setCarritoAbierto(true)}
             style={{
               display: "flex",
               alignItems: "center",
               gap: "10px",
               cursor: "pointer",
+              color: theme.text,
+              paddingLeft: "10px",
+              borderLeft: `1px solid ${theme.border}`,
             }}
           >
-            <div
-              style={{
-                width: "30px",
-                height: "30px",
-                borderRadius: "8px",
-                backgroundColor: "transparent",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "16px",
-                fontWeight: "bold",
-              }}
-            >
-              {configTienda.logoTienda &&
-              configTienda.logoTienda.startsWith("http") ? (
-                <img
-                  src={configTienda.logoTienda}
-                  alt="Logo Tienda"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    borderRadius: "8px",
-                  }}
-                />
-              ) : (
-                configTienda.logoTienda
-              )}
-            </div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: "18px",
-                fontWeight: "800",
-                letterSpacing: "-0.5px",
-                color: theme.text,
-              }}
-            >
-              {configTienda.nombreTienda}
-            </h2>
-          </div>
-
-          {/* ICONOS A LA DERECHA */}
-          <div
-            id="contenedor-buscador"
-            style={{ display: "flex", gap: "15px", alignItems: "center" }}
-          >
-            {mostrarBuscador && (
-              <input
-                type="text"
-                placeholder="Buscar..."
-                value={busquedaTienda}
-                onChange={(e) => setBusquedaTienda(e.target.value)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "20px",
-                  border: `1px solid ${theme.border}`,
-                  outline: "none",
-                  fontSize: "12px",
-                  width: "120px",
-                }}
-                autoFocus
-              />
-            )}
-            <span
-              onClick={() => {
-                setMostrarBuscador(!mostrarBuscador);
-                if (mostrarBuscador) setBusquedaTienda("");
-              }}
-              style={{ cursor: "pointer", fontSize: "18px" }}
-            >
-              🔍
-            </span>
-            <span
-              onClick={() => alert("Próximamente")}
-              style={{ cursor: "pointer", fontSize: "18px" }}
-              title="Mi Cuenta"
-            >
-              👤
-            </span>
-            <button
-              onClick={() => setCarritoAbierto(true)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
-                padding: 0,
-              }}
-            >
-              <span style={{ fontSize: "20px" }}>🛍️</span>
+            <div style={{ position: "relative" }}>
+              <span style={{ fontSize: "24px" }}>🛒</span>
               <span
                 style={{
                   position: "absolute",
@@ -1265,8 +1398,8 @@ function App() {
                   color: "white",
                   fontSize: "10px",
                   fontWeight: "bold",
-                  width: "16px",
-                  height: "16px",
+                  width: "18px",
+                  height: "18px",
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
@@ -1275,119 +1408,85 @@ function App() {
               >
                 {totalArticulos}
               </span>
-            </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: theme.textMuted,
+                  fontWeight: "600",
+                }}
+              >
+                Mi carrito
+              </span>
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "900",
+                  color: theme.primary,
+                }}
+              >
+                {configTienda.moneda} {formatoPrecio(subtotalCarrito)}
+              </span>
+            </div>
           </div>
         </div>
-
-        {/* FILA 2: CATEGORÍAS (UNA SOLA LÍNEA CON SCROLL HORIZONTAL CENTRADO) */}
-        <nav
-          style={{
-            width: "100%",
-            overflowX: "auto", // Activa el scroll horizontal en celular
-            whiteSpace: "nowrap", // Evita que salten a la segunda línea
-            textAlign: "center", // <-- ¡La magia! Centra todo en computadora
-            paddingBottom: "8px",
-            WebkitOverflowScrolling: "touch",
-          }}
-        >
-          <span
-            onClick={() => setCategoriaActiva("TODAS")}
-            style={{
-              display: "inline-block", // Permite que se formen uno al lado del otro
-              margin: "0 10px", // Crea el espacio entre cada categoría
-              fontWeight: "600",
-              fontSize: "12px",
-              color:
-                categoriaActiva === "TODAS" ? theme.primary : theme.textMuted,
-              cursor: "pointer",
-              borderBottom:
-                categoriaActiva === "TODAS"
-                  ? `2px solid ${theme.primary}`
-                  : "none",
-            }}
-          >
-            TODO EL CATÁLOGO
-          </span>
-          {categorias.map((cat) => (
-            <span
-              key={cat._id}
-              onClick={() => setCategoriaActiva(cat._id)}
-              style={{
-                display: "inline-block",
-                margin: "0 10px",
-                fontWeight: "600",
-                fontSize: "12px",
-                color:
-                  categoriaActiva === cat._id ? theme.primary : theme.textMuted,
-                cursor: "pointer",
-                borderBottom:
-                  categoriaActiva === cat._id
-                    ? `2px solid ${theme.primary}`
-                    : "none",
-                textTransform: "uppercase",
-              }}
-            >
-              {cat.nombre}
-            </span>
-          ))}
-        </nav>
       </header>
 
+      {/* =========================================
+          HERO BANNER & ICONOS DE CATEGORÍAS
+          ========================================= */}
       {categoriaActiva === "TODAS" && busquedaTienda === "" && (
         <section
           style={{
-            padding: "15px clamp(15px, 4vw, 40px) 25px",
+            padding: "30px 40px 10px 40px",
             boxSizing: "border-box",
             width: "100%",
-            maxWidth: "100vw",
           }}
         >
+          {/* BANNER ANCHO ESTILO MOCKUP - TOTALMENTE RESPONSIVO */}
           <div
             style={{
-              backgroundColor: theme.white,
-              border: `1px solid ${theme.border}`,
+              backgroundColor: "#111827",
               borderRadius: "16px",
-              padding: "25px 30px",
+              overflow: "hidden",
               display: "flex",
-              flexDirection: "column", // <-- Textos arriba, contenido abajo
-              gap: "20px",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-              boxSizing: "border-box",
-              width: "100%",
+              flexWrap: "wrap", // <-- MAGIA 1: Si no cabe (celular), pasa la imagen para abajo
+              alignItems: "center",
+              padding: "clamp(20px, 4vw, 40px) clamp(20px, 6vw, 60px)", // Relleno que se ajusta solo
+              color: "white",
+              position: "relative",
+              minHeight: "250px",
+              marginBottom: "30px",
+              gap: "30px",
             }}
           >
-            {/* 1. ARRIBA: Textos del Banner en horizontal */}
+            {/* Textos del Banner */}
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                textAlign: "center",
-                width: "100%",
+                zIndex: 2,
+                flex: "1 1 300px" /* Crece, pero pide 300px mínimo */,
               }}
             >
               <div
                 style={{
-                  backgroundColor: "#f3f0ff",
-                  color: theme.primary,
+                  backgroundColor: theme.primary,
+                  color: "white",
                   padding: "6px 16px",
                   borderRadius: "20px",
                   fontSize: "12px",
                   fontWeight: "bold",
-                  marginBottom: "10px",
+                  marginBottom: "15px",
                   width: "fit-content",
-                  letterSpacing: "1px",
                   textTransform: "uppercase",
-                  margin: "0 auto 10px auto",
                 }}
               >
-                ¡Especial de Verano!
+                Novedades y Ofertas
               </div>
               <h1
                 style={{
-                  color: theme.text,
-                  fontSize: "clamp(24px, 4vw, 34px)",
-                  margin: "0 0 8px 0",
+                  fontSize: "clamp(28px, 4vw, 42px)",
+                  margin: "0 0 10px 0",
                   fontWeight: "900",
                   lineHeight: "1.1",
                 }}
@@ -1396,337 +1495,132 @@ function App() {
               </h1>
               <p
                 style={{
-                  color: theme.textMuted,
-                  fontSize: "15px",
-                  maxWidth: "900px",
-                  margin: "0",
+                  fontSize: "16px",
+                  color: "#d1d5db",
+                  margin: "0 0 25px 0",
                   lineHeight: "1.5",
                 }}
               >
                 {configTienda.descripcionBanner}
               </p>
+              <button
+                onClick={() =>
+                  setCategoriaActiva(
+                    categorias.length > 0 ? categorias[0]._id : "TODAS",
+                  )
+                }
+                style={{
+                  backgroundColor: theme.primary,
+                  color: "white",
+                  border: "none",
+                  padding: "12px 24px",
+                  borderRadius: "8px",
+                  fontSize: "15px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                Ver productos ➔
+              </button>
             </div>
 
-            {/* 2. ABAJO: Dos columnas (Lado a lado: Carrusel y Video) */}
+            {/* Visual (Imagen del Mega Banner) */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "20px",
-                width: "100%",
+                flex: "1 1 300px",
+                zIndex: 2,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
               }}
             >
-              {/* COLUMNA IZQUIERDA: CARRUSEL DE OFERTAS */}
-              <div
-                style={{
-                  backgroundColor: theme.bg,
-                  borderRadius: "12px",
-                  padding: "15px",
-                  border: `1px solid ${theme.border}`,
-                  position: "relative",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  minHeight: "260px",
-                  boxSizing: "border-box",
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "15px",
-                    left: "15px",
-                    backgroundColor: theme.red,
-                    color: "white",
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                    fontSize: "11px",
-                    fontWeight: "bold",
-                    zIndex: 2,
-                  }}
-                >
-                  OFERTA TOP
-                </span>
-                <button
-                  onClick={anteriorSlide}
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.white,
-                    color: theme.text,
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  ←
-                </button>
-                <div
+              {configTienda.imagenBanner ? (
+                <img
+                  src={configTienda.imagenBanner}
+                  alt="Banner Promocional"
                   style={{
                     width: "100%",
-                    flex: 1,
-                    overflow: "hidden",
-                    position: "relative",
-                    display: "flex",
+                    maxHeight: "300px", // Limita el alto en computadora
+                    objectFit: "contain", // <-- MAGIA 2: Respeta proporciones sin deformar
+                    filter: "drop-shadow(0 20px 30px rgba(0,0,0,0.5))",
                   }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      width: "100%",
-                      transition: "transform 0.5s ease-in-out",
-                      transform: `translateX(-${slideActual * 100}%)`,
-                      alignItems: "center",
-                    }}
-                  >
-                    {productosOferta.map((producto) => (
-                      <div
-                        key={producto._id}
-                        style={{
-                          flex: "0 0 100%",
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "center",
-                          alignItems: "center",
-                          textAlign: "center",
-                          padding: "0 clamp(20px, 8vw, 40px)",
-                          boxSizing: "border-box",
-                        }}
-                      >
-                        {/* CONTENEDOR CLICKEABLE PARA ABRIR EL MODAL */}
-                        <div
-                          onClick={() => abrirModalProducto(producto)}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            cursor: "pointer",
-                          }}
-                          title="Haz clic para ver detalles"
-                        >
-                          <div
-                            style={{
-                              width: "90px",
-                              height: "90px",
-                              backgroundColor: "#f1f3f5",
-                              borderRadius: "12px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "45px",
-                              marginBottom: "10px",
-                              overflow: "hidden",
-                            }}
-                          >
-                            {producto.fotos && producto.fotos.length > 0 ? (
-                              <img
-                                src={producto.fotos[0]}
-                                alt={producto.nombre}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                }}
-                              />
-                            ) : (
-                              "📸"
-                            )}
-                          </div>
-                          <h3
-                            style={{
-                              margin: "0 0 8px 0",
-                              fontSize: "16px",
-                              color: theme.text,
-                              fontWeight: "700",
-                            }}
-                          >
-                            {producto.nombre}
-                          </h3>
-                        </div>
+                />
+              ) : (
+                <div style={{ fontSize: "120px", opacity: 0.2 }}>🛍️</div>
+              )}
+            </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            justifyContent: "center",
-                            marginBottom: "10px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: theme.textMuted,
-                              textDecoration: "line-through",
-                              fontWeight: "500",
-                            }}
-                          >
-                            ${producto.precioOriginal.toFixed(2)}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "20px",
-                              color: theme.green,
-                              fontWeight: "900",
-                            }}
-                          >
-                            ${producto.precioVenta.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  onClick={siguienteSlide}
-                  style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.white,
-                    color: theme.text,
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  →
-                </button>
-                {productosOferta.length > 0 && (
-                  <button
-                    onClick={() =>
-                      agregarAlCarrito(productosOferta[slideActual])
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      backgroundColor: theme.blue,
-                      color: "white",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontSize: "13px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                      marginTop: "auto",
-                      zIndex: 2,
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    Añadir al carrito
-                  </button>
-                )}
-              </div>
+            {/* Efecto de resplandor para fondo tecnológico */}
+            <div
+              style={{
+                position: "absolute",
+                top: "-50px",
+                right: "-50px",
+                width: "400px",
+                height: "400px",
+                backgroundColor: theme.primary,
+                filter: "blur(120px)",
+                opacity: 0.4,
+                zIndex: 1,
+              }}
+            ></div>
+          </div>
 
-              {/* COLUMNA DERECHA: REPRODUCTOR DE VIDEO SINCRONIZADO */}
+          {/* ACCESOS DIRECTOS A CATEGORÍAS (CIRCULOS) */}
+          <div
+            style={{
+              display: "flex",
+              gap: "25px",
+              overflowX: "auto",
+              paddingBottom: "15px",
+              WebkitOverflowScrolling: "touch",
+              alignItems: "center",
+            }}
+          >
+            {categorias.map((cat) => (
               <div
+                key={cat._id}
+                onClick={() => setCategoriaActiva(cat._id)}
                 style={{
-                  backgroundColor: theme.bg,
-                  borderRadius: "12px",
-                  padding: "15px",
-                  border: `1px solid ${theme.border}`,
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "center",
                   alignItems: "center",
-                  minHeight: "260px",
-                  boxSizing: "border-box",
-                  position: "relative",
-                  overflow: "hidden",
+                  cursor: "pointer",
+                  gap: "10px",
+                  flexShrink: 0,
                 }}
               >
-                <span
+                <div
                   style={{
-                    position: "absolute",
-                    top: "15px",
-                    left: "15px",
-                    backgroundColor: theme.primary,
-                    color: "white",
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                    fontSize: "11px",
-                    fontWeight: "bold",
-                    zIndex: 2,
+                    width: "70px",
+                    height: "70px",
+                    backgroundColor: theme.white,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "16px",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    fontSize: "28px",
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.03)",
+                    color: theme.primary,
                   }}
                 >
-                  🎥 VIDEO PROMOCIONAL
+                  📦
+                </div>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    color: theme.text,
+                  }}
+                >
+                  {cat.nombre}
                 </span>
-
-                {productosOferta.length > 0 &&
-                productosOferta[slideActual]?.videoUrl ? (
-                  <video
-                    key={productosOferta[slideActual]._id}
-                    src={productosOferta[slideActual].videoUrl}
-                    autoPlay
-                    muted
-                    playsInline
-                    onTimeUpdate={(e) => {
-                      if (e.target.currentTime >= 5) {
-                        e.target.currentTime = 0; // <-- Reinicia el video exactamente a los 5 segundos
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      height: "180px",
-                      objectFit: "cover",
-                      borderRadius: "8px",
-                      marginTop: "20px",
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "180px",
-                      backgroundColor: "#e9ecef",
-                      borderRadius: "8px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: theme.textMuted,
-                      marginTop: "20px",
-                      textAlign: "center",
-                      padding: "10px",
-                    }}
-                  >
-                    <span style={{ fontSize: "32px", marginBottom: "5px" }}>
-                      🎬
-                    </span>
-                    <p
-                      style={{ margin: 0, fontSize: "13px", fontWeight: "600" }}
-                    >
-                      Video promocional corto (5s)
-                    </p>
-                    <p style={{ margin: "4px 0 0", fontSize: "11px" }}>
-                      {productosOferta.length > 0
-                        ? `(Sube un video a "${productosOferta[slideActual]?.nombre}" desde tu panel)`
-                        : "No hay productos en oferta activa"}
-                    </p>
-                  </div>
-                )}
               </div>
-            </div>
+            ))}
           </div>
         </section>
       )}

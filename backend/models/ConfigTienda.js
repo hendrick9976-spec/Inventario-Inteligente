@@ -10,16 +10,35 @@ const configTiendaSchema = new mongoose.Schema(
     },
     nombreTienda: {
       type: String,
-      default: "TechStore", // Valor por defecto si no han configurado nada
+      default: "Tienda", // Valor por defecto si no han configurado nada
     },
+    // --- NUEVOS CAMPOS ---
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true, // Permite que registros viejos sin slug no rompan la base de datos
+      trim: true,
+      lowercase: true,
+    },
+    colorPrincipal: {
+      type: String,
+      default: "#6366f1", // Color por defecto (puedes poner el violeta de tu maqueta)
+    },
+    // ---------------------
     // En models/ConfigTienda.js
     logoTienda: {
       type: String,
       default: "⚡",
     },
+
+    // --- NUEVO: IMAGEN DEL MEGA BANNER ---
+    imagenBanner: {
+      type: String,
+      default: "", // Estará vacío por defecto
+    },
     mensajeBanner: {
       type: String,
-      default: "HASTA 30% OFF EN TODA LA TIENDA",
+      default: "HASTA X% OFF EN TODA LA TIENDA",
     },
     descripcionBanner: {
       type: String,
@@ -67,5 +86,17 @@ const configTiendaSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Middleware para autogenerar o limpiar el slug antes de guardar
+configTiendaSchema.pre("save", function (next) {
+  if (this.isModified("nombreTienda") || !this.slug) {
+    this.slug = this.nombreTienda
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-") // Reemplaza espacios y símbolos por guiones
+      .replace(/^-+|-+$/g, ""); // Elimina guiones al inicio o final
+  }
+  next();
+});
 
 module.exports = mongoose.model("ConfigTienda", configTiendaSchema);

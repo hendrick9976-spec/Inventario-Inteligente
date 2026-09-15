@@ -76,6 +76,52 @@ app.post("/categorias", authMiddleware, async (req, res) => {
   }
 });
 
+// Editar una categoría existente
+app.put("/categorias/:id", authMiddleware, async (req, res) => {
+  try {
+    const { nombre, descripcion } = req.body;
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({ error: "El nombre es obligatorio" });
+    }
+
+    const categoriaActualizada = await Categoria.findOneAndUpdate(
+      { _id: req.params.id, user: req.user.userId },
+      {
+        nombre: nombre.trim(),
+        descripcion: descripcion ? descripcion.trim() : "",
+      },
+      { new: true },
+    );
+
+    if (!categoriaActualizada) {
+      return res.status(404).json({ error: "Categoría no encontrada" });
+    }
+
+    res.json(categoriaActualizada);
+  } catch (error) {
+    res.status(500).json({ error: "Error al actualizar la categoría" });
+  }
+});
+
+// Eliminar una categoría
+app.delete("/categorias/:id", authMiddleware, async (req, res) => {
+  try {
+    // Opcional: Podríamos verificar si hay productos usando esta categoría antes de borrarla
+    const categoriaEliminada = await Categoria.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user.userId,
+    });
+
+    if (!categoriaEliminada) {
+      return res.status(404).json({ error: "Categoría no encontrada" });
+    }
+
+    res.json({ mensaje: "Categoría eliminada correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: "Error al eliminar la categoría" });
+  }
+});
+
 // Obtener todos los productos
 app.get("/productos", authMiddleware, async (req, res) => {
   try {
@@ -548,13 +594,15 @@ app.get("/api/tienda/config", authMiddleware, async (req, res) => {
   }
 });
 
-// 2. Guardar/Actualizar la configuración (Privado - Para el dueño en el CMS)
+// 2. Guardar/Actualizar la configuración
 // Actualizar la ruta PUT /api/tienda/config
+
 // 2. Guardar/Actualizar la configuración (Backend)
 app.put("/api/tienda/config", authMiddleware, async (req, res) => {
   try {
     const {
       nombreTienda,
+      colorPrincipal, // <--- ¡AQUÍ ESTÁ LA MAGIA DEL COLOR!
       logoTienda,
       mensajeBanner,
       descripcionBanner,
@@ -568,22 +616,40 @@ app.put("/api/tienda/config", authMiddleware, async (req, res) => {
       moneda,
     } = req.body;
 
+    // Generar slug basado en el nombre de la tienda para la URL amigable
+    let slug;
+    if (nombreTienda) {
+      slug = nombreTienda
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-") // Cambia espacios por guiones
+        .replace(/^-+|-+$/g, ""); // Limpia guiones en los bordes
+    }
+
+    const camposActualizar = {
+      nombreTienda,
+      colorPrincipal: colorPrincipal || "#7c3aed", // <--- ¡AQUÍ SE GUARDA EN MONGODB!
+      logoTienda,
+      mensajeBanner,
+      descripcionBanner,
+      correoTienda,
+      whatsappTienda,
+      politicaReembolso,
+      terminosServicio,
+      politicaPrivacidad,
+      preguntasFrecuentes,
+      badgesConfianza,
+      moneda,
+    };
+
+    // Si generamos un slug, lo añadimos a lo que se va a guardar
+    if (slug) {
+      camposActualizar.slug = slug;
+    }
+
     const configActualizada = await ConfigTienda.findOneAndUpdate(
       { user: req.user.userId },
-      {
-        nombreTienda,
-        logoTienda,
-        mensajeBanner,
-        descripcionBanner,
-        correoTienda,
-        whatsappTienda,
-        politicaReembolso,
-        terminosServicio,
-        politicaPrivacidad,
-        preguntasFrecuentes,
-        badgesConfianza,
-        moneda,
-      },
+      { $set: camposActualizar },
       { returnDocument: "after", upsert: true },
     );
     res.json(configActualizada);
@@ -616,6 +682,32 @@ app.post(
       });
     } catch (error) {
       console.error("Error al subir logo:", error);
+      res.status(500).json({ error: "Error al procesar la imagen" });
+    }
+  },
+);
+
+// Subir la imagen principal del Mega Banner
+app.post(
+  "/api/tienda/config/banner",
+  authMiddleware,
+  upload.single("banner"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se detectó ninguna imagen" });
+      }
+      const configActualizada = await ConfigTienda.findOneAndUpdate(
+        { user: req.user.userId },
+        { $set: { imagenBanner: req.file.path } },
+        { returnDocument: "after", upsert: true },
+      );
+      res.json({
+        mensaje: "Banner guardado con éxito",
+        config: configActualizada,
+      });
+    } catch (error) {
+      console.error("Error al subir banner:", error);
       res.status(500).json({ error: "Error al procesar la imagen" });
     }
   },
@@ -709,64 +801,28 @@ app.post("/api/tienda/ofertas/quitar", authMiddleware, async (req, res) => {
 // RUTA PÚBLICA PARA EL FRONTEND DE LA TIENDA
 // ==========================================
 // 3. El e-commerce consulta los datos de su dueño (Público)
-app.get("/api/tienda/:usuarioId/config", async (req, res) => {
+
+// Función auxiliar para buscar la tienda por Slug o por ID
+async function resolverTienda(identificador) {
+  let config = null;
+  // Si el texto tiene 24 caracteres (es un ID de MongoDB)
+  if (identificador.match(/^[0-9a-fA-F]{24}$/)) {
+    config = await ConfigTienda.findOne({ user: identificador });
+  }
+  // Si no es un ID, asumimos que es el nombre (slug)
+  if (!config) {
+    config = await ConfigTienda.findOne({ slug: identificador.toLowerCase() });
+  }
+  return config;
+}
+
+// 1. Obtener Configuración Pública
+app.get("/api/tienda/:identificador/config", async (req, res) => {
   try {
-    const { usuarioId } = req.params;
-    const config = await ConfigTienda.findOne({ user: usuarioId });
-
+    const config = await resolverTienda(req.params.identificador);
     if (!config) {
-      return res.json({
-        nombreTienda: "Mi Tienda Virtual",
-        mensajeBanner: "¡Bienvenido a nuestra Tienda en Línea!",
-        descripcionBanner:
-          "Personaliza este banner desde tu panel de administración en la sección Mi Tienda Web.",
-        descripcionBanner:
-          "Personaliza este banner desde tu panel de administración en la sección Mi Tienda Web.",
-        moneda: "MXN", // <--- NUEVO: MONEDA POR DEFECTO
-        // <--- NUEVO: PREGUNTAS POR DEFECTO
-        preguntasFrecuentes: [
-          {
-            pregunta: "¿Cuánto tarda en llegar mi pedido?",
-            respuesta:
-              "El tiempo de entrega estándar es de 3 a 5 días hábiles a todo México tras procesar tu pago.",
-          },
-          {
-            pregunta: "¿Qué formas de pago aceptan?",
-            respuesta:
-              "Aceptamos tarjetas de crédito/débito, PayPal y pagos en efectivo a través de tiendas de conveniencia.",
-          },
-          {
-            pregunta: "¿Puedo devolver un producto si llega dañado?",
-            respuesta:
-              "Sí, tienes 7 días naturales desde que recibes el paquete para reportar cualquier daño y solicitar un reemplazo sin costo extra.",
-          },
-        ],
-        badgesConfianza: [
-          {
-            icono: "📦",
-            titulo: "Envíos a todo México",
-            descripcion: "Recíbelo en la puerta de tu casa de forma rápida.",
-          },
-          {
-            icono: "🛡️",
-            titulo: "Garantía de Calidad",
-            descripcion: "Productos probados y garantizados contra defectos.",
-          },
-          {
-            icono: "🔒",
-            titulo: "Compra Segura",
-            descripcion: "Tu información y tus pagos están 100% protegidos.",
-          },
-          {
-            icono: "⭐",
-            titulo: "Clientes Satisfechos",
-            descripcion:
-              "Más de 500 reseñas positivas respaldan nuestro servicio.",
-          },
-        ],
-      });
+      return res.status(404).json({ error: "Tienda no encontrada" });
     }
-
     res.json(config);
   } catch (error) {
     console.error("Error al obtener config pública:", error);
@@ -774,67 +830,46 @@ app.get("/api/tienda/:usuarioId/config", async (req, res) => {
   }
 });
 
-// ==========================================
-// NUEVAS RUTAS PÚBLICAS PARA LA TIENDA (DÍA 2)
-// ==========================================
-
-// 1. Obtener productos de forma pública para la tienda (Ruta Dinámica)
-app.get("/api/tienda/:usuarioId/productos", async (req, res) => {
+// 2. Obtener Productos Públicos
+app.get("/api/tienda/:identificador/productos", async (req, res) => {
   try {
-    const { usuarioId } = req.params;
-
-    // Se extrae el catálogo exclusivamente del usuario especificado en la URL
-    const productos = await Product.find({ user: usuarioId }).sort({
+    const config = await resolverTienda(req.params.identificador);
+    if (!config) {
+      return res.status(404).json({ error: "Tienda no encontrada" });
+    }
+    const productos = await Product.find({ user: config.user }).sort({
       nombre: 1,
     });
-
     res.json(productos);
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Error al obtener los productos de la tienda" });
+    res.status(500).json({ error: "Error al obtener los productos" });
   }
 });
 
-// 2. Simular una compra desde la tienda (Ruta Dinámica)
-app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
+// 3. Simular una compra desde la tienda
+app.post("/api/tienda/:identificador/compra", async (req, res) => {
   try {
+    const config = await resolverTienda(req.params.identificador);
+    if (!config) {
+      return res.status(404).json({ error: "Tienda no encontrada" });
+    }
+    const usuarioId = config.user;
     const { productoId, cantidad, cliente, telefonoCliente } = req.body;
-    const { usuarioId } = req.params;
 
     if (!productoId || cantidad === undefined || Number(cantidad) <= 0) {
       return res.status(400).json({ error: "Datos de compra inválidos" });
     }
 
-    // === OPERACIÓN ATÓMICA DE CONCURRENCIA ===
     const producto = await Product.findOneAndUpdate(
-      {
-        _id: productoId,
-        user: usuarioId, // Validación extra de seguridad
-        stock: { $gte: Number(cantidad) },
-      },
-      {
-        $inc: { stock: -Number(cantidad) },
-      },
+      { _id: productoId, user: usuarioId, stock: { $gte: Number(cantidad) } },
+      { $inc: { stock: -Number(cantidad) } },
       { returnDocument: "after" },
     );
 
     if (!producto) {
-      const existeProducto = await Product.findOne({
-        _id: productoId,
-        user: usuarioId,
-      });
-      if (!existeProducto) {
-        return res
-          .status(404)
-          .json({ error: "El producto ya no existe en esta tienda" });
-      }
-      return res
-        .status(400)
-        .json({ error: "Lo sentimos, no hay suficiente stock disponible" });
+      return res.status(400).json({ error: "Stock insuficiente" });
     }
 
-    // NUEVO: Verificamos cuál es el precio real que debemos cobrar
     const precioRealVenta =
       producto.precioOferta && producto.precioOferta > 0
         ? Number(producto.precioOferta)
@@ -851,13 +886,13 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
       nombreProducto: producto.nombre,
       cantidad: Number(cantidad),
       costoUnitario: Number(producto.precio),
-      precioVentaUnitario: precioRealVenta, // <-- Usamos el precio final detectado
+      precioVentaUnitario: precioRealVenta,
       ingresoTotal,
       costoTotal,
       utilidad,
       tipoVenta: "detalle",
       cliente: cliente || "",
-      telefonoCliente: telefonoCliente || "", // <--- NUEVO
+      telefonoCliente: telefonoCliente || "",
       ventaConPerdida: utilidad < 0,
       user: producto.user,
       origenVenta: "Web",
@@ -865,74 +900,24 @@ app.post("/api/tienda/:usuarioId/compra", async (req, res) => {
     });
 
     await nuevaVenta.save();
-
-    res.status(201).json({
-      mensaje: "¡Pedido registrado correctamente!",
-      venta: nuevaVenta,
-      productoUpdated: producto,
-    });
+    res.status(201).json({ mensaje: "¡Pedido registrado!", venta: nuevaVenta });
   } catch (error) {
     console.error("Error en la compra simulada:", error);
     res.status(500).json({ error: "Error al procesar la compra simulada" });
   }
 });
 
-// Actualizar estado de la venta
-app.put("/ventas/:id/estado", authMiddleware, async (req, res) => {
+// 4. Obtener categorías de forma pública
+app.get("/api/tienda/:identificador/categorias", async (req, res) => {
   try {
-    const { estado } = req.body;
-    const ventaActualizada = await Venta.findOneAndUpdate(
-      { _id: req.params.id, user: req.user.userId },
-      { estado },
-      { returnDocument: "after" },
-    );
-    if (!ventaActualizada) {
-      return res.status(404).json({ error: "Venta no encontrada" });
+    const config = await resolverTienda(req.params.identificador);
+    if (!config) {
+      return res.status(404).json({ error: "Tienda no encontrada" });
     }
-    res.json(ventaActualizada);
-  } catch (error) {
-    console.error("Error al actualizar estado:", error);
-    res.status(500).json({ error: "Error al actualizar estado" });
-  }
-});
-
-// Cancelar pedido web y devolver stock
-app.delete("/api/ventas/:id/cancelar", authMiddleware, async (req, res) => {
-  try {
-    const venta = await Venta.findOne({
-      _id: req.params.id,
-      user: req.user.userId,
-    });
-    if (!venta) {
-      return res.status(404).json({ error: "Venta no encontrada" });
-    }
-
-    // 1. Devolver el stock al producto sumando la cantidad apartada
-    await Product.updateOne(
-      { _id: venta.productoId },
-      { $inc: { stock: venta.cantidad } },
-    );
-
-    // 2. Eliminar el registro de la venta para no ensuciar el historial
-    await Venta.deleteOne({ _id: venta._id });
-
-    res.json({ mensaje: "Pedido cancelado y stock restaurado" });
-  } catch (error) {
-    console.error("Error al cancelar pedido:", error);
-    res.status(500).json({ error: "Error al cancelar el pedido" });
-  }
-});
-
-// 3. Obtener categorías de forma pública para la tienda
-app.get("/api/tienda/:usuarioId/categorias", async (req, res) => {
-  try {
-    const { usuarioId } = req.params;
-    const categorias = await Categoria.find({ user: usuarioId });
+    const categorias = await Categoria.find({ user: config.user });
     res.json(categorias);
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Error al obtener las categorías de la tienda" });
+    res.status(500).json({ error: "Error al obtener las categorías" });
   }
 });
 
